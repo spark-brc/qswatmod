@@ -116,11 +116,11 @@ class PathlineFile():
         """
         if self.version == 3 or self.version == 5:
             dtype = np.dtype([("particleid", np.int32),
-                              ("x", np.float32),
-                              ("y", np.float32),
-                              ("zloc", np.float32),
-                              ("z", np.float32),
-                              ("time", np.float32),
+                              ("x", np.float64),
+                              ("y", np.float64),
+                              ("zloc", np.float64),
+                              ("z", np.float64),
+                              ("time", np.float64),
                               ("j", np.int32),
                               ("i", np.int32),
                               ("k", np.int32),
@@ -130,12 +130,12 @@ class PathlineFile():
                               ("particlegroup", np.int32),
                               ("timepointindex", np.int32),
                               ("cumulativetimestep", np.int32),
-                              ("time", np.float32), ("x", np.float32),
-                              ("y", np.float32), ("z", np.float32),
+                              ("time", np.float64), ("x", np.float64),
+                              ("y", np.float64), ("z", np.float64),
                               ("k", np.int32), ("i", np.int32),
                               ("j", np.int32),
-                              ("grid", np.int32), ("xloc", np.float32),
-                              ("yloc", np.float32), ("zloc", np.float32),
+                              ("grid", np.int32), ("xloc", np.float64),
+                              ("yloc", np.float64), ("zloc", np.float64),
                               ("linesegmentindex", np.int32)])
         elif self.version == 7:
             msg = '_get_dtypes() should not be called for ' + \
@@ -144,28 +144,28 @@ class PathlineFile():
         return dtype
 
     def _get_outdtype(self):
-        outdtype = np.dtype([("x", np.float32), ("y", np.float32),
-                             ("z", np.float32),
-                             ("time", np.float32), ("k", np.int32),
+        outdtype = np.dtype([("x", np.float64), ("y", np.float64),
+                             ("z", np.float64),
+                             ("time", np.float64), ("k", np.int32),
                              ("particleid", np.int32)])
         return outdtype
 
     def _get_mp7data(self):
-        dtyper = np.dtype([("node", np.int32), ("x", np.float32),
-                           ("y", np.float32), ("z", np.float32),
-                           ("time", np.float32), ("xloc", np.float32),
-                           ("yloc", np.float32), ("zloc", np.float32),
+        dtyper = np.dtype([("node", np.int32), ("x", np.float64),
+                           ("y", np.float64), ("z", np.float64),
+                           ("time", np.float64), ("xloc", np.float64),
+                           ("yloc", np.float64), ("zloc", np.float64),
                            ("k", np.int32),
                            ("stressperiod", np.int32), ("timestep", np.int32)])
         dtype = np.dtype([("particleid", np.int32),
                           ("particlegroup", np.int32),
                           ("sequencenumber", np.int32),
                           ("particleidloc", np.int32),
-                          ("time", np.float32), ("x", np.float32),
-                          ("y", np.float32), ("z", np.float32),
+                          ("time", np.float64), ("x", np.float64),
+                          ("y", np.float64), ("z", np.float64),
                           ("k", np.int32), ("node", np.int32),
-                          ("xloc", np.float32), ("yloc", np.float32),
-                          ("zloc", np.float32),
+                          ("xloc", np.float64), ("yloc", np.float64),
+                          ("zloc", np.float64),
                           ("stressperiod", np.int32), ("timestep", np.int32)])
         idx = 0
         part_dict = collections.OrderedDict()
@@ -495,7 +495,7 @@ class PathlineFile():
             if att in names:
                 t = np.int32
                 if att == 'time':
-                    t = np.float32
+                    t = np.float64
                 dtype.append((att, t))
         dtype = np.dtype(dtype)
 
@@ -672,17 +672,17 @@ class EndpointFile():
     def _get_mp35_dtype(self, add_id=False):
         dtype = [('zone', np.int32), ('j', np.int32),
                  ('i', np.int32), ('k', np.int32),
-                 ('x', np.float32), ('y', np.float32),
-                 ('z', np.float32), ('zloc', np.float32),
-                 ('time', np.float32),
-                 ('x0', np.float32), ('y0', np.float32),
-                 ('zloc0', np.float32),
+                 ('x', np.float64), ('y', np.float64),
+                 ('z', np.float64), ('zloc', np.float64),
+                 ('time', np.float64),
+                 ('x0', np.float64), ('y0', np.float64),
+                 ('zloc0', np.float64),
                  ('j0', np.int32), ('i0', np.int32),
                  ('k0', np.int32),
                  ('zone0', np.int32),
                  ("cumulativetimestep", np.int32),
                  ("ipcode", np.int32),
-                 ('time0', np.float32)]
+                 ('time0', np.float64)]
         if add_id:
             dtype.insert(0, ("particleid", np.int32))
         return np.dtype(dtype)
@@ -691,22 +691,22 @@ class EndpointFile():
         dtype = [('particleid', np.int32),
                  ('particlegroup', np.int32),
                  ('status', np.int32),
-                 ('time0', np.float32),
-                 ('time', np.float32),
+                 ('time0', np.float64),
+                 ('time', np.float64),
                  ('initialgrid', np.int32),
                  ('k0', np.int32), ('i0', np.int32),
                  ('j0', np.int32), ('cellface0', np.int32),
-                 ('zone0', np.int32), ('xloc0', np.float32),
-                 ('yloc0', np.float32), ('zloc0', np.float32),
-                 ('x0', np.float32), ('y0', np.float32),
-                 ('z0', np.float32),
+                 ('zone0', np.int32), ('xloc0', np.float64),
+                 ('yloc0', np.float64), ('zloc0', np.float64),
+                 ('x0', np.float64), ('y0', np.float64),
+                 ('z0', np.float64),
                  ('finalgrid', np.int32), ('k', np.int32),
                  ('i', np.int32), ('j', np.int32),
                  ('cellface', np.int32),
-                 ('zone', np.int32), ('xloc', np.float32),
-                 ('yloc', np.float32), ('zloc', np.float32),
-                 ('x', np.float32), ('y', np.float32),
-                 ('z', np.float32), ('label', '|S40')]
+                 ('zone', np.int32), ('xloc', np.float64),
+                 ('yloc', np.float64), ('zloc', np.float64),
+                 ('x', np.float64), ('y', np.float64),
+                 ('z', np.float64), ('label', '|S40')]
         return np.dtype(dtype)
 
     def _get_mp7_dtype(self):
@@ -714,17 +714,17 @@ class EndpointFile():
                  ('particlegroup', np.int32),
                  ('particleidloc', np.int32),
                  ('status', np.int32),
-                 ('time0', np.float32),
-                 ('time', np.float32),
+                 ('time0', np.float64),
+                 ('time', np.float64),
                  ('node0', np.int32), ('k0', np.int32),
-                 ('xloc0', np.float32), ('yloc0', np.float32),
-                 ('zloc0', np.float32), ('x0', np.float32),
-                 ('y0', np.float32), ('z0', np.float32),
+                 ('xloc0', np.float64), ('yloc0', np.float64),
+                 ('zloc0', np.float64), ('x0', np.float64),
+                 ('y0', np.float64), ('z0', np.float64),
                  ('zone0', np.int32), ('initialcellface', np.int32),
                  ('node', np.int32), ('k', np.int32),
-                 ('xloc', np.float32), ('yloc', np.float32),
-                 ('zloc', np.float32), ('x', np.float32),
-                 ('y', np.float32), ('z', np.float32),
+                 ('xloc', np.float64), ('yloc', np.float64),
+                 ('zloc', np.float64), ('x', np.float64),
+                 ('y', np.float64), ('z', np.float64),
                  ('zone', np.int32), ('cellface', np.int32)]
         return np.dtype(dtype)
 
@@ -1133,11 +1133,11 @@ class TimeseriesFile():
                 dtype = np.dtype([('timestepindex', np.int32),
                                   ('particleid', np.int32),
                                   ('node', np.int32),
-                                  ('x', np.float32),
-                                  ('y', np.float32),
-                                  ('z', np.float32),
-                                  ('zloc', np.float32),
-                                  ('time', np.float32),
+                                  ('x', np.float64),
+                                  ('y', np.float64),
+                                  ('z', np.float64),
+                                  ('zloc', np.float64),
+                                  ('time', np.float64),
                                   ('timestep', np.int32)])
             else:
                 dtype = np.dtype([('timestepindex', np.int32),
@@ -1145,45 +1145,45 @@ class TimeseriesFile():
                                   ('j', np.int32),
                                   ('i', np.int32),
                                   ('k', np.int32),
-                                  ('x', np.float32),
-                                  ('y', np.float32),
-                                  ('z', np.float32),
-                                  ('zloc', np.float32),
-                                  ('time', np.float32),
+                                  ('x', np.float64),
+                                  ('y', np.float64),
+                                  ('z', np.float64),
+                                  ('zloc', np.float64),
+                                  ('time', np.float64),
                                   ('timestep', np.int32)])
         elif self.version == 6:
             dtype = np.dtype([('timepointindex', np.int32),
                               ('timestep', np.int32),
-                              ('time', np.float32),
+                              ('time', np.float64),
                               ('particleid', np.int32),
                               ('particlegroup', np.int32),
-                              ('x', np.float32), ('y', np.float32),
-                              ('z', np.float32),
+                              ('x', np.float64), ('y', np.float64),
+                              ('z', np.float64),
                               ('grid', np.int32),
                               ('k', np.int32),
                               ('i', np.int32),
                               ('j', np.int32),
-                              ('xloc', np.float32), ('yloc', np.float32),
-                              ('zloc', np.float32)])
+                              ('xloc', np.float64), ('yloc', np.float64),
+                              ('zloc', np.float64)])
         elif self.version == 7:
             dtype = np.dtype([('timepointindex', np.int32),
                               ('timestep', np.int32),
-                              ('time', np.float32),
+                              ('time', np.float64),
                               ('particleid', np.int32),
                               ('particlegroup', np.int32),
                               ('particleidloc', np.int32),
                               ('node', np.int32),
-                              ('xloc', np.float32), ('yloc', np.float32),
-                              ('zloc', np.float32),
-                              ('x', np.float32), ('y', np.float32),
-                              ('z', np.float32),
+                              ('xloc', np.float64), ('yloc', np.float64),
+                              ('zloc', np.float64),
+                              ('x', np.float64), ('y', np.float64),
+                              ('z', np.float64),
                               ('k', np.int32)])
         return dtype
 
     def _get_outdtype(self):
-        outdtype = np.dtype([('x', np.float32), ('y', np.float32),
-                             ('z', np.float32),
-                             ('time', np.float32), ('k', np.int32),
+        outdtype = np.dtype([('x', np.float64), ('y', np.float64),
+                             ('z', np.float64),
+                             ('time', np.float64), ('k', np.int32),
                              ('particleid', np.int32)])
         return outdtype
 

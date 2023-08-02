@@ -94,10 +94,10 @@ def ndarray_to_asciigrid(fname, a, extent, nodata=1.e30):
     header += 'xllcorner {}\n'.format(xmin)
     header += 'yllcorner {}\n'.format(ymin)
     header += 'cellsize {}\n'.format(dx)
-    header += 'NODATA_value {}\n'.format(np.float(nodata))
+    header += 'NODATA_value {}\n'.format(np.float64(nodata))
     # replace nan with nodata
     idx = np.isnan(a)
-    a[idx] = np.float(nodata)
+    a[idx] = np.float64(nodata)
     # write
     with open(fname, 'wb') as f:
         f.write(header.encode('ascii'))
@@ -144,7 +144,7 @@ class Gridgen(object):
 
         self.nodes = 0
         self.nja = 0
-        self.nodelay = np.zeros((self.nlay), dtype=np.int)
+        self.nodelay = np.zeros((self.nlay), dtype=np.int_)
         self._vertdict = {}
         self.model_ws = model_ws
         exe_name = which(exe_name)
@@ -562,9 +562,9 @@ class Gridgen(object):
         # nodes, nlay, ivsd, itmuni, lenuni, idsymrd, laycbd
         fname = os.path.join(self.model_ws, 'qtg.nod')
         f = open(fname, 'r')
-        dt = np.dtype([('node', np.int), ('layer', np.int),
-                       ('x', np.float), ('y', np.float), ('z', np.float),
-                       ('dx', np.float), ('dy', np.float), ('dz', np.float),
+        dt = np.dtype([('node', np.int_), ('layer', np.int_),
+                       ('x', np.float64), ('y', np.float64), ('z', np.float64),
+                       ('dx', np.float64), ('dy', np.float64), ('dz', np.float64),
                        ])
         node_ra = np.genfromtxt(fname, dtype=dt, skip_header=1)
         node_ra['layer'] -= 1
@@ -590,7 +590,7 @@ class Gridgen(object):
         self.nodes = nodes
 
         # nodelay
-        nodelay = np.empty((nlay), dtype=np.int)
+        nodelay = np.empty((nlay), dtype=np.int_)
         fname = os.path.join(self.model_ws, 'qtg.nodesperlay.dat')
         f = open(fname, 'r')
         nodelay = read1d(f, nodelay)
@@ -602,13 +602,13 @@ class Gridgen(object):
             fname = os.path.join(self.model_ws,
                                  'quadtreegrid.top{}.dat'.format(k + 1))
             f = open(fname, 'r')
-            tpk = np.empty((nodelay[k]), dtype=np.float32)
+            tpk = np.empty((nodelay[k]), dtype=np.float64)
             tpk = read1d(f, tpk)
             f.close()
             if tpk.min() == tpk.max():
                 tpk = tpk.min()
             else:
-                tpk = Util2d(model, (nodelay[k],), np.float32,
+                tpk = Util2d(model, (nodelay[k],), np.float64,
                              np.reshape(tpk, (nodelay[k],)),
                              name='top {}'.format(k + 1))
             top[k] = tpk
@@ -619,13 +619,13 @@ class Gridgen(object):
             fname = os.path.join(self.model_ws,
                                  'quadtreegrid.bot{}.dat'.format(k + 1))
             f = open(fname, 'r')
-            btk = np.empty((nodelay[k]), dtype=np.float32)
+            btk = np.empty((nodelay[k]), dtype=np.float64)
             btk = read1d(f, btk)
             f.close()
             if btk.min() == btk.max():
                 btk = btk.min()
             else:
-                btk = Util2d(model, (nodelay[k],), np.float32,
+                btk = Util2d(model, (nodelay[k],), np.float64,
                              np.reshape(btk, (nodelay[k],)),
                              name='bot {}'.format(k + 1))
             bot[k] = btk
@@ -634,7 +634,7 @@ class Gridgen(object):
         area = [0] * nlay
         fname = os.path.join(self.model_ws, 'qtg.area.dat')
         f = open(fname, 'r')
-        anodes = np.empty((nodes), dtype=np.float32)
+        anodes = np.empty((nodes), dtype=np.float64)
         anodes = read1d(f, anodes)
         f.close()
         istart = 0
@@ -644,14 +644,14 @@ class Gridgen(object):
             if ark.min() == ark.max():
                 ark = ark.min()
             else:
-                ark = Util2d(model, (nodelay[k],), np.float32,
+                ark = Util2d(model, (nodelay[k],), np.float64,
                              np.reshape(ark, (nodelay[k],)),
                              name='area layer {}'.format(k + 1))
             area[k] = ark
             istart = istop
 
         # iac
-        iac = np.empty((nodes), dtype=np.int)
+        iac = np.empty((nodes), dtype=np.int_)
         fname = os.path.join(self.model_ws, 'qtg.iac.dat')
         f = open(fname, 'r')
         iac = read1d(f, iac)
@@ -662,14 +662,14 @@ class Gridgen(object):
         self.nja = njag
 
         # ja
-        ja = np.empty((njag), dtype=np.int)
+        ja = np.empty((njag), dtype=np.int_)
         fname = os.path.join(self.model_ws, 'qtg.ja.dat')
         f = open(fname, 'r')
         ja = read1d(f, ja)
         f.close()
 
         # ivc
-        fldr = np.empty((njag), dtype=np.int)
+        fldr = np.empty((njag), dtype=np.int_)
         fname = os.path.join(self.model_ws, 'qtg.fldr.dat')
         f = open(fname, 'r')
         fldr = read1d(f, fldr)
@@ -679,14 +679,14 @@ class Gridgen(object):
         cl1 = None
         cl2 = None
         # cl12
-        cl12 = np.empty((njag), dtype=np.float32)
+        cl12 = np.empty((njag), dtype=np.float64)
         fname = os.path.join(self.model_ws, 'qtg.c1.dat')
         f = open(fname, 'r')
         cl12 = read1d(f, cl12)
         f.close()
 
         # fahl
-        fahl = np.empty((njag), dtype=np.float32)
+        fahl = np.empty((njag), dtype=np.float64)
         fname = os.path.join(self.model_ws, 'qtg.fahl.dat')
         f = open(fname, 'r')
         fahl = read1d(f, fahl)
@@ -744,7 +744,7 @@ class Gridgen(object):
 
         """
         nlay = self.get_nlay()
-        nodelay = np.empty((nlay), dtype=np.int)
+        nodelay = np.empty((nlay), dtype=np.int_)
         fname = os.path.join(self.model_ws, 'qtg.nodesperlay.dat')
         f = open(fname, 'r')
         nodelay = read1d(f, nodelay)
@@ -764,14 +764,14 @@ class Gridgen(object):
         nodes = self.get_nodes()
         nlay = self.get_nlay()
         nodelay = self.get_nodelay()
-        top = np.empty((nodes), dtype=np.float32)
+        top = np.empty((nodes), dtype=np.float64)
         istart = 0
         for k in range(nlay):
             istop = istart + nodelay[k]
             fname = os.path.join(self.model_ws,
                                  'quadtreegrid.top{}.dat'.format(k + 1))
             f = open(fname, 'r')
-            tpk = np.empty((nodelay[k]), dtype=np.float32)
+            tpk = np.empty((nodelay[k]), dtype=np.float64)
             tpk = read1d(f, tpk)
             f.close()
             top[istart:istop] = tpk
@@ -791,14 +791,14 @@ class Gridgen(object):
         nodes = self.get_nodes()
         nlay = self.get_nlay()
         nodelay = self.get_nodelay()
-        bot = np.empty((nodes), dtype=np.float32)
+        bot = np.empty((nodes), dtype=np.float64)
         istart = 0
         for k in range(nlay):
             istop = istart + nodelay[k]
             fname = os.path.join(self.model_ws,
                                  'quadtreegrid.bot{}.dat'.format(k + 1))
             f = open(fname, 'r')
-            btk = np.empty((nodelay[k]), dtype=np.float32)
+            btk = np.empty((nodelay[k]), dtype=np.float64)
             btk = read1d(f, btk)
             f.close()
             bot[istart:istop] = btk
@@ -818,7 +818,7 @@ class Gridgen(object):
         nodes = self.get_nodes()
         fname = os.path.join(self.model_ws, 'qtg.area.dat')
         f = open(fname, 'r')
-        area = np.empty((nodes), dtype=np.float32)
+        area = np.empty((nodes), dtype=np.float64)
         area = read1d(f, area)
         f.close()
         return area
@@ -834,7 +834,7 @@ class Gridgen(object):
 
         """
         nodes = self.get_nodes()
-        iac = np.empty((nodes), dtype=np.int)
+        iac = np.empty((nodes), dtype=np.int_)
         fname = os.path.join(self.model_ws, 'qtg.iac.dat')
         f = open(fname, 'r')
         iac = read1d(f, iac)
@@ -860,7 +860,7 @@ class Gridgen(object):
         if nja is None:
             iac = self.get_iac()
             nja = iac.sum()
-        ja = np.empty((nja), dtype=np.int)
+        ja = np.empty((nja), dtype=np.int_)
         fname = os.path.join(self.model_ws, 'qtg.ja.dat')
         f = open(fname, 'r')
         ja = read1d(f, ja)
@@ -881,7 +881,7 @@ class Gridgen(object):
         """
         iac = self.get_iac()
         njag = iac.sum()
-        fldr = np.empty((njag), dtype=np.int)
+        fldr = np.empty((njag), dtype=np.int_)
         fname = os.path.join(self.model_ws, 'qtg.fldr.dat')
         f = open(fname, 'r')
         fldr = read1d(f, fldr)
@@ -907,7 +907,7 @@ class Gridgen(object):
         """
         if fldr is None:
             fldr = self.get_fldr()
-        ivc = np.zeros(fldr.shape, dtype=np.int)
+        ivc = np.zeros(fldr.shape, dtype=np.int_)
         idx = (abs(fldr) == 3)
         ivc[idx] = 1
         return ivc
@@ -932,7 +932,7 @@ class Gridgen(object):
         """
         if fldr is None:
             fldr = self.get_fldr()
-        ihc = np.empty(fldr.shape, dtype=np.int)
+        ihc = np.empty(fldr.shape, dtype=np.int_)
         ihc = np.where(abs(fldr) == 0, 0, ihc)
         ihc = np.where(abs(fldr) == 1, 1, ihc)
         ihc = np.where(abs(fldr) == 2, 1, ihc)
@@ -952,7 +952,7 @@ class Gridgen(object):
         """
         iac = self.get_iac()
         njag = iac.sum()
-        cl12 = np.empty((njag), dtype=np.float32)
+        cl12 = np.empty((njag), dtype=np.float64)
         fname = os.path.join(self.model_ws, 'qtg.c1.dat')
         f = open(fname, 'r')
         cl12 = read1d(f, cl12)
@@ -973,7 +973,7 @@ class Gridgen(object):
         """
         iac = self.get_iac()
         njag = iac.sum()
-        fahl = np.empty((njag), dtype=np.float32)
+        fahl = np.empty((njag), dtype=np.float64)
         fname = os.path.join(self.model_ws, 'qtg.fahl.dat')
         f = open(fname, 'r')
         fahl = read1d(f, fahl)
@@ -1058,7 +1058,7 @@ class Gridgen(object):
         """
         if fldr is None:
             fldr = self.get_fldr()
-        angldegx = np.zeros(fldr.shape, dtype=np.float)
+        angldegx = np.zeros(fldr.shape, dtype=np.float64)
         angldegx = np.where(fldr == 0, 1.e30, angldegx)
         angldegx = np.where(abs(fldr) == 3, 1.e30, angldegx)
         angldegx = np.where(fldr == 2, 90, angldegx)
@@ -1105,7 +1105,7 @@ class Gridgen(object):
             x and y cell centers.  Shape is (ncells, 2)
 
         """
-        cellxy = np.empty((ncells, 2), dtype=np.float)
+        cellxy = np.empty((ncells, 2), dtype=np.float64)
         for n in range(ncells):
             x, y = self.get_center(n)
             cellxy[n, 0] = x
@@ -1349,7 +1349,7 @@ class Gridgen(object):
         gridprops['ncpl'] = ncpl
 
         # top
-        top = np.empty(ncpl, dtype=np.float32)
+        top = np.empty(ncpl, dtype=np.float64)
         k = 0
         fname = os.path.join(self.model_ws,
                              'quadtreegrid.top{}.dat'.format(k + 1))
@@ -1366,7 +1366,7 @@ class Gridgen(object):
             fname = os.path.join(self.model_ws,
                                  'quadtreegrid.bot{}.dat'.format(k + 1))
             f = open(fname, 'r')
-            btk = np.empty((nodelay[k]), dtype=np.float32)
+            btk = np.empty((nodelay[k]), dtype=np.float64)
             btk = read1d(f, btk)
             f.close()
             botm.append(btk)

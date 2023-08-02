@@ -256,11 +256,11 @@ class Mt3dSft(Package):
         self.iprtxmd = iprtxmd
 
         # Set 1D array values
-        self.coldsf = [Util2d(model, (nsfinit,), np.float32, coldsf,
+        self.coldsf = [Util2d(model, (nsfinit,), np.float64, coldsf,
                               name='coldsf', locat=self.unit_number[0],
                               array_free_format=False)]
 
-        self.dispsf = [Util2d(model, (nsfinit,), np.float32, dispsf,
+        self.dispsf = [Util2d(model, (nsfinit,), np.float64, dispsf,
                               name='dispsf', locat=self.unit_number[0],
                               array_free_format=False)]
         ncomp = model.ncomp
@@ -277,7 +277,7 @@ class Mt3dSft(Package):
                             "SFT: setting {0} for component {1} to zero, kwarg name {2}".
                             format(base_name, icomp, name))
                         val = 0.0
-                    u2d = Util2d(model, (nsfinit,), np.float32, val,
+                    u2d = Util2d(model, (nsfinit,), np.float64, val,
                                  name=name, locat=self.unit_number[0],
                                  array_free_format=model.free_format)
                     attr.append(u2d)
@@ -307,12 +307,12 @@ class Mt3dSft(Package):
         Construct a dtype for the recarray containing the list of surface
         water boundary conditions.
         """
-        type_list = [("node", np.int), ("isfbctyp", np.int), \
-                     ("cbcsf0", np.float32)]
+        type_list = [("node", np.int_), ("isfbctyp", np.int_), \
+                     ("cbcsf0", np.float64)]
         if ncomp > 1:
             for icomp in range(1, ncomp):
                 comp_name = "cbcsf{0:d}".format(icomp)
-                type_list.append((comp_name, np.float32))
+                type_list.append((comp_name, np.float64))
         dtype = np.dtype(type_list)
         return dtype
 
@@ -552,7 +552,7 @@ class Mt3dSft(Package):
                 print('   Using historic MT3DMS array reader utilities to ' \
                       'read COLDSF')
 
-        coldsf = Util2d.load(f, model, (np.abs(nsfinit),), np.float32,
+        coldsf = Util2d.load(f, model, (np.abs(nsfinit),), np.float64,
                              'coldsf1',
                              ext_unit_dict, array_format=model.array_format)
 
@@ -562,7 +562,7 @@ class Mt3dSft(Package):
                 name = "coldsf" + str(icomp)
                 if model.verbose:
                     print('   loading {}...'.format(name))
-                u2d = Util2d.load(f, model, (nsfinit,), np.float32,
+                u2d = Util2d.load(f, model, (nsfinit,), np.float64,
                                   name, ext_unit_dict,
                                   array_format=model.array_format)
                 kwargs[name] = u2d
@@ -576,7 +576,7 @@ class Mt3dSft(Package):
                 print('   Using historic MT3DMS array reader utilities to ' \
                       'read DISPSF')
 
-        dispsf = Util2d.load(f, model, (np.abs(nsfinit),), np.float32,
+        dispsf = Util2d.load(f, model, (np.abs(nsfinit),), np.float64,
                              'dispsf1',
                              ext_unit_dict, array_format=model.array_format)
         if ncomp > 1:
@@ -584,7 +584,7 @@ class Mt3dSft(Package):
                 name = "dispsf" + str(icomp)
                 if model.verbose:
                     print('   loading {}...'.format(name))
-                u2d = Util2d.load(f, model, (np.abs(nsfinit),), np.float32,
+                u2d = Util2d.load(f, model, (np.abs(nsfinit),), np.float64,
                                   name, ext_unit_dict,
                                   array_format=model.array_format)
                 kwargs[name] = u2d

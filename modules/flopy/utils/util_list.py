@@ -724,7 +724,7 @@ class MfList(DataInterface, DataListInterface):
         if self.__binary:
             dtype2 = []
             for name in self.dtype.names:
-                dtype2.append((name, np.float32))
+                dtype2.append((name, np.float64))
             dtype2 = np.dtype(dtype2)
             d = np.array(d, dtype=dtype2)
             d.tofile(f)
@@ -1045,11 +1045,11 @@ class MfList(DataInterface, DataListInterface):
         for name, arr in arrays.items():
             if unstructured:
                 cnt = np.zeros((self._model.nlay * self._model.ncpl,),
-                               dtype=np.float)
+                               dtype=np.float64)
             else:
                 cnt = np.zeros(
                     (self._model.nlay, self._model.nrow, self._model.ncol),
-                    dtype=np.float)
+                    dtype=np.float64)
             #print(name,kper)
             for rec in sarr:
                 if unstructured:

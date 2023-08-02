@@ -207,7 +207,7 @@ class ModflowHfb(Package):
         """
         dtype = ModflowHfb.get_default_dtype(structured=structured)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
         return create_empty_recarray(ncells, dtype, default_value=-1.0E+10)
 
     @staticmethod
@@ -217,10 +217,10 @@ class ModflowHfb(Package):
 
         """
         if structured:
-            dtype = np.dtype([("k", np.int),
-                              ("irow1", np.int), ("icol1", np.int),
-                              ("irow2", np.int), ("icol2", np.int),
-                              ("hydchr", np.float32)])
+            dtype = np.dtype([("k", np.int_),
+                              ("irow1", np.int_), ("icol1", np.int_),
+                              ("irow2", np.int_), ("icol2", np.int_),
+                              ("hydchr", np.float64)])
         else:
             assert not structured, 'is there an unstructured HFB???'
         return dtype
@@ -338,12 +338,12 @@ class ModflowHfb(Package):
 
                 #
                 if model.mfpar.pval is None:
-                    parval = np.float(par_dict['parval'])
+                    parval = np.float64(par_dict['parval'])
                 else:
                     try:
-                        parval = np.float(model.mfpar.pval.pval_dict[pname])
+                        parval = np.float64(model.mfpar.pval.pval_dict[pname])
                     except:
-                        parval = np.float(par_dict['parval'])
+                        parval = np.float64(par_dict['parval'])
 
                 # fill current parameter data (par_current)
                 for ibnd, t in enumerate(data_dict):

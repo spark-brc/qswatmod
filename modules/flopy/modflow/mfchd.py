@@ -178,18 +178,18 @@ class ModflowChd(Package):
         # get an empty recarray that corresponds to dtype
         dtype = ModflowChd.get_default_dtype(structured=structured)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
         return create_empty_recarray(ncells, dtype, default_value=-1.0E+10)
 
     @staticmethod
     def get_default_dtype(structured=True):
         if structured:
-            dtype = np.dtype([("k", np.int), ("i", np.int),
-                              ("j", np.int), ("shead", np.float32),
-                              ("ehead", np.float32)])
+            dtype = np.dtype([("k", np.int_), ("i", np.int_),
+                              ("j", np.int_), ("shead", np.float64),
+                              ("ehead", np.float64)])
         else:
-            dtype = np.dtype([("node", np.int), ("shead", np.float32),
-                              ("ehead", np.float32)])
+            dtype = np.dtype([("node", np.int_), ("shead", np.float64),
+                              ("ehead", np.float64)])
         return dtype
 
     @staticmethod

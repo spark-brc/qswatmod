@@ -137,7 +137,7 @@ class ModflowRch(Package):
 
         self.nrchop = nrchop
         self.ipakcb = ipakcb
-        self.rech = Transient2d(model, (nrow, ncol), np.float32,
+        self.rech = Transient2d(model, (nrow, ncol), np.float64,
                                 rech, name='rech_')
         if self.nrchop == 2:
             self.irch = Transient2d(model, (nrow, ncol), np.int32,
@@ -368,7 +368,7 @@ class ModflowRch(Package):
         npar = 0
         if "parameter" in line.lower():
             raw = line.strip().split()
-            npar = np.int(raw[1])
+            npar = np.int_(raw[1])
             if npar > 0:
                 if model.verbose:
                     txt = 3 * ' ' + 'Parameters detected. Number of ' + \
@@ -406,7 +406,7 @@ class ModflowRch(Package):
                         txt = 3 * ' ' + 'loading rech stress ' + \
                               'period {0:3d}...'.format(iper + 1)
                         print(txt)
-                    t = Util2d.load(f, model, (nrow, ncol), np.float32, 'rech',
+                    t = Util2d.load(f, model, (nrow, ncol), np.float64, 'rech',
                                     ext_unit_dict)
                 else:
                     parm_dict = {}

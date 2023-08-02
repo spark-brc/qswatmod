@@ -236,7 +236,7 @@ class ModflowLpf(Package):
         self.nplpf = 0  # number of LPF parameters
         self.laytyp = Util2d(model, (nlay,), np.int32, laytyp, name='laytyp')
         self.layavg = Util2d(model, (nlay,), np.int32, layavg, name='layavg')
-        self.chani = Util2d(model, (nlay,), np.float32, chani, name='chani')
+        self.chani = Util2d(model, (nlay,), np.float64, chani, name='chani')
         self.layvka = Util2d(model, (nlay,), np.int32, layvka, name='layvka')
         self.laywet = Util2d(model, (nlay,), np.int32, laywet, name='laywet')
         # Factor that is included in the calculation of the head when a cell is
@@ -254,9 +254,9 @@ class ModflowLpf(Package):
         if thickstrt: self.options = self.options + 'THICKSTRT '
         if nocvcorrection: self.options = self.options + 'NOCVCORRECTION '
         if novfc: self.options = self.options + 'NOVFC '
-        self.hk = Util3d(model, (nlay, nrow, ncol), np.float32, hk, name='hk',
+        self.hk = Util3d(model, (nlay, nrow, ncol), np.float64, hk, name='hk',
                          locat=self.unit_number[0])
-        self.hani = Util3d(model, (nlay, nrow, ncol), np.float32, hani,
+        self.hani = Util3d(model, (nlay, nrow, ncol), np.float64, hani,
                            name='hani', locat=self.unit_number[0])
         keys = []
         for k in range(nlay):
@@ -264,18 +264,18 @@ class ModflowLpf(Package):
             if self.layvka[k] != 0:
                 key = 'vani'
             keys.append(key)
-        self.vka = Util3d(model, (nlay, nrow, ncol), np.float32, vka,
+        self.vka = Util3d(model, (nlay, nrow, ncol), np.float64, vka,
                           name=keys, locat=self.unit_number[0])
         tag = 'ss'
         if storagecoefficient:
             tag = 'storage'
-        self.ss = Util3d(model, (nlay, nrow, ncol), np.float32, ss, name=tag,
+        self.ss = Util3d(model, (nlay, nrow, ncol), np.float64, ss, name=tag,
                          locat=self.unit_number[0])
-        self.sy = Util3d(model, (nlay, nrow, ncol), np.float32, sy, name='sy',
+        self.sy = Util3d(model, (nlay, nrow, ncol), np.float64, sy, name='sy',
                          locat=self.unit_number[0])
-        self.vkcb = Util3d(model, (nlay, nrow, ncol), np.float32, vkcb,
+        self.vkcb = Util3d(model, (nlay, nrow, ncol), np.float64, vkcb,
                            name='vkcb', locat=self.unit_number[0])
-        self.wetdry = Util3d(model, (nlay, nrow, ncol), np.float32, wetdry,
+        self.wetdry = Util3d(model, (nlay, nrow, ncol), np.float64, wetdry,
                              name='wetdry', locat=self.unit_number[0])
         self.parent.add_package(self)
         return
@@ -447,7 +447,7 @@ class ModflowLpf(Package):
         # CHANI array
         if model.verbose:
             print('   loading CHANI...')
-        chani = np.empty((nlay), dtype=np.float32)
+        chani = np.empty((nlay), dtype=np.float64)
         chani = read1d(f, chani)
 
         # LAYVKA array
@@ -503,7 +503,7 @@ class ModflowLpf(Package):
             if model.verbose:
                 print('   loading hk layer {0:3d}...'.format(k + 1))
             if 'hk' not in par_types:
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'hk',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'hk',
                                 ext_unit_dict)
             else:
                 line = f.readline()
@@ -516,7 +516,7 @@ class ModflowLpf(Package):
                 if model.verbose:
                     print('   loading hani layer {0:3d}...'.format(k + 1))
                 if 'hani' not in par_types:
-                    t = Util2d.load(f, model, (nrow, ncol), np.float32, 'hani',
+                    t = Util2d.load(f, model, (nrow, ncol), np.float64, 'hani',
                                     ext_unit_dict)
                 else:
                     line = f.readline()
@@ -531,7 +531,7 @@ class ModflowLpf(Package):
             if layvka[k] != 0:
                 key = 'vani'
             if 'vk' not in par_types and 'vani' not in par_types:
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, key,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, key,
                                 ext_unit_dict)
             else:
                 line = f.readline()
@@ -549,7 +549,7 @@ class ModflowLpf(Package):
                 if model.verbose:
                     print('   loading ss layer {0:3d}...'.format(k + 1))
                 if 'ss' not in par_types:
-                    t = Util2d.load(f, model, (nrow, ncol), np.float32, 'ss',
+                    t = Util2d.load(f, model, (nrow, ncol), np.float64, 'ss',
                                     ext_unit_dict)
                 else:
                     line = f.readline()
@@ -562,7 +562,7 @@ class ModflowLpf(Package):
                     if model.verbose:
                         print('   loading sy layer {0:3d}...'.format(k + 1))
                     if 'sy' not in par_types:
-                        t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                        t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                         'sy',
                                         ext_unit_dict)
                     else:
@@ -576,7 +576,7 @@ class ModflowLpf(Package):
                 if model.verbose:
                     print('   loading vkcb layer {0:3d}...'.format(k + 1))
                 if 'vkcb' not in par_types:
-                    t = Util2d.load(f, model, (nrow, ncol), np.float32, 'vkcb',
+                    t = Util2d.load(f, model, (nrow, ncol), np.float64, 'vkcb',
                                     ext_unit_dict)
                 else:
                     line = f.readline()
@@ -588,7 +588,7 @@ class ModflowLpf(Package):
             if (laywet[k] != 0 and laytyp[k] != 0):
                 if model.verbose:
                     print('   loading wetdry layer {0:3d}...'.format(k + 1))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'wetdry',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'wetdry',
                                 ext_unit_dict)
                 wetdry[k] = t
 

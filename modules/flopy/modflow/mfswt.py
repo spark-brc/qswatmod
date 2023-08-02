@@ -408,30 +408,30 @@ class ModflowSwt(Package):
         self.istfl = istfl
         self.istfm = istfm
 
-        self.gl0 = Util2d(model, (nrow, ncol), np.float32, gl0, name='gl0')
-        self.sgm = Util2d(model, (nrow, ncol), np.float32, sgm, name='sgm')
-        self.sgs = Util2d(model, (nrow, ncol), np.float32, sgs, name='sgs')
+        self.gl0 = Util2d(model, (nrow, ncol), np.float64, gl0, name='gl0')
+        self.sgm = Util2d(model, (nrow, ncol), np.float64, sgm, name='sgm')
+        self.sgs = Util2d(model, (nrow, ncol), np.float64, sgs, name='sgs')
 
         # interbed data
         names = ['thick system ' for n in range(nsystm)]
-        self.thick = Util3d(model, (nsystm, nrow, ncol), np.float32, thick,
+        self.thick = Util3d(model, (nsystm, nrow, ncol), np.float64, thick,
                             name=names,
                             locat=self.unit_number[0])
         names = ['void system ' for n in range(nsystm)]
-        self.void = Util3d(model, (nsystm, nrow, ncol), np.float32, void,
+        self.void = Util3d(model, (nsystm, nrow, ncol), np.float64, void,
                            name=names,
                            locat=self.unit_number[0])
         names = ['sub system ' for n in range(nsystm)]
-        self.sub = Util3d(model, (nsystm, nrow, ncol), np.float32, sub,
+        self.sub = Util3d(model, (nsystm, nrow, ncol), np.float64, sub,
                           name=names,
                           locat=self.unit_number[0])
         if icrcc != 0:
             names = ['sse system ' for n in range(nsystm)]
-            self.sse = Util3d(model, (nsystm, nrow, ncol), np.float32, sse,
+            self.sse = Util3d(model, (nsystm, nrow, ncol), np.float64, sse,
                               name=names,
                               locat=self.unit_number[0])
             names = ['ssc system ' for n in range(nsystm)]
-            self.ssv = Util3d(model, (nsystm, nrow, ncol), np.float32, ssv,
+            self.ssv = Util3d(model, (nsystm, nrow, ncol), np.float64, ssv,
                               name=names,
                               locat=self.unit_number[0])
             self.cr = None
@@ -440,22 +440,22 @@ class ModflowSwt(Package):
             self.sse = None
             self.ssv = None
             names = ['cr system ' for n in range(nsystm)]
-            self.cr = Util3d(model, (nsystm, nrow, ncol), np.float32, cr,
+            self.cr = Util3d(model, (nsystm, nrow, ncol), np.float64, cr,
                              name=names,
                              locat=self.unit_number[0])
             names = ['cc system ' for n in range(nsystm)]
-            self.cc = Util3d(model, (nsystm, nrow, ncol), np.float32, cc,
+            self.cc = Util3d(model, (nsystm, nrow, ncol), np.float64, cc,
                              name=names,
                              locat=self.unit_number[0])
 
         # layer data
         if istpcs != 0:
-            self.pcsoff = Util3d(model, (nlay, nrow, ncol), np.float32, pcsoff,
+            self.pcsoff = Util3d(model, (nlay, nrow, ncol), np.float64, pcsoff,
                                  name='pcsoff', locat=self.unit_number[0])
             self.pcs = None
         else:
             self.pcsoff = None
-            self.pcs = Util3d(model, (nlay, nrow, ncol), np.float32, pcs,
+            self.pcs = Util3d(model, (nlay, nrow, ncol), np.float64, pcs,
                               name='pcs', locat=self.unit_number[0])
 
         # output data
@@ -574,19 +574,19 @@ class ModflowSwt(Package):
         # read dataset 4
         if model.verbose:
             sys.stdout.write('  loading swt dataset 4')
-        gl0 = Util2d.load(f, model, (nrow, ncol), np.float32, 'gl0',
+        gl0 = Util2d.load(f, model, (nrow, ncol), np.float64, 'gl0',
                           ext_unit_dict)
 
         # read dataset 5
         if model.verbose:
             sys.stdout.write('  loading swt dataset 5')
-        sgm = Util2d.load(f, model, (nrow, ncol), np.float32, 'sgm',
+        sgm = Util2d.load(f, model, (nrow, ncol), np.float64, 'sgm',
                           ext_unit_dict)
 
         # read dataset 6
         if model.verbose:
             sys.stdout.write('  loading swt dataset 6')
-        sgs = Util2d.load(f, model, (nrow, ncol), np.float32, 'sgs',
+        sgs = Util2d.load(f, model, (nrow, ncol), np.float64, 'sgs',
                           ext_unit_dict)
 
         # read datasets 7 to 13
@@ -610,7 +610,7 @@ class ModflowSwt(Package):
             if model.verbose:
                 sys.stdout.write(
                     '  loading swt dataset 7 for layer {}\n'.format(kk))
-            t = Util2d.load(f, model, (nrow, ncol), np.float32,
+            t = Util2d.load(f, model, (nrow, ncol), np.float64,
                             'thick layer {}'.format(kk),
                             ext_unit_dict)
             thick[k] = t
@@ -619,14 +619,14 @@ class ModflowSwt(Package):
                 if model.verbose:
                     sys.stdout.write(
                         '  loading swt dataset 8 for layer {}\n'.format(kk))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'sse layer {}'.format(kk), ext_unit_dict)
                 sse[k] = t
                 # ssv
                 if model.verbose:
                     sys.stdout.write(
                         '  loading swt dataset 9 for layer {}\n'.format(kk))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'sse layer {}'.format(kk), ext_unit_dict)
                 ssv[k] = t
             else:
@@ -634,28 +634,28 @@ class ModflowSwt(Package):
                 if model.verbose:
                     sys.stdout.write(
                         '  loading swt dataset 10 for layer {}\n'.format(kk))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'cr layer {}'.format(kk), ext_unit_dict)
                 cr[k] = t
                 # cc
                 if model.verbose:
                     sys.stdout.write(
                         '  loading swt dataset 11 for layer {}\n'.format(kk))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'cc layer {}'.format(kk), ext_unit_dict)
                 cc[k] = t
             # void
             if model.verbose:
                 sys.stdout.write(
                     '  loading swt dataset 12 for layer {}\n'.format(kk))
-            t = Util2d.load(f, model, (nrow, ncol), np.float32,
+            t = Util2d.load(f, model, (nrow, ncol), np.float64,
                             'void layer {}'.format(kk), ext_unit_dict)
             void[k] = t
             # sub
             if model.verbose:
                 sys.stdout.write(
                     '  loading swt dataset 13 for layer {}\n'.format(kk))
-            t = Util2d.load(f, model, (nrow, ncol), np.float32,
+            t = Util2d.load(f, model, (nrow, ncol), np.float64,
                             'sub layer {}'.format(kk), ext_unit_dict)
             sub[k] = t
 
@@ -671,14 +671,14 @@ class ModflowSwt(Package):
                 if model.verbose:
                     sys.stdout.write(
                         '  loading swt dataset 14 for layer {}\n'.format(kk))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'pcsoff layer {}'.format(k + 1), ext_unit_dict)
                 pcsoff[k] = t
             else:
                 if model.verbose:
                     sys.stdout.write(
                         '  loading swt dataset 15 for layer {}\n'.format(kk))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'pcs layer {}'.format(k + 1), ext_unit_dict)
                 pcs[k] = t
 

@@ -136,11 +136,11 @@ class ModflowEvt(Package):
         else:
             load = model.load
 
-        self.surf = Transient2d(model, (nrow, ncol), np.float32,
+        self.surf = Transient2d(model, (nrow, ncol), np.float64,
                                 surf, name='surf')
-        self.evtr = Transient2d(model, (nrow, ncol), np.float32,
+        self.evtr = Transient2d(model, (nrow, ncol), np.float64,
                                 evtr, name='evtr')
-        self.exdp = Transient2d(model, (nrow, ncol), np.float32,
+        self.exdp = Transient2d(model, (nrow, ncol), np.float64,
                                 exdp, name='exdp')
         self.ievt = Transient2d(model, (nrow, ncol), np.int32,
                                 ievt, name='ievt')
@@ -279,7 +279,7 @@ class ModflowEvt(Package):
                 if model.verbose:
                     print('   loading surf stress period {0:3d}...'.format(
                         iper + 1))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'surf',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'surf',
                                 ext_unit_dict)
                 current_surf = t
             surf[iper] = current_surf
@@ -289,7 +289,7 @@ class ModflowEvt(Package):
                     if model.verbose:
                         print('   loading evtr stress period {0:3d}...'.format(
                             iper + 1))
-                    t = Util2d.load(f, model, (nrow, ncol), np.float32, 'evtr',
+                    t = Util2d.load(f, model, (nrow, ncol), np.float64, 'evtr',
                                     ext_unit_dict)
                 else:
                     parm_dict = {}
@@ -319,7 +319,7 @@ class ModflowEvt(Package):
                 if model.verbose:
                     print('   loading exdp stress period {0:3d}...'.format(
                         iper + 1))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'exdp',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'exdp',
                                 ext_unit_dict)
                 current_exdp = t
             exdp[iper] = current_exdp

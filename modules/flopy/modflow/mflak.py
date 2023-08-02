@@ -353,7 +353,7 @@ class ModflowLak(Package):
 
         if isinstance(stages, float):
             if self.nlakes == 1:
-                stages = np.array([self.nlakes], dtype=np.float) * stages
+                stages = np.array([self.nlakes], dtype=np.float64) * stages
             else:
                 stages = np.ones(self.nlakes, dtype=float) * stages
         elif isinstance(stages, list):
@@ -364,7 +364,7 @@ class ModflowLak(Package):
             raise Exception(err)
         self.stages = stages
         if stage_range is None:
-            stage_range = np.ones((nlakes, 2), dtype=np.float)
+            stage_range = np.ones((nlakes, 2), dtype=np.float64)
             stage_range[:, 0] = -10000.
             stage_range[:, 1] = 10000.
         else:
@@ -392,7 +392,7 @@ class ModflowLak(Package):
         nrow, ncol, nlay, nper = self.parent.get_nrow_ncol_nlay_nper()
         self.lakarr = Transient3d(model, (nlay, nrow, ncol), np.int32,
                                   lakarr, name='lakarr_')
-        self.bdlknc = Transient3d(model, (nlay, nrow, ncol), np.float32,
+        self.bdlknc = Transient3d(model, (nlay, nrow, ncol), np.float64,
                                   bdlknc, name='bdlknc_')
 
         if sill_data is not None:
@@ -425,7 +425,7 @@ class ModflowLak(Package):
                         isinstance(value, int):
                     td = {}
                     for k in range(self.nlakes):
-                        td[k] = (np.ones(6, dtype=np.float) * value).tolist()
+                        td[k] = (np.ones(6, dtype=np.float64) * value).tolist()
                     flux_data[key] = td
                 elif isinstance(value, dict):
                     try:
@@ -720,7 +720,7 @@ class ModflowLak(Package):
                     print("   reading lak dataset 6 - " +
                           "for stress period {}".format(iper + 1))
                 name = 'BDLKNC_StressPeriod_{}'.format(iper)
-                bdlknc = Util3d.load(f, model, (nlay, nrow, ncol), np.float32,
+                bdlknc = Util3d.load(f, model, (nlay, nrow, ncol), np.float64,
                                      name, ext_unit_dict)
 
                 lake_loc[iper] = lakarr
@@ -793,7 +793,7 @@ class ModflowLak(Package):
         # convert lake data to Transient3d objects
         lake_loc = Transient3d(model, (nlay, nrow, ncol), np.int32,
                                lake_loc, name='lakarr_')
-        lake_lknc = Transient3d(model, (nlay, nrow, ncol), np.float32,
+        lake_lknc = Transient3d(model, (nlay, nrow, ncol), np.float64,
                                 lake_lknc, name='bdlknc_')
 
         # determine specified unit number

@@ -248,7 +248,7 @@ def flux_to_wel(cbc_file, text, precision="single", model=None, verbose=False):
     cbf = CBF(cbc_file, precision=precision, verbose=verbose)
 
     # create a empty numpy array of shape (time,layer,row,col)
-    m4d = np.zeros((cbf.nper, cbf.nlay, cbf.nrow, cbf.ncol), dtype=np.float32)
+    m4d = np.zeros((cbf.nper, cbf.nlay, cbf.nrow, cbf.ncol), dtype=np.float64)
     m4d[:] = np.NaN
 
     # process the records in the cell budget file
@@ -433,7 +433,7 @@ def ulstrd(f, nlist, ra, model, sfac_columns, ext_unit_dict):
     if binary:
         dtype2 = []
         for name in ra.dtype.names:
-            dtype2.append((name, np.float32))
+            dtype2.append((name, np.float64))
         dtype2 = np.dtype(dtype2)
         d = np.fromfile(file_handle, dtype=dtype2, count=nlist)
         ra = np.array(d, dtype=ra.dtype)

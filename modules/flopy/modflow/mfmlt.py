@@ -192,7 +192,7 @@ class ModflowMlt(Package):
                     kwrd = t[1].lower()
             # load data
             if readArray:
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, mltnam,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, mltnam,
                                 ext_unit_dict)
                 # add unit number to list of external files in
                 # ext_unit_dict to remove.

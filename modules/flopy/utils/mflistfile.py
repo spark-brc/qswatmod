@@ -422,7 +422,7 @@ class ListBudget(object):
             t = self.cum[ipos]
 
         dtype = np.dtype(
-            [('index', np.int32), ('value', np.float32), ('name', '|S25')])
+            [('index', np.int32), ('value', np.float64), ('name', '|S25')])
         v = np.recarray(shape=(len(self.inc.dtype.names[3:])), dtype=dtype)
         for i, name in enumerate(self.inc.dtype.names[3:]):
             mult = 1.
@@ -744,10 +744,10 @@ class ListBudget(object):
         idx_array = np.array(self.idx_map)
 
         # build dtype for recarray
-        dtype_tups = [('totim', np.float32), ("time_step", np.int32),
+        dtype_tups = [('totim', np.float64), ("time_step", np.int32),
                       ("stress_period", np.int32)]
         for entry in self.entries:
-            dtype_tups.append((entry, np.float32))
+            dtype_tups.append((entry, np.float64))
         dtype = np.dtype(dtype_tups)
 
         # create recarray

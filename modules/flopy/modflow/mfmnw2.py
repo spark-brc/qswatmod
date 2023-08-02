@@ -475,7 +475,7 @@ class Mnw(object):
         #
         dtype = Mnw.get_default_spd_dtype(structured=structured)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
         return create_empty_recarray(nper, dtype, default_value=default_value)
 
     @staticmethod
@@ -496,17 +496,17 @@ class Mnw(object):
 
         """
         if structured:
-            return np.dtype([('k', np.int),
-                             ('i', np.int),
-                             ('j', np.int),
-                             ('per', np.int),
-                             ('qdes', np.float32),
-                             ('capmult', np.int),
-                             ('cprime', np.float32),
-                             ('hlim', np.float32),
-                             ('qcut', np.int),
-                             ('qfrcmn', np.float32),
-                             ('qfrcmx', np.float32)])
+            return np.dtype([('k', np.int_),
+                             ('i', np.int_),
+                             ('j', np.int_),
+                             ('per', np.int_),
+                             ('qdes', np.float64),
+                             ('capmult', np.int_),
+                             ('cprime', np.float64),
+                             ('hlim', np.float64),
+                             ('qcut', np.int_),
+                             ('qfrcmn', np.float64),
+                             ('qfrcmx', np.float64)])
         else:
             msg = 'Mnw2: get_default_spd_dtype not implemented for ' + \
                   'unstructured grids'
@@ -1055,7 +1055,7 @@ class ModflowMnw2(Package):
         """
         dtype = ModflowMnw2.get_default_node_dtype(structured=structured)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
         return create_empty_recarray(maxnodes, dtype,
                                      default_value=default_value)
 
@@ -1077,39 +1077,39 @@ class ModflowMnw2(Package):
 
         """
         if structured:
-            return np.dtype([('k', np.int),
-                             ('i', np.int),
-                             ('j', np.int),
-                             ('ztop', np.float32),
-                             ('zbotm', np.float32),
+            return np.dtype([('k', np.int_),
+                             ('i', np.int_),
+                             ('j', np.int_),
+                             ('ztop', np.float64),
+                             ('zbotm', np.float64),
                              ('wellid', np.object),
                              ('losstype', np.object),
-                             ('pumploc', np.int),
-                             ('qlimit', np.int),
-                             ('ppflag', np.int),
-                             ('pumpcap', np.int),
-                             ('rw', np.float32),
-                             ('rskin', np.float32),
-                             ('kskin', np.float32),
-                             ('B', np.float32),
-                             ('C', np.float32),
-                             ('P', np.float32),
-                             ('cwc', np.float32),
-                             ('pp', np.float32),
-                             ('pumplay', np.int),
-                             ('pumprow', np.int),
-                             ('pumpcol', np.int),
-                             ('zpump', np.float32),
-                             ('hlim', np.float32),
-                             ('qcut', np.int),
-                             ('qfrcmn', np.float32),
-                             ('qfrcmx', np.float32),
-                             ('hlift', np.float32),
-                             ('liftq0', np.float32),
-                             ('liftqmax', np.float32),
-                             ('hwtol', np.float32),
-                             ('liftn', np.float32),
-                             ('qn', np.float32)])
+                             ('pumploc', np.int_),
+                             ('qlimit', np.int_),
+                             ('ppflag', np.int_),
+                             ('pumpcap', np.int_),
+                             ('rw', np.float64),
+                             ('rskin', np.float64),
+                             ('kskin', np.float64),
+                             ('B', np.float64),
+                             ('C', np.float64),
+                             ('P', np.float64),
+                             ('cwc', np.float64),
+                             ('pp', np.float64),
+                             ('pumplay', np.int_),
+                             ('pumprow', np.int_),
+                             ('pumpcol', np.int_),
+                             ('zpump', np.float64),
+                             ('hlim', np.float64),
+                             ('qcut', np.int_),
+                             ('qfrcmn', np.float64),
+                             ('qfrcmx', np.float64),
+                             ('hlift', np.float64),
+                             ('liftq0', np.float64),
+                             ('liftqmax', np.float64),
+                             ('hwtol', np.float64),
+                             ('liftn', np.float64),
+                             ('qn', np.float64)])
         else:
             msg = 'get_default_node_dtype: unstructured model not supported'
             raise NotImplementedError(msg)
@@ -1140,7 +1140,7 @@ class ModflowMnw2(Package):
         """
         dtype = ModflowMnw2.get_default_spd_dtype(structured=structured)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
         return create_empty_recarray(itmp, dtype, default_value=default_value)
 
     @staticmethod
@@ -1161,17 +1161,17 @@ class ModflowMnw2(Package):
 
         """
         if structured:
-            return np.dtype([('k', np.int),
-                             ('i', np.int),
-                             ('j', np.int),
+            return np.dtype([('k', np.int_),
+                             ('i', np.int_),
+                             ('j', np.int_),
                              ('wellid', np.object),
-                             ('qdes', np.float32),
-                             ('capmult', np.int),
-                             ('cprime', np.float32),
-                             ('hlim', np.float32),
-                             ('qcut', np.int),
-                             ('qfrcmn', np.float32),
-                             ('qfrcmx', np.float32)])
+                             ('qdes', np.float64),
+                             ('capmult', np.int_),
+                             ('cprime', np.float64),
+                             ('hlim', np.float64),
+                             ('qcut', np.int_),
+                             ('qfrcmn', np.float64),
+                             ('qfrcmx', np.float64)])
         else:
             msg = 'get_default_spd_dtype: unstructured model not supported'
             raise NotImplementedError(msg)

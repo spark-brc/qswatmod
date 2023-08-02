@@ -123,7 +123,7 @@ class ModflowBas(Package):
         nrow, ncol, nlay, nper = self.parent.nrow_ncol_nlay_nper
         self.ibound = Util3d(model, (nlay, nrow, ncol), np.int32, ibound,
                              name='ibound', locat=self.unit_number[0])
-        self.strt = Util3d(model, (nlay, nrow, ncol), np.float32, strt,
+        self.strt = Util3d(model, (nlay, nrow, ncol), np.float64, strt,
                            name='strt', locat=self.unit_number[0])
         self.heading = '# {} package for '.format(self.name[0]) + \
                        ' {}, '.format(model.version_types[model.version]) + \
@@ -323,7 +323,7 @@ class ModflowBas(Package):
         ishowp = 'SHOWPROGRESS' in opts
         if 'STOPERROR' in opts:
             i = opts.index('STOPERROR')
-            stoper = np.float32(opts[i + 1])
+            stoper = np.float64(opts[i + 1])
         else:
             stoper = None
         # get nlay,nrow,ncol if not passed
@@ -336,10 +336,10 @@ class ModflowBas(Package):
 
         # dataset 3 -- hnoflo
         line = f.readline()
-        hnoflo = np.float32(line.strip().split()[0])
+        hnoflo = np.float64(line.strip().split()[0])
 
         # dataset 4 -- strt
-        strt = Util3d.load(f, model, (nlay, nrow, ncol), np.float32, 'strt',
+        strt = Util3d.load(f, model, (nlay, nrow, ncol), np.float64, 'strt',
                            ext_unit_dict)
         if openfile:
             f.close()

@@ -31,13 +31,13 @@ class Grid(object):
     grid_type : enumeration
         type of model grid ('structured', 'vertex_layered',
         'vertex_unlayered')
-    top : ndarray(np.float)
+    top : ndarray(np.float64)
         top elevations of cells in topmost layer
-    botm : ndarray(np.float)
+    botm : ndarray(np.float64)
         bottom elevations of all cells
-    idomain : ndarray(np.int)
+    idomain : ndarray(np.int_)
         ibound/idomain value for each cell
-    lenuni : ndarray(np.int)
+    lenuni : ndarray(np.int_)
         model length units
     origin_loc : str
         Corner of the model grid that is the model origin
@@ -56,11 +56,11 @@ class Grid(object):
     grid_type : enumeration
         type of model grid ('structured', 'vertex_layered',
         'vertex_unlayered')
-    top : ndarray(np.float)
+    top : ndarray(np.float64)
         top elevations of cells in topmost layer
-    botm : ndarray(np.float)
+    botm : ndarray(np.float64)
         bottom elevations of all cells
-    idomain : ndarray(np.int)
+    idomain : ndarray(np.int_)
         ibound/idomain value for each cell
     proj4 : proj4 SpatialReference
         spatial reference locates the grid in a coordinate system

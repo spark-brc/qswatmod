@@ -114,7 +114,7 @@ class ZoneBudget(object):
             self.kstpkper = self.cbc.get_kstpkper()
 
         # Set float and integer types
-        self.float_type = np.float32
+        self.float_type = np.float64
         self.int_type = np.int32
 
         # Check dimensions of input zone array

@@ -135,13 +135,13 @@ class Mt3dDsp(Package):
         ncomp = model.ncomp
         mcomp = model.mcomp
         self.multiDiff = multiDiff
-        self.al = Util3d(model, (nlay, nrow, ncol), np.float32, al, name='al',
+        self.al = Util3d(model, (nlay, nrow, ncol), np.float64, al, name='al',
                          locat=self.unit_number[0],
                          array_free_format=False)
-        self.trpt = Util2d(model, (nlay,), np.float32, trpt, name='trpt',
+        self.trpt = Util2d(model, (nlay,), np.float64, trpt, name='trpt',
                            locat=self.unit_number[0],
                            array_free_format=False)
-        self.trpv = Util2d(model, (nlay,), np.float32, trpv, name='trpv',
+        self.trpv = Util2d(model, (nlay,), np.float64, trpv, name='trpv',
                            locat=self.unit_number[0],
                            array_free_format=False)
 
@@ -154,7 +154,7 @@ class Mt3dDsp(Package):
             shape = (nlay, nrow, ncol)
             utype = Util3d
             nmcomp = mcomp
-        u2or3 = utype(model, shape, np.float32, dmcoef,
+        u2or3 = utype(model, shape, np.float64, dmcoef,
                       name='dmcoef1', locat=self.unit_number[0],
                       array_free_format=False)
         self.dmcoef.append(u2or3)
@@ -167,7 +167,7 @@ class Mt3dDsp(Package):
                 print("DSP: setting dmcoef for component " +
                       str(icomp) + " to zero, kwarg name " +
                       name)
-            u2or3 = utype(model, shape, np.float32, val,
+            u2or3 = utype(model, shape, np.float64, val,
                           name=name, locat=self.unit_number[0],
                           array_free_format=False)
             self.dmcoef.append(u2or3)
@@ -297,18 +297,18 @@ class Mt3dDsp(Package):
         # Read arrays
         if model.verbose:
             print('   loading AL...')
-        al = Util3d.load(f, model, (nlay, nrow, ncol), np.float32, 'al',
+        al = Util3d.load(f, model, (nlay, nrow, ncol), np.float64, 'al',
                          ext_unit_dict, array_format="mt3d")
 
         if model.verbose:
             print('   loading TRPT...')
-        trpt = Util2d.load(f, model, (nlay,), np.float32, 'trpt',
+        trpt = Util2d.load(f, model, (nlay,), np.float64, 'trpt',
                            ext_unit_dict, array_format="mt3d",
                            array_free_format=False)
 
         if model.verbose:
             print('   loading TRPV...')
-        trpv = Util2d.load(f, model, (nlay,), np.float32, 'trpv',
+        trpv = Util2d.load(f, model, (nlay,), np.float64, 'trpv',
                            ext_unit_dict, array_format="mt3d",
                            array_free_format=False)
 
@@ -317,23 +317,23 @@ class Mt3dDsp(Package):
         kwargs = {}
         dmcoef = []
         if multiDiff:
-            dmcoef = Util3d.load(f, model, (nlay, nrow, ncol), np.float32,
+            dmcoef = Util3d.load(f, model, (nlay, nrow, ncol), np.float64,
                                  'dmcoef1', ext_unit_dict, array_format="mt3d")
             if model.mcomp > 1:
                 for icomp in range(2, model.mcomp + 1):
                     name = "dmcoef" + str(icomp)
-                    u3d = Util3d.load(f, model, (nlay, nrow, ncol), np.float32,
+                    u3d = Util3d.load(f, model, (nlay, nrow, ncol), np.float64,
                                       name, ext_unit_dict, array_format="mt3d")
                     kwargs[name] = u3d
 
 
         else:
-            dmcoef = Util2d.load(f, model, (nlay,), np.float32,
+            dmcoef = Util2d.load(f, model, (nlay,), np.float64,
                                  'dmcoef1', ext_unit_dict, array_format="mt3d")
             # if model.mcomp > 1:
             #     for icomp in range(2, model.mcomp + 1):
             #         name = "dmcoef" + str(icomp + 1)
-            #         u2d = Util2d.load(f, model, (nlay,), np.float32, name,
+            #         u2d = Util2d.load(f, model, (nlay,), np.float64, name,
             #                     ext_unit_dict, array_format="mt3d")
             #         kwargs[name] = u2d
 

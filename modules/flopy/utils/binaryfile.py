@@ -119,7 +119,7 @@ def binaryread_struct(file, vartype, shape=(1,), charlen=16):
     import numpy as np
 
     # store the mapping from type to struct format (fmt)
-    typefmtd = {np.int32: 'i', np.float32: 'f', np.float64: 'd'}
+    typefmtd = {np.int32: 'i', np.float64: 'f', np.float64: 'd'}
 
     # read a string variable of length charlen
     if vartype == str:
@@ -593,7 +593,7 @@ class CellBudgetFile(object):
                 ('ncol', 'i4'), ('nrow', 'i4'), ('nlay', 'i4')]
 
         if precision == 'single':
-            self.realtype = np.float32
+            self.realtype = np.float64
             ffmt = 'f4'
         elif precision == 'double':
             self.realtype = np.float64
@@ -1366,7 +1366,7 @@ class CellBudgetFile(object):
                          str((nrow, ncol))
                 print(s)
             if full3D:
-                out = np.ma.zeros((nlay, nrow, ncol), dtype=np.float32)
+                out = np.ma.zeros((nlay, nrow, ncol), dtype=np.float64)
                 out.mask = True
                 vertical_layer = ilayer[0] - 1  # This is always the top layer
                 out[vertical_layer, :, :] = data
@@ -1460,7 +1460,7 @@ class CellBudgetFile(object):
             List contains unique simulation times (totim) in binary file.
 
         """
-        out = np.ma.zeros((nlay * nrow * ncol), dtype=np.float32)
+        out = np.ma.zeros((nlay * nrow * ncol), dtype=np.float64)
         out.mask = True
         for [node, q] in zip(data['node'], data['q']):
             idx = node - 1
@@ -1519,9 +1519,9 @@ class CellBudgetFile(object):
         nlay = self.nlay
         nrow = self.nrow
         ncol = self.ncol
-        residual = np.zeros((nlay, nrow, ncol), dtype=np.float)
+        residual = np.zeros((nlay, nrow, ncol), dtype=np.float64)
         if scaled:
-            inflow = np.zeros((nlay, nrow, ncol), dtype=np.float)
+            inflow = np.zeros((nlay, nrow, ncol), dtype=np.float64)
         select_indices = np.where((self.recordarray['totim'] == totim))[0]
 
         for i in select_indices:
@@ -1566,7 +1566,7 @@ class CellBudgetFile(object):
                     inflow[idx] += flow[idx]
 
         if scaled:
-            residual_scaled = np.zeros((nlay, nrow, ncol), dtype=np.float)
+            residual_scaled = np.zeros((nlay, nrow, ncol), dtype=np.float64)
             idx = (inflow > 0.)
             residual_scaled[idx] = residual[idx] / inflow[idx]
             return residual_scaled

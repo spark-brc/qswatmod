@@ -512,28 +512,28 @@ class ModflowUzf1(Package):
         # Data Set 4
         # [VKS (NCOL, NROW)] -- U2DREL
         if abs(iuzfopt) in [0, 1]:
-            self.vks = Util2d(model, (nrow, ncol), np.float32, vks, name='vks')
+            self.vks = Util2d(model, (nrow, ncol), np.float64, vks, name='vks')
 
         if seepsurfk or specifysurfk:
-            self.surfk = Util2d(model, (nrow, ncol), np.float32, surfk,
+            self.surfk = Util2d(model, (nrow, ncol), np.float64, surfk,
                                 name='surfk')
 
         if iuzfopt > 0:
             # Data Set 5
             # EPS (NCOL, NROW) -- U2DREL
-            self.eps = Util2d(model, (nrow, ncol), np.float32, eps, name='eps')
+            self.eps = Util2d(model, (nrow, ncol), np.float64, eps, name='eps')
             # Data Set 6a
             # THTS (NCOL, NROW) -- U2DREL
-            self.thts = Util2d(model, (nrow, ncol), np.float32, thts,
+            self.thts = Util2d(model, (nrow, ncol), np.float64, thts,
                                name='thts')
             # Data Set 6b
             # THTS (NCOL, NROW) -- U2DREL
             if self.specifythtr > 0:
-                self.thtr = Util2d(model, (nrow, ncol), np.float32, thtr,
+                self.thtr = Util2d(model, (nrow, ncol), np.float64, thtr,
                                    name='thtr')
             # Data Set 7
             # [THTI (NCOL, NROW)] -- U2DREL
-            self.thti = Util2d(model, (nrow, ncol), np.float32, thti,
+            self.thti = Util2d(model, (nrow, ncol), np.float64, thti,
                                name='thti')
 
         # Data Set 8
@@ -545,14 +545,14 @@ class ModflowUzf1(Package):
         # Data Set 10
         # [FINF (NCOL, NROW)] – U2DREL
 
-        self.finf = Transient2d(model, (nrow, ncol), np.float32,
+        self.finf = Transient2d(model, (nrow, ncol), np.float64,
                                 finf, name='finf')
         if ietflg > 0:
-            self.pet = Transient2d(model, (nrow, ncol), np.float32,
+            self.pet = Transient2d(model, (nrow, ncol), np.float64,
                                    pet, name='pet')
-            self.extdp = Transient2d(model, (nrow, ncol), np.float32,
+            self.extdp = Transient2d(model, (nrow, ncol), np.float64,
                                      extdp, name='extdp')
-            self.extwc = Transient2d(model, (nrow, ncol), np.float32,
+            self.extwc = Transient2d(model, (nrow, ncol), np.float64,
                                      extwc, name='extwc')
         self.parent.add_package(self)
 
@@ -849,27 +849,27 @@ class ModflowUzf1(Package):
 
         # dataset 4
         if iuzfopt in [0, 1]:
-            load_util2d('vks', np.float32)
+            load_util2d('vks', np.float64)
 
         # dataset 4b
         if seepsurfk or specifysurfk:
-            load_util2d('surfk', np.float32)
+            load_util2d('surfk', np.float64)
 
         if iuzfopt > 0:
             # dataset 5
-            load_util2d('eps', np.float32)
+            load_util2d('eps', np.float64)
 
             # dataset 6
-            load_util2d('thts', np.float32)
+            load_util2d('thts', np.float64)
 
             if specifythtr:
                 # dataset 6b (residual water content)
-                load_util2d('thtr', np.float32)
+                load_util2d('thtr', np.float64)
 
             if specifythti or np.all(~model.dis.steady.array):
                 # dataset 7 (initial water content;
                 #            only read if not steady-state)
-                load_util2d('thti', np.float32)
+                load_util2d('thti', np.float64)
 
         # dataset 8
         uzgag = {}
@@ -890,7 +890,7 @@ class ModflowUzf1(Package):
 
             # dataset 10
             if nuzf1 >= 0:
-                load_util2d('finf', np.float32, per=per)
+                load_util2d('finf', np.float64, per=per)
 
             if ietflg > 0:
                 # dataset 11
@@ -898,19 +898,19 @@ class ModflowUzf1(Package):
                 nuzf2 = pop_item(line, int)
                 if nuzf2 >= 0:
                     # dataset 12
-                    load_util2d('pet', np.float32, per=per)
+                    load_util2d('pet', np.float64, per=per)
                 # dataset 13
                 line = line_parse(f.readline())
                 nuzf3 = pop_item(line, int)
                 if nuzf3 >= 0:
                     # dataset 14
-                    load_util2d('extdp', np.float32, per=per)
+                    load_util2d('extdp', np.float64, per=per)
                 # dataset 15
                 line = line_parse(f.readline())
                 nuzf4 = pop_item(line, int)
                 if nuzf4 >= 0:
                     # dataset 16
-                    load_util2d('extwc', np.float32, per=per)
+                    load_util2d('extwc', np.float64, per=per)
 
         # close the file
         f.close()

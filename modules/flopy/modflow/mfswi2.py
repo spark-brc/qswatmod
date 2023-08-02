@@ -334,16 +334,16 @@ class ModflowSwi2(Package):
         self.nadptmx, self.nadptmn, self.adptfct = nadptmx, nadptmn, adptfct
         # Create arrays so that they have the correct size
         if self.istrat == 1:
-            self.nu = Util2d(model, (self.nsrf + 1,), np.float32, nu,
+            self.nu = Util2d(model, (self.nsrf + 1,), np.float64, nu,
                              name='nu')
         else:
-            self.nu = Util2d(model, (self.nsrf + 2,), np.float32, nu,
+            self.nu = Util2d(model, (self.nsrf + 2,), np.float64, nu,
                              name='nu')
         self.zeta = []
         for i in range(self.nsrf):
-            self.zeta.append(Util3d(model, (nlay, nrow, ncol), np.float32,
+            self.zeta.append(Util3d(model, (nlay, nrow, ncol), np.float64,
                                     zeta[i], name='zeta_' + str(i + 1)))
-        self.ssz = Util3d(model, (nlay, nrow, ncol), np.float32, ssz,
+        self.ssz = Util3d(model, (nlay, nrow, ncol), np.float64, ssz,
                           name='ssz')
         self.isource = Util3d(model, (nlay, nrow, ncol), np.int32, isource,
                               name='isource')
@@ -600,7 +600,7 @@ class ModflowSwi2(Package):
             if line[0] != '#':
                 f.seek(ipos)
                 break
-        nu = Util2d.load(f, model, (nnu,), np.float32, 'nu',
+        nu = Util2d.load(f, model, (nnu,), np.float64, 'nu',
                          ext_unit_dict)
 
         # read dataset 5
@@ -616,7 +616,7 @@ class ModflowSwi2(Package):
         for n in range(nsrf):
             ctxt = 'zeta_surf{:02d}'.format(n + 1)
             zeta.append(Util3d.load(f, model, (nlay, nrow, ncol),
-                                    np.float32, ctxt, ext_unit_dict))
+                                    np.float64, ctxt, ext_unit_dict))
 
         # read dataset 6
         if model.verbose:
@@ -627,7 +627,7 @@ class ModflowSwi2(Package):
             if line[0] != '#':
                 f.seek(ipos)
                 break
-        ssz = Util3d.load(f, model, (nlay, nrow, ncol), np.float32,
+        ssz = Util3d.load(f, model, (nlay, nrow, ncol), np.float64,
                           'ssz', ext_unit_dict)
 
         # read dataset 7

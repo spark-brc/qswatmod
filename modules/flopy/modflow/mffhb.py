@@ -290,16 +290,16 @@ class ModflowFhb(Package):
     @staticmethod
     def get_default_dtype(nbdtim=1, structured=True, head=False):
         if structured:
-            dtype = [("k", np.int), ("i", np.int), ("j", np.int)]
+            dtype = [("k", np.int_), ("i", np.int_), ("j", np.int_)]
         else:
-            dtype = [("node", np.int)]
-        dtype.append(("iaux", np.int))
+            dtype = [("node", np.int_)]
+        dtype.append(("iaux", np.int_))
         for n in range(nbdtim):
             if head:
                 name = ("sbhed{}".format(n + 1))
             else:
                 name = ("flwrat{}".format(n + 1))
-            dtype.append((name, np.float32))
+            dtype.append((name, np.float64))
         return np.dtype(dtype)
 
     def ncells(self):
@@ -556,7 +556,7 @@ class ModflowFhb(Package):
                 ds6 = []
                 dtype = []
                 for name, weight in flow_aux:
-                    dtype.append((name, np.float32))
+                    dtype.append((name, np.float64))
                 for naux in range(nfhbx1):
                     if model.verbose:
                         sys.stdout.write('loading fhb dataset 6a - aux ' +
@@ -634,7 +634,7 @@ class ModflowFhb(Package):
                 ds8 = []
                 dtype = []
                 for name, weight in head_aux:
-                    dtype.append((name, np.float32))
+                    dtype.append((name, np.float64))
                 for naux in range(nfhbx1):
                     if model.verbose:
                         sys.stdout.write('loading fhb dataset 8a - aux ' +
