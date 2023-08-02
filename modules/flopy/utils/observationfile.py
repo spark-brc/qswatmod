@@ -288,7 +288,7 @@ class Mf6Obs(ObsFiles):
             self.nobs = self.read_integer()
 
             # # continue reading the file
-            # self.v = np.empty(self.nobs, dtype=np.float)
+            # self.v = np.empty(self.nobs, dtype=np.float64)
             # self.v.fill(1.0E+32)
 
             # read obsnames
@@ -391,7 +391,7 @@ class HydmodObs(ObsFiles):
 
         # continue reading the file
         self.itmuni = self.read_integer()
-        self.v = np.empty(self.nobs, dtype=np.float)
+        self.v = np.empty(self.nobs, dtype=np.float64)
         self.v.fill(1.0E+32)
         ctime = self.read_text(nchar=4)
         self.hydlbl_len = int(hydlbl_len)

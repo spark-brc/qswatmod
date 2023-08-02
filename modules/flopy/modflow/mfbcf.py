@@ -136,7 +136,7 @@ class ModflowBcf(Package):
                                  name='laycon', locat=self.unit_number[0])
         self.laycon = Util2d(model, (nlay,), np.int32, laycon, name='laycon',
                              locat=self.unit_number[0])
-        self.trpy = Util2d(model, (nlay,), np.float32, trpy,
+        self.trpy = Util2d(model, (nlay,), np.float64, trpy,
                            name='Anisotropy factor', locat=self.unit_number[0])
 
         # item 1
@@ -146,25 +146,25 @@ class ModflowBcf(Package):
         self.wetfct = wetfct
         self.iwetit = iwetit
         self.ihdwet = ihdwet
-        self.tran = Util3d(model, (nlay, nrow, ncol), np.float32, tran,
+        self.tran = Util3d(model, (nlay, nrow, ncol), np.float64, tran,
                            'Transmissivity', locat=self.unit_number[0])
-        self.hy = Util3d(model, (nlay, nrow, ncol), np.float32, hy,
+        self.hy = Util3d(model, (nlay, nrow, ncol), np.float64, hy,
                          'Horizontal Hydraulic Conductivity',
                          locat=self.unit_number[0])
         if model.nlay > 1:
-            self.vcont = Util3d(model, (nlay - 1, nrow, ncol), np.float32,
+            self.vcont = Util3d(model, (nlay - 1, nrow, ncol), np.float64,
                                 vcont,
                                 'Vertical Conductance',
                                 locat=self.unit_number[0])
         else:
             self.vcont = None
-        self.sf1 = Util3d(model, (nlay, nrow, ncol), np.float32, sf1,
+        self.sf1 = Util3d(model, (nlay, nrow, ncol), np.float64, sf1,
                           'Primary Storage Coefficient',
                           locat=self.unit_number[0])
-        self.sf2 = Util3d(model, (nlay, nrow, ncol), np.float32, sf2,
+        self.sf2 = Util3d(model, (nlay, nrow, ncol), np.float64, sf2,
                           'Secondary Storage Coefficient',
                           locat=self.unit_number[0])
-        self.wetdry = Util3d(model, (nlay, nrow, ncol), np.float32, wetdry,
+        self.wetdry = Util3d(model, (nlay, nrow, ncol), np.float64, wetdry,
                              'WETDRY', locat=self.unit_number[0])
         self.parent.add_package(self)
         return
@@ -342,7 +342,7 @@ class ModflowBcf(Package):
         # TRPY array
         if model.verbose:
             print('   loading TRPY...')
-        trpy = Util2d.load(f, model, (nlay,), np.float32, 'trpy',
+        trpy = Util2d.load(f, model, (nlay,), np.float64, 'trpy',
                            ext_unit_dict)
 
         # property data for each layer based on options
@@ -371,7 +371,7 @@ class ModflowBcf(Package):
             if transient:
                 if model.verbose:
                     print('   loading sf1 layer {0:3d}...'.format(k + 1))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'sf1',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'sf1',
                                 ext_unit_dict)
                 sf1[k] = t
 
@@ -379,13 +379,13 @@ class ModflowBcf(Package):
             if ((laycon[k] == 0) or (laycon[k] == 2)):
                 if model.verbose:
                     print('   loading tran layer {0:3d}...'.format(k + 1))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'tran',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'tran',
                                 ext_unit_dict)
                 tran[k] = t
             else:
                 if model.verbose:
                     print('   loading hy layer {0:3d}...'.format(k + 1))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'hy',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'hy',
                                 ext_unit_dict)
                 hy[k] = t
 
@@ -393,7 +393,7 @@ class ModflowBcf(Package):
             if k < (nlay - 1):
                 if model.verbose:
                     print('   loading vcont layer {0:3d}...'.format(k + 1))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'vcont',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'vcont',
                                 ext_unit_dict)
                 vcont[k] = t
 
@@ -401,7 +401,7 @@ class ModflowBcf(Package):
             if (transient and ((laycon[k] == 2) or (laycon[k] == 3))):
                 if model.verbose:
                     print('   loading sf2 layer {0:3d}...'.format(k + 1))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'sf2',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'sf2',
                                 ext_unit_dict)
                 sf2[k] = t
 
@@ -409,7 +409,7 @@ class ModflowBcf(Package):
             if ((iwdflg != 0) and ((laycon[k] == 1) or (laycon[k] == 3))):
                 if model.verbose:
                     print('   loading sf2 layer {0:3d}...'.format(k + 1))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'wetdry',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'wetdry',
                                 ext_unit_dict)
                 wetdry[k] = t
 

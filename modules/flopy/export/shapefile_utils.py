@@ -135,7 +135,7 @@ def write_grid_shapefile(filename, mg, array_dict, nan_val=np.nan,  # -1.0e9,
         names = enforce_10ch_limit(names)
 
     # flag nan values and explicitly set the dtypes
-    if at.dtype in [np.float, np.float32, np.float64]:
+    if at.dtype in [np.float64, np.float64, np.float64]:
         at[np.isnan(at)] = nan_val
     at = np.array([tuple(i) for i in at], dtype=dtypes)
 
@@ -410,8 +410,8 @@ def get_pyshp_field_info(dtypename):
 
 def get_pyshp_field_dtypes(code):
     """Returns a numpy dtype for a pyshp field type."""
-    dtypes = {'N': np.int,
-              'F': np.float,
+    dtypes = {'N': np.int_,
+              'F': np.float64,
               'L': np.bool,
               'C': np.object}
     return dtypes.get(code, np.object)

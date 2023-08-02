@@ -175,18 +175,18 @@ class ModflowDrn(Package):
     def get_default_dtype(structured=True, is_drt=False):
         if structured:
             if not is_drt:
-                dtype = np.dtype([("k", np.int), ("i", np.int),
-                                  ("j", np.int), ("elev", np.float32),
-                                  ("cond", np.float32)])
+                dtype = np.dtype([("k", np.int_), ("i", np.int_),
+                                  ("j", np.int_), ("elev", np.float64),
+                                  ("cond", np.float64)])
             else:
-                dtype = np.dtype([("k", np.int), ("i", np.int),
-                                  ("j", np.int), ("elev", np.float32),
-                                  ("cond", np.float32), ("layr", np.int),
-                                  ("rowr", np.int), ("colr", np.int),
-                                  ("rfprop", np.float32)])
+                dtype = np.dtype([("k", np.int_), ("i", np.int_),
+                                  ("j", np.int_), ("elev", np.float64),
+                                  ("cond", np.float64), ("layr", np.int_),
+                                  ("rowr", np.int_), ("colr", np.int_),
+                                  ("rfprop", np.float64)])
         else:
-            dtype = np.dtype([("node", np.int), ("elev", np.float32),
-                              ("cond", np.float32)])
+            dtype = np.dtype([("node", np.int_), ("elev", np.float64),
+                              ("cond", np.float64)])
         return dtype
 
     def ncells(self):
@@ -238,7 +238,7 @@ class ModflowDrn(Package):
         dtype = ModflowDrn.get_default_dtype(structured=structured,
                                              is_drt=is_drt)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
         return create_empty_recarray(ncells, dtype, default_value=-1.0E+10)
 
     @staticmethod

@@ -676,7 +676,7 @@ class Vtk(object):
         shape1d = self.shape[0] * self.shape[1] * self.shape[2]
 
         # build index array
-        ot_idx_array = np.zeros(shape1d, dtype=np.int)
+        ot_idx_array = np.zeros(shape1d, dtype=np.int_)
         # loop through arrays
         for name in self.arrays:
             array = self.arrays[name]

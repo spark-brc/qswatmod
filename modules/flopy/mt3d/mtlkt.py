@@ -167,7 +167,7 @@ class Mt3dLkt(Package):
 
         # Set initial lake concentrations
         self.coldlak = []
-        u2d = Util2d(self.parent, (nlkinit,), np.float32, coldlak,
+        u2d = Util2d(self.parent, (nlkinit,), np.float64, coldlak,
                      name='coldlak', locat=self.unit_number[0],
                      array_free_format=False, iprn=iprn)
         self.coldlak.append(u2d)
@@ -184,7 +184,7 @@ class Mt3dLkt(Package):
                             "LKT: setting {0} for component {1} to zero, kwarg name {2}".
                             format(base_name, icomp, name))
                         val = 0.0
-                    u2d = Util2d(model, (nlkinit,), np.float32, val,
+                    u2d = Util2d(model, (nlkinit,), np.float64, val,
                                  name=name, locat=self.unit_number[0],
                                  array_free_format=model.free_format)
                     self.coldlak.append(u2d)
@@ -354,7 +354,7 @@ class Mt3dLkt(Package):
                       'read COLDLAK')
 
         kwargs = {}
-        coldlak = Util2d.load(f, model, (nlkinit,), np.float32, 'coldlak1',
+        coldlak = Util2d.load(f, model, (nlkinit,), np.float64, 'coldlak1',
                               ext_unit_dict, array_format=model.array_format)
 
         if ncomp > 1:
@@ -362,7 +362,7 @@ class Mt3dLkt(Package):
                 name = "coldlak" + str(icomp)
                 if model.verbose:
                     print('   loading {}...'.format(name))
-                u2d = Util2d.load(f, model, (nlkinit,), np.float32,
+                u2d = Util2d.load(f, model, (nlkinit,), np.float64,
                                   name, ext_unit_dict,
                                   array_format=model.array_format)
                 kwargs[name] = u2d
@@ -448,12 +448,12 @@ class Mt3dLkt(Package):
         Construct a dtype for the recarray containing the list of boundary
         conditions interacting with the lake (i.e., pumps, specified runoff...)
         """
-        type_list = [("node", np.int), ("ilkbctyp", np.int), \
-                     ("cbclk0", np.float32)]
+        type_list = [("node", np.int_), ("ilkbctyp", np.int_), \
+                     ("cbclk0", np.float64)]
         if ncomp > 1:
             for icomp in range(2, ncomp + 1):
                 comp_name = "cbclk({0:02d})".format(icomp)
-                type_list.append((comp_name, np.float32))
+                type_list.append((comp_name, np.float64))
         dtype = np.dtype(type_list)
         return dtype
 

@@ -195,8 +195,8 @@ class ModflowWel(Package):
                 if 'specify' in opt:
                     t = opt.strip().split()
                     self.specify = True
-                    self.phiramp = np.float(t[1])
-                    self.iunitramp = np.int(t[2])
+                    self.phiramp = np.float64(t[1])
+                    self.iunitramp = np.int_(t[2])
                     self.options.pop(idx)
                     break
 
@@ -317,10 +317,10 @@ class ModflowWel(Package):
     @staticmethod
     def get_default_dtype(structured=True):
         if structured:
-            dtype = np.dtype([("k", np.int), ("i", np.int),
-                              ("j", np.int), ("flux", np.float32)])
+            dtype = np.dtype([("k", np.int_), ("i", np.int_),
+                              ("j", np.int_), ("flux", np.float64)])
         else:
-            dtype = np.dtype([("node", np.int), ("flux", np.float32)])
+            dtype = np.dtype([("node", np.int_), ("flux", np.float64)])
         return dtype
 
     @staticmethod
@@ -328,7 +328,7 @@ class ModflowWel(Package):
         # get an empty recarray that corresponds to dtype
         dtype = ModflowWel.get_default_dtype(structured=structured)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
         return create_empty_recarray(ncells, dtype, default_value=-1.0E+10)
 
     @staticmethod

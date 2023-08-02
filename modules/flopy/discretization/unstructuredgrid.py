@@ -259,9 +259,9 @@ class UnstructuredGrid(Grid):
         ncells, nverts = ll[0:2]
         ncells = int(ncells)
         nverts = int(nverts)
-        verts = np.empty((nverts, 2), dtype=np.float)
-        xc = np.empty((ncells), dtype=np.float)
-        yc = np.empty((ncells), dtype=np.float)
+        verts = np.empty((nverts, 2), dtype=np.float64)
+        xc = np.empty((ncells), dtype=np.float64)
+        yc = np.empty((ncells), dtype=np.float64)
 
         # read the vertices
         f.readline()

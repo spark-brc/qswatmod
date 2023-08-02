@@ -250,8 +250,8 @@ class ModflowHyd(Package):
     def get_default_dtype():
         # PCKG ARR INTYP KLAY XL YL HYDLBL
         dtype = np.dtype([("pckg", '|S3'), ("arr", '|S2'),
-                          ("intyp", '|S1'), ("klay", np.int),
-                          ("xl", np.float32), ("yl", np.float32),
+                          ("intyp", '|S1'), ("klay", np.int_),
+                          ("xl", np.float64), ("yl", np.float64),
                           ("hydlbl", '|S14')])
         return dtype
 

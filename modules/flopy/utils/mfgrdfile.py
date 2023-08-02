@@ -105,7 +105,7 @@ class MfGrdFile(FlopyBinaryData):
             if dt == 'INTEGER':
                 dtype = np.int32
             elif dt == 'SINGLE':
-                dtype = np.float32
+                dtype = np.float64
             elif dt == 'DOUBLE':
                 dtype = np.float64
             else:
@@ -146,7 +146,7 @@ class MfGrdFile(FlopyBinaryData):
             else:
                 if dt == np.int32:
                     v = self.read_integer()
-                elif dt == np.float32:
+                elif dt == np.float64:
                     v = self.read_real()
                 elif dt == np.float64:
                     v = self.read_real()

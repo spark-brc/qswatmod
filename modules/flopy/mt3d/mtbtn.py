@@ -260,7 +260,7 @@ class Mt3dBtn(Package):
             species_names = []
         self.species_names = species_names
         self.prsity = Util3d(model, (self.nlay, self.nrow, self.ncol),
-                             np.float32, prsity, name='prsity',
+                             np.float64, prsity, name='prsity',
                              locat=self.unit_number[0],
                              array_free_format=False)
         self.icbund = Util3d(model, (self.nlay, self.nrow, self.ncol),
@@ -269,18 +269,18 @@ class Mt3dBtn(Package):
                              locat=self.unit_number[0],
                              array_free_format=False)
         self.ssflag = ssflag
-        self.dt0 = Util2d(model, (self.nper,), np.float32, dt0, name='dt0',
+        self.dt0 = Util2d(model, (self.nper,), np.float64, dt0, name='dt0',
                           array_free_format=False)
         self.mxstrn = Util2d(model, (self.nper,), np.int32, mxstrn,
                              name='mxstrn')
-        self.ttsmult = Util2d(model, (self.nper,), np.float32, ttsmult,
+        self.ttsmult = Util2d(model, (self.nper,), np.float64, ttsmult,
                               name='ttmult')
-        self.ttsmax = Util2d(model, (self.nper,), np.float32, ttsmax,
+        self.ttsmax = Util2d(model, (self.nper,), np.float64, ttsmax,
                              name='ttsmax')
 
         # Do some fancy stuff for multi-species concentrations
         self.sconc = []
-        u3d = Util3d(model, (self.nlay, self.nrow, self.ncol), np.float32,
+        u3d = Util3d(model, (self.nlay, self.nrow, self.ncol), np.float64,
                      sconc, name='sconc1', locat=self.unit_number[0],
                      array_free_format=False)
         self.sconc.append(u3d)
@@ -295,7 +295,7 @@ class Mt3dBtn(Package):
                           str(icomp) + " to zero, kwarg name " +
                           name)
                 u3d = Util3d(model, (self.nlay, self.nrow, self.ncol),
-                             np.float32, val, name=name,
+                             np.float64, val, name=name,
                              locat=self.unit_number[0],
                              array_free_format=False)
                 self.sconc.append(u3d)
@@ -361,58 +361,58 @@ class Mt3dBtn(Package):
         nper = self.nper
 
         if delr is not None:
-            self.delr = Util2d(self.parent, (ncol,), np.float32, delr,
+            self.delr = Util2d(self.parent, (ncol,), np.float64, delr,
                                name='delr',
                                locat=self.unit_number[0],
                                array_free_format=False)
         else:
-            self.delr = Util2d(self.parent, (ncol,), np.float32,
+            self.delr = Util2d(self.parent, (ncol,), np.float64,
                                mf.dis.delr.get_value(),
                                name='delr',
                                locat=self.unit_number[0],
                                array_free_format=False)
 
         if delc is not None:
-            self.delc = Util2d(self.parent, (nrow,), np.float32, delc,
+            self.delc = Util2d(self.parent, (nrow,), np.float64, delc,
                                name='delc',
                                locat=self.unit_number[0])
         else:
-            self.delc = Util2d(self.parent, (nrow,), np.float32,
+            self.delc = Util2d(self.parent, (nrow,), np.float64,
                                mf.dis.delc.get_value(),
                                name='delc',
                                locat=self.unit_number[0],
                                array_free_format=False)
 
         if htop is not None:
-            self.htop = Util2d(self.parent, (nrow, ncol), np.float32, htop,
+            self.htop = Util2d(self.parent, (nrow, ncol), np.float64, htop,
                                name='htop',
                                locat=self.unit_number[0],
                                array_free_format=False)
         else:
-            self.htop = Util2d(self.parent, (nrow, ncol), np.float32,
+            self.htop = Util2d(self.parent, (nrow, ncol), np.float64,
                                mf.dis.top.get_value(),
                                name='htop',
                                locat=self.unit_number[0],
                                array_free_format=False)
 
         if dz is not None:
-            self.dz = Util3d(self.parent, (nlay, nrow, ncol), np.float32, dz,
+            self.dz = Util3d(self.parent, (nlay, nrow, ncol), np.float64, dz,
                              name='dz',
                              locat=self.unit_number[0],
                              array_free_format=False)
         else:
             thickness = mf.dis.thickness.get_value()
-            self.dz = Util3d(self.parent, (nlay, nrow, ncol), np.float32,
+            self.dz = Util3d(self.parent, (nlay, nrow, ncol), np.float64,
                              thickness, name='dz',
                              locat=self.unit_number[0],
                              array_free_format=False)
 
         if perlen is not None:
-            self.perlen = Util2d(self.parent, (nper,), np.float32, perlen,
+            self.perlen = Util2d(self.parent, (nper,), np.float64, perlen,
                                  name='perlen',
                                  locat=self.unit_number[0])
         else:
-            self.perlen = Util2d(self.parent, (nper,), np.float32,
+            self.perlen = Util2d(self.parent, (nper,), np.float64,
                                  mf.dis.perlen.get_value(),
                                  name='perlen',
                                  locat=self.unit_number[0])
@@ -428,11 +428,11 @@ class Mt3dBtn(Package):
                                locat=self.unit_number[0])
 
         if tsmult is not None:
-            self.tsmult = Util2d(self.parent, (nper,), np.float32, tsmult,
+            self.tsmult = Util2d(self.parent, (nper,), np.float64, tsmult,
                                  name='tsmult',
                                  locat=self.unit_number[0])
         else:
-            self.tsmult = Util2d(self.parent, (nper,), np.float32,
+            self.tsmult = Util2d(self.parent, (nper,), np.float64,
                                  mf.dis.tsmult.get_value(),
                                  name='tsmult',
                                  locat=self.unit_number[0])
@@ -590,7 +590,7 @@ class Mt3dBtn(Package):
         else:
             f_btn.write('{0:10d}\n'.format(len(self.timprs)))
             timprs = Util2d(self.parent, (len(self.timprs),),
-                            np.float32, self.timprs, name='timprs',
+                            np.float64, self.timprs, name='timprs',
                             fmtin='(8G10.4)')
             timprs.format.fortran = '(8G10.4)'
             f_btn.write(timprs.string)
@@ -763,35 +763,35 @@ class Mt3dBtn(Package):
 
         if model.verbose:
             print('   loading DELR...')
-        delr = Util2d.load(f, model, (ncol,), np.float32, 'delr',
+        delr = Util2d.load(f, model, (ncol,), np.float64, 'delr',
                            ext_unit_dict, array_format="mt3d")
         if model.verbose:
             print('   DELR {}'.format(delr))
 
         if model.verbose:
             print('   loading DELC...')
-        delc = Util2d.load(f, model, (nrow,), np.float32, 'delc',
+        delc = Util2d.load(f, model, (nrow,), np.float64, 'delc',
                            ext_unit_dict, array_format="mt3d")
         if model.verbose:
             print('   DELC {}'.format(delc))
 
         if model.verbose:
             print('   loading HTOP...')
-        htop = Util2d.load(f, model, (nrow, ncol), np.float32, 'htop',
+        htop = Util2d.load(f, model, (nrow, ncol), np.float64, 'htop',
                            ext_unit_dict, array_format="mt3d")
         if model.verbose:
             print('   HTOP {}'.format(htop))
 
         if model.verbose:
             print('   loading DZ...')
-        dz = Util3d.load(f, model, (nlay, nrow, ncol), np.float32, 'dz',
+        dz = Util3d.load(f, model, (nlay, nrow, ncol), np.float64, 'dz',
                          ext_unit_dict, array_format="mt3d")
         if model.verbose:
             print('   DZ {}'.format(dz))
 
         if model.verbose:
             print('   loading PRSITY...')
-        prsity = Util3d.load(f, model, (nlay, nrow, ncol), np.float32,
+        prsity = Util3d.load(f, model, (nlay, nrow, ncol), np.float64,
                              'prsity',
                              ext_unit_dict, array_format="mt3d")
         if model.verbose:
@@ -807,14 +807,14 @@ class Mt3dBtn(Package):
         if model.verbose:
             print('   loading SCONC...')
         kwargs = {}
-        sconc = Util3d.load(f, model, (nlay, nrow, ncol), np.float32, 'sconc1',
+        sconc = Util3d.load(f, model, (nlay, nrow, ncol), np.float64, 'sconc1',
                             ext_unit_dict, array_format="mt3d")
         if ncomp > 1:
             for icomp in range(2, ncomp + 1):
                 name = "sconc" + str(icomp)
                 if model.verbose:
                     print('   loading {}...'.format(name))
-                u3d = Util3d.load(f, model, (nlay, nrow, ncol), np.float32,
+                u3d = Util3d.load(f, model, (nlay, nrow, ncol), np.float64,
                                   name, ext_unit_dict, array_format="mt3d")
                 kwargs[name] = u3d
         if model.verbose:
@@ -860,7 +860,7 @@ class Mt3dBtn(Package):
         if nprs > 0:
             if model.verbose:
                 print('   loading TIMPRS...')
-            timprs = Util2d.load_txt((nprs,), f, np.float32, '(8F10.0)')
+            timprs = Util2d.load_txt((nprs,), f, np.float64, '(8F10.0)')
             if model.verbose:
                 print('   TIMPRS {}'.format(timprs))
 
@@ -927,7 +927,7 @@ class Mt3dBtn(Package):
             ssflag.append(sf)
 
             if tsmult[-1] <= 0:
-                t = Util2d.load_txt((nstp[-1],), f, np.float32, '(8F10.0)')
+                t = Util2d.load_txt((nstp[-1],), f, np.float64, '(8F10.0)')
                 tslngh.append(t)
                 raise Exception("tsmult <= 0 not supported")
 

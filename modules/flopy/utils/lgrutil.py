@@ -50,10 +50,10 @@ class Lgr(object):
         self.ncolp = ncolp
 
         m = Modflow()
-        self.delrp = Util2d(m, (ncolp,), np.float32, delrp, 'delrp').array
-        self.delcp = Util2d(m, (nrowp,), np.float32, delcp, 'delcp').array
-        self.topp = Util2d(m, (nrowp, ncolp), np.float32, topp, 'topp').array
-        self.botmp = Util3d(m, (nlayp, nrowp, ncolp), np.float32, botmp,
+        self.delrp = Util2d(m, (ncolp,), np.float64, delrp, 'delrp').array
+        self.delcp = Util2d(m, (nrowp,), np.float64, delcp, 'delcp').array
+        self.topp = Util2d(m, (nrowp, ncolp), np.float64, topp, 'topp').array
+        self.botmp = Util3d(m, (nlayp, nrowp, ncolp), np.float64, botmp,
                             'botmp').array
 
         # idomain
@@ -64,7 +64,7 @@ class Lgr(object):
 
         # # child cells per parent and child cells per parent layer
         self.ncpp = ncpp
-        self.ncppl = Util2d(m, (nlayp,), np.int, ncppl, 'ncppl').array
+        self.ncppl = Util2d(m, (nlayp,), np.int_, ncppl, 'ncppl').array
 
         # parent lower left
         self.xllp = xllp
@@ -205,7 +205,7 @@ class Lgr(object):
             idomain array for the child model
 
         """
-        idomain = np.ones((self.nlay, self.nrow, self.ncol), dtype=np.int)
+        idomain = np.ones((self.nlay, self.nrow, self.ncol), dtype=np.int_)
         for kc in range(self.nlay):
             for ic in range(self.nrow):
                 for jc in range(self.ncol):

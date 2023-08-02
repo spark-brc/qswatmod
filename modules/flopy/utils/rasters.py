@@ -54,11 +54,11 @@ class Raster(object):
     >>> rio = Raster.load("myraster.tif")
 
     """
-    FLOAT32 = (float, np.float, np.float32, np.float_)
+    FLOAT32 = (float, np.float64, np.float64, np.float_)
     FLOAT64 = (np.float64,)
     INT8 = (np.int8,)
     INT16 = (np.int16,)
-    INT32 = (int, np.int, np.int32, np.int_)
+    INT32 = (int, np.int_, np.int32, np.int_)
     INT64 = (np.int64,)
 
     def __init__(self, array, bands, crs, transform,

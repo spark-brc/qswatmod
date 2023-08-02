@@ -43,7 +43,7 @@ class Mt3dSsm(Package):
         can be specified for additional species by passing additional
         arguments to the Mt3dSsm constructor.  For example, to specify the
         recharge concentration for species two one could use
-        crch2={0: 0., 1: 10*np.ones((nrow, ncol), dtype=np.float)} as
+        crch2={0: 0., 1: 10*np.ones((nrow, ncol), dtype=np.float64)} as
         and additional keyword argument that is passed to Mt3dSsm when making
         the ssm object.
     cevt : Transient2d, scalar, array of floats, or dictionary
@@ -63,9 +63,9 @@ class Mt3dSsm(Package):
         values in the dictionary are recarrays of SSM boundaries.  The
         dtype for the recarray can be obtained using ssm.dtype (after the
         ssm package has been created).  The default dtype for the recarray is
-        np.dtype([('k', np.int), ("i", np.int), ("j", np.int),
-        ("css", np.float32), ("itype", np.int),
-        ((cssms(n), np.float), n=1, ncomp)])
+        np.dtype([('k', np.int_), ("i", np.int_), ("j", np.int_),
+        ("css", np.float64), ("itype", np.int_),
+        ((cssms(n), np.float64), n=1, ncomp)])
         If there are more than one component species, then additional entries
         will be added to the dtype as indicated by cssm(n).
         Note that if the number of dictionary entries is less than the number
@@ -263,7 +263,7 @@ class Mt3dSsm(Package):
         if crch is not None:
 
             self.crch = []
-            t2d = Transient2d(model, (nrow, ncol), np.float32,
+            t2d = Transient2d(model, (nrow, ncol), np.float64,
                               crch, name='crch1',
                               locat=self.unit_number[0],
                               array_free_format=False)
@@ -278,7 +278,7 @@ class Mt3dSsm(Package):
                         print("SSM: setting crch for component " + \
                               str(icomp) + " to zero. kwarg name " + \
                               name)
-                    t2d = Transient2d(model, (nrow, ncol), np.float32,
+                    t2d = Transient2d(model, (nrow, ncol), np.float64,
                                       val, name=name,
                                       locat=self.unit_number[0],
                                       array_free_format=False)
@@ -287,7 +287,7 @@ class Mt3dSsm(Package):
         #     try:
         #         if model.mf.rch is not None:
         #             print("found 'rch' in modflow model, resetting crch to 0.0")
-        #             self.crch = [Transient2d(model, (nrow, ncol), np.float32,
+        #             self.crch = [Transient2d(model, (nrow, ncol), np.float64,
         #                           0, name='crch1',
         #                           locat=self.unit_number[0],
         #                           array_free_format=False)]
@@ -310,7 +310,7 @@ class Mt3dSsm(Package):
 
         if cevt is not None:
             self.cevt = []
-            t2d = Transient2d(model, (nrow, ncol), np.float32,
+            t2d = Transient2d(model, (nrow, ncol), np.float64,
                               cevt, name='cevt1',
                               locat=self.unit_number[0],
                               array_free_format=False)
@@ -326,7 +326,7 @@ class Mt3dSsm(Package):
                         print("SSM: setting cevt for component " + \
                               str(icomp) + " to zero, kwarg name " + \
                               name)
-                    t2d = Transient2d(model, (nrow, ncol), np.float32,
+                    t2d = Transient2d(model, (nrow, ncol), np.float64,
                                       val, name=name,
                                       locat=self.unit_number[0],
                                       array_free_format=False)
@@ -336,7 +336,7 @@ class Mt3dSsm(Package):
         #     try:
         #         if model.mf.evt is not None or model.mf.ets is not None:
         #             print("found 'ets'/'evt' in modflow model, resetting cevt to 0.0")
-        #             self.cevt = [Transient2d(model, (nrow, ncol), np.float32,
+        #             self.cevt = [Transient2d(model, (nrow, ncol), np.float64,
         #                                     0, name='cevt1',
         #                                     locat=self.unit_number[0],
         #                                     array_free_format=False)]
@@ -382,12 +382,12 @@ class Mt3dSsm(Package):
         Construct a dtype for the recarray containing the list of sources
         and sinks
         """
-        type_list = [("k", np.int), ("i", np.int), ("j", np.int),
-                     ("css", np.float32), ("itype", np.int)]
+        type_list = [("k", np.int_), ("i", np.int_), ("j", np.int_),
+                     ("css", np.float64), ("itype", np.int_)]
         if ncomp > 1:
             for comp in range(1, ncomp + 1):
                 comp_name = "cssm({0:02d})".format(comp)
-                type_list.append((comp_name, np.float32))
+                type_list.append((comp_name, np.float64))
         dtype = np.dtype(type_list)
         return dtype
 
@@ -590,28 +590,28 @@ class Mt3dSsm(Package):
 
         crch = None
         if 't' in frch.lower():
-            t2d = Transient2d(model, (nrow, ncol), np.float32,
+            t2d = Transient2d(model, (nrow, ncol), np.float64,
                               0.0, name='crch', locat=0,
                               array_free_format=False)
             crch = {0: t2d}
             if ncomp > 1:
                 for icomp in range(2, ncomp + 1):
                     name = "crch" + str(icomp)
-                    t2d = Transient2d(model, (nrow, ncol), np.float32,
+                    t2d = Transient2d(model, (nrow, ncol), np.float64,
                                       0.0, name=name, locat=0,
                                       array_free_format=False)
                     kwargs[name] = {0: t2d}
 
         cevt = None
         if 't' in fevt.lower():
-            t2d = Transient2d(model, (nrow, ncol), np.float32,
+            t2d = Transient2d(model, (nrow, ncol), np.float64,
                               0.0, name='cevt', locat=0,
                               array_free_format=False)
             cevt = {0: t2d}
             if ncomp > 1:
                 for icomp in range(2, ncomp + 1):
                     name = "cevt" + str(icomp)
-                    t2d = Transient2d(model, (nrow, ncol), np.float32,
+                    t2d = Transient2d(model, (nrow, ncol), np.float64,
                                       0.0, name=name, locat=0,
                                       array_free_format=False)
                     kwargs[name] = {0: t2d}
@@ -635,7 +635,7 @@ class Mt3dSsm(Package):
             if incrch >= 0:
                 if model.verbose:
                     print('   loading CRCH...')
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'crch',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'crch',
                                 ext_unit_dict, array_format="mt3d")
                 crch[iper] = t
                 # Load each multispecies array
@@ -645,7 +645,7 @@ class Mt3dSsm(Package):
                         if model.verbose:
                             print('   loading {}...'.format(name))
                         t = Util2d.load(f, model, (nrow, ncol),
-                                        np.float32, name, ext_unit_dict,
+                                        np.float64, name, ext_unit_dict,
                                         array_format="mt3d")
                         crchicomp = kwargs[name]
                         crchicomp[iper] = t
@@ -662,7 +662,7 @@ class Mt3dSsm(Package):
             if incevt >= 0:
                 if model.verbose:
                     print('   loading CEVT...')
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'cevt',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'cevt',
                                 ext_unit_dict, array_format="mt3d")
                 cevt[iper] = t
                 # Load each multispecies array
@@ -672,7 +672,7 @@ class Mt3dSsm(Package):
                         if model.verbose:
                             print('   loading {}...'.format(name))
                         t = Util2d.load(f, model, (nrow, ncol),
-                                        np.float32, name, ext_unit_dict,
+                                        np.float64, name, ext_unit_dict,
                                         array_format="mt3d")
                         cevticomp = kwargs[name]
                         cevticomp[iper] = t

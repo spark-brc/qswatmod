@@ -212,17 +212,17 @@ class check:
             # include node column for structured grids (useful for indexing)
             dtype = np.dtype([('type', np.object),
                               ('package', np.object),
-                              ('k', np.int),
-                              ('i', np.int),
-                              ('j', np.int),
-                              ('value', np.float),
+                              ('k', np.int_),
+                              ('i', np.int_),
+                              ('j', np.int_),
+                              ('value', np.float64),
                               ('desc', np.object)
                               ])
         else:
             dtype = np.dtype([('type', np.object),
                               ('package', np.object),
-                              ('node', np.int),
-                              ('value', np.float),
+                              ('node', np.int_),
+                              ('value', np.float64),
                               ('desc', np.object)
                               ])
         if array is None:

@@ -56,7 +56,7 @@ class ArrayFormat(object):
 
     Methods
     -------
-    get_default_numpy_fmt : (dtype : [np.int32, np.float32])
+    get_default_numpy_fmt : (dtype : [np.int32, np.float64])
         a static method to get a default numpy dtype - used for loading
     decode_fortran_descriptor : (fd : str)
         a static method to decode fortran descriptors into npl, format,
@@ -127,7 +127,7 @@ class ArrayFormat(object):
             self._width = self.default_int_width
             self._decimal = None
 
-        elif self.dtype in [np.float32, bool]:
+        elif self.dtype in [np.float64, bool]:
             self._npl = self._npl_full
             self._format = self.default_float_format
             self._width = self.default_float_width
@@ -146,12 +146,12 @@ class ArrayFormat(object):
     def get_default_numpy_fmt(dtype):
         if dtype == np.int32:
             return "%10d"
-        elif dtype == np.float32:
+        elif dtype == np.float64:
             return "%15.6E"
         else:
             raise Exception(
                 "ArrayFormat.get_default_numpy_fmt(): unrecognized " + \
-                "dtype, must be np.int32 or np.float32")
+                "dtype, must be np.int32 or np.float64")
 
     @classmethod
     def integer(cls):
@@ -212,9 +212,9 @@ class ArrayFormat(object):
 
         elif key == "width":
             width = int(value)
-            if self.dtype == np.float32 and width < self.decimal:
+            if self.dtype == np.float64 and width < self.decimal:
                 raise Exception("width cannot be less than decimal")
-            elif self.dtype == np.float32 and \
+            elif self.dtype == np.float64 and \
                     width < self.default_float_width:
                 print("ArrayFormat warning:setting width less " +
                       "than default of {0}".format(self.default_float_width))
@@ -222,7 +222,7 @@ class ArrayFormat(object):
         elif key == "decimal":
             if self.dtype == np.int32:
                 raise Exception("cannot set decimal for integer dtypes")
-            elif self.dtype == np.float32:
+            elif self.dtype == np.float64:
                 value = int(value)
                 if value < self.default_float_decimal:
                     print("ArrayFormat warning: setting decimal " +
@@ -444,7 +444,7 @@ class Util3d(DataInterface):
         this package will be added.
     shape : length 3 tuple
         shape of the 3-D array, typically (nlay,nrow,ncol)
-    dtype : [np.int32, np.float32, np.bool]
+    dtype : [np.int32, np.float64, np.bool]
         the type of the data
     value : variable
         the data to be assigned to the 3-D array.
@@ -898,7 +898,7 @@ class Transient3d(DataInterface):
         this package will be added.
     shape : length 3 tuple
         shape of the 3-D transient arrays, typically (nlay,nrow,ncol)
-    dtype : [np.int32, np.float32, np.bool]
+    dtype : [np.int32, np.float64, np.bool]
         the type of the data
     value : variable
         the data to be assigned to the 3-D arrays. Typically a dict
@@ -1139,7 +1139,7 @@ class Transient2d(DataInterface):
         this package will be added.
     shape : length 2 tuple
         shape of the 2-D transient arrays, typically (nrow,ncol)
-    dtype : [np.int32, np.float32, np.bool]
+    dtype : [np.int32, np.float64, np.bool]
         the type of the data
     value : variable
         the data to be assigned to the 2-D arrays. Typically a dict
@@ -1301,7 +1301,7 @@ class Transient2d(DataInterface):
         assert m4d.shape[1] == 1
         assert m4d.shape[2] == model.nrow
         assert m4d.shape[3] == model.ncol
-        m4d = m4d.astype(np.float32)
+        m4d = m4d.astype(np.float64)
         kper_dict = Transient2d.masked4d_array_to_kper_dict(m4d)
         return cls(model=model, shape=(model.nrow, model.ncol),
                    value=kper_dict,
@@ -1576,7 +1576,7 @@ class Util2d(DataInterface):
         this package will be added.
     shape : tuple
         Shape of the 1- or 2-D array
-    dtype : [np.int32, np.float32, np.bool]
+    dtype : [np.int32, np.float64, np.bool]
         the type of the data
     value : variable
         the data to be assigned to the 1- or 2-D array.
@@ -1657,12 +1657,12 @@ class Util2d(DataInterface):
         model : model object
         shape : tuple
             Dimensions of 1- or 2-D array, e.g. (nrow, ncol)
-        dtype : int or np.float32
-        value : str, list, np.int32, np.float32, bool or np.ndarray
+        dtype : int or np.float64
+        value : str, list, np.int32, np.float64, bool or np.ndarray
         name : str
             Array name or description
         fmtin : str, optional
-        cnstnt : np.int32 or np.float32, optional
+        cnstnt : np.int32 or np.float64, optional
             Array constant; default 1.0
         iprn : int, optional
             Modflow printing option; default -1
@@ -1707,7 +1707,7 @@ class Util2d(DataInterface):
                 warn('Util2d: setting integer dtype from {0} to int32'
                      .format(dtype))
             dtype = np.int32
-        if dtype not in [np.int32, np.float32, np.bool]:
+        if dtype not in [np.int32, np.float64, np.bool]:
             raise TypeError('Util2d:unsupported dtype: ' + str(dtype))
 
         if name is not None:
@@ -1771,7 +1771,7 @@ class Util2d(DataInterface):
 
     def _decide_how(self):
         # if a constant was passed in
-        if self.vtype in [np.int32, np.float32]:
+        if self.vtype in [np.int32, np.float64]:
             self._how = "constant"
         # if a filename was passed in or external path was set
         elif self._model.external_path is not None or \
@@ -1902,13 +1902,13 @@ class Util2d(DataInterface):
 
     # overloads, tries to avoid creating arrays if possible
     def __add__(self, other):
-        if self.vtype in [np.int32, np.float32] and self.vtype == other.vtype:
+        if self.vtype in [np.int32, np.float64] and self.vtype == other.vtype:
             return self.__value + other.get_value()
         else:
             return self.array + other.array
 
     def __sub__(self, other):
-        if self.vtype in [np.int32, np.float32] and self.vtype == other.vtype:
+        if self.vtype in [np.int32, np.float64] and self.vtype == other.vtype:
             return self.__value - other.get_value()
         else:
             return self.array - other.array
@@ -2087,14 +2087,14 @@ class Util2d(DataInterface):
             cr = '{0:>10.0f}{1:>10.0f}{2:>19s}{3:>10.0f} #{4}\n' \
                 .format(locat, value, fformat,
                         self.iprn, self._name)
-        elif self._dtype == np.float32:
+        elif self._dtype == np.float64:
             cr = '{0:>10.0f}{1:>10.5G}{2:>19s}{3:>10.0f} #{4}\n' \
                 .format(locat, value, fformat,
                         self.iprn, self._name)
         else:
             raise Exception(
                 'Util2d: error generating fixed-format control record, '
-                'dtype must be np.int32 or np.float32')
+                'dtype must be np.int32 or np.float64')
         return cr
 
     def get_internal_cr(self):
@@ -2210,7 +2210,7 @@ class Util2d(DataInterface):
                 return self.get_openclose_cr()
 
         elif how == "constant":
-            if self.vtype not in [np.int32, np.float32]:
+            if self.vtype not in [np.int32, np.float64]:
                 u = np.unique(self._array)
                 assert u.shape[
                            0] == 1, "Util2d error: 'how' is constant, but array " + \
@@ -2315,7 +2315,7 @@ class Util2d(DataInterface):
             Array dimensions (nrow, ncol)
         file_in : file or str
             Filename or file handle
-        dtype : np.int32 or np.float32
+        dtype : np.int32 or np.float64
 
         Returns
         -------
@@ -2358,7 +2358,7 @@ class Util2d(DataInterface):
             One or two array dimensions
         file_in : file or str
             Filename or file handle
-        dtype : np.int32 or np.float32
+        dtype : np.int32 or np.float64
         fmtin : str
             Fortran array format descriptor, '(FREE)' or e.g. '(10G11.4)'
 
@@ -2502,9 +2502,9 @@ class Util2d(DataInterface):
             One or two array dimensions
         file_in : file or str
             Filename or file handle
-        dtype : np.int32 or np.float32
+        dtype : np.int32 or np.float64
             Data type of unformatted file and Numpy array; use np.int32 for
-            Fortran's INTEGER, and np.float32 for Fortran's REAL data types.
+            Fortran's INTEGER, and np.float64 for Fortran's REAL data types.
         bintype : str
             Normally 'Head'
 
@@ -2606,9 +2606,9 @@ class Util2d(DataInterface):
                 except:
                     raise Exception('Util2d:could not cast scalar ' +
                                     'value to type "int": ' + str(value))
-            elif self._dtype == np.float32:
+            elif self._dtype == np.float64:
                 try:
-                    self.__value = np.float32(value)
+                    self.__value = np.float64(value)
                 except:
                     raise Exception('Util2d:could not cast ' +
                                     'scalar value to type "float": ' +
@@ -2737,7 +2737,7 @@ class Util2d(DataInterface):
         return u2d
 
     @staticmethod
-    def parse_control_record(line, current_unit=None, dtype=np.float32,
+    def parse_control_record(line, current_unit=None, dtype=np.float64,
                              ext_unit_dict=None, array_format=None):
         """
         parses a control record when reading an existing file
@@ -2749,21 +2749,21 @@ class Util2d(DataInterface):
         freefmt, cnstnt, fmtin, iprn, nunit = None, None, None, -1, None
         fname = None
         isfloat = False
-        if dtype == np.float or dtype == np.float32:
+        if dtype == np.float64 or dtype == np.float64:
             isfloat = True
             # if free format keywords
         if str(raw[0].lower()) in str(free_fmt):
             freefmt = raw[0].lower()
             if raw[0].lower() == 'constant':
                 if isfloat:
-                    cnstnt = np.float(raw[1].lower().replace('d', 'e'))
+                    cnstnt = np.float64(raw[1].lower().replace('d', 'e'))
                 else:
-                    cnstnt = np.int(raw[1].lower())
+                    cnstnt = np.int_(raw[1].lower())
             if raw[0].lower() == 'internal':
                 if isfloat:
-                    cnstnt = np.float(raw[1].lower().replace('d', 'e'))
+                    cnstnt = np.float64(raw[1].lower().replace('d', 'e'))
                 else:
-                    cnstnt = np.int(raw[1].lower())
+                    cnstnt = np.int_(raw[1].lower())
                 fmtin = raw[2].strip()
                 iprn = 0
                 if len(raw) >= 4:
@@ -2779,9 +2779,9 @@ class Util2d(DataInterface):
 
                 nunit = int(raw[1])
                 if isfloat:
-                    cnstnt = np.float(raw[2].lower().replace('d', 'e'))
+                    cnstnt = np.float64(raw[2].lower().replace('d', 'e'))
                 else:
-                    cnstnt = np.int(raw[2].lower())
+                    cnstnt = np.int_(raw[2].lower())
                 fmtin = raw[3].strip()
                 iprn = 0
                 if len(raw) >= 5:
@@ -2789,25 +2789,25 @@ class Util2d(DataInterface):
             elif raw[0].lower() == 'open/close':
                 fname = raw[1].strip()
                 if isfloat:
-                    cnstnt = np.float(raw[2].lower().replace('d', 'e'))
+                    cnstnt = np.float64(raw[2].lower().replace('d', 'e'))
                 else:
-                    cnstnt = np.int(raw[2].lower())
+                    cnstnt = np.int_(raw[2].lower())
                 fmtin = raw[3].strip()
                 iprn = 0
                 if len(raw) >= 5:
                     iprn = int(raw[4])
                 npl, fmt, width, decimal = None, None, None, None
         else:
-            locat = np.int(line[0:10].strip())
+            locat = np.int_(line[0:10].strip())
             if isfloat:
                 if len(line) >= 20:
-                    cnstnt = np.float(
+                    cnstnt = np.float64(
                         line[10:20].strip().lower().replace('d', 'e'))
                 else:
                     cnstnt = 0.0
             else:
                 if len(line) >= 20:
-                    cnstnt = np.int(line[10:20].strip())
+                    cnstnt = np.int_(line[10:20].strip())
                 else:
                     cnstnt = 0
                 # if cnstnt == 0:
@@ -2818,7 +2818,7 @@ class Util2d(DataInterface):
                 else:
                     fmtin = ''
                 try:
-                    iprn = np.int(line[40:50].strip())
+                    iprn = np.int_(line[40:50].strip())
                 except:
                     iprn = 0
             # locat = int(raw[0])
@@ -2829,7 +2829,7 @@ class Util2d(DataInterface):
                 freefmt = 'constant'
             elif locat < 0:
                 freefmt = 'external'
-                nunit = np.int(locat) * -1
+                nunit = np.int_(locat) * -1
                 fmtin = '(binary)'
             elif locat > 0:
                 # if the unit number matches the current file, it's internal
@@ -2837,7 +2837,7 @@ class Util2d(DataInterface):
                     freefmt = 'internal'
                 else:
                     freefmt = 'external'
-                nunit = np.int(locat)
+                nunit = np.int_(locat)
 
             # Reset for special MT3D control flags
             if array_format == 'mt3d':

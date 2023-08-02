@@ -263,8 +263,8 @@ class Mt3dCts(Package):
         raise NotImplementedError()
 
         # # Item 3
-        # type_list = [("icts", np.int), ("next", np.int), ("ninj", np.int),
-        #              ("itrtinj", np.int)]
+        # type_list = [("icts", np.int_), ("next", np.int_), ("ninj", np.int_),
+        #              ("itrtinj", np.int_)]
         #
         # # Create a list for storing items 5, 6, & 9
         # items_5_6_7_9_list = []
@@ -273,35 +273,35 @@ class Mt3dCts(Package):
         #     for comp in range(1, ncomp+1):
         #         qincts_name = "qincts{0:d}".format(comp)
         #         cincts_name = "cincts{0:d}".format(comp)
-        #         items_5_6_7_9_list.append((qincts_name, np.float32))
-        #         items_5_6_7_9_list.append((cincts_name, np.float32))
+        #         items_5_6_7_9_list.append((qincts_name, np.float64))
+        #         items_5_6_7_9_list.append((cincts_name, np.float64))
         #
         #     # Item 6 in CTS input
         #     for comp in range(1, ncomp+1):
         #         ioptinj_name = "ioptinj{0:d}".format(comp)
         #         cmchginj_name = "cmchginj{0:d}".format(comp)
-        #         items_5_6_7_9_list.append((ioptinj_name, np.int))
-        #         items_5_6_7_9_list.append((cmchginj_name, np.float32))
+        #         items_5_6_7_9_list.append((ioptinj_name, np.int_))
+        #         items_5_6_7_9_list.append((cmchginj_name, np.float64))
         #
         #     if iforce == 0:
         #         for comp in range(1, ncomp+1):
         #             cnte_name = "cnte{0:d}".format(comp)
-        #             items_5_6_7_9_list.append(cnte_name, np.float32)
+        #             items_5_6_7_9_list.append(cnte_name, np.float64)
         #
         #     # Item 9 in CTS input
-        #     items_5_6_7_9_list.append(("qoutcts", np.float32))
+        #     items_5_6_7_9_list.append(("qoutcts", np.float64))
         #
         # type_list.append(items_5_6_7_9_list)
         #
         # # Now create a list for the records in Item 4
-        # ext_wels_list = [("kext", np.int), ("iext", np.int), ("jext", np.int),
-        #                  ("iwext", np.int)]
+        # ext_wels_list = [("kext", np.int_), ("iext", np.int_), ("jext", np.int_),
+        #                  ("iwext", np.int_)]
         #
         # type_list.append(ext_wels_list)
         #
         # # Now create a list for the records in Item 8
-        # inj_wels_list = [("kinj", np.int), ("iinj", np.int), ("jinj", np.int),
-        #                  ("iwinj", np.int)]
+        # inj_wels_list = [("kinj", np.int_), ("iinj", np.int_), ("jinj", np.int_),
+        #                  ("iwinj", np.int_)]
         # type_list.append(inj_wels_list)
         #
         # #

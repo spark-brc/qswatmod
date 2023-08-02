@@ -455,7 +455,7 @@ class ModflowFlwob(Package):
             k = np.zeros(abs(nqclfb[nobs]), np.int32)
             i = np.zeros(abs(nqclfb[nobs]), np.int32)
             j = np.zeros(abs(nqclfb[nobs]), np.int32)
-            fac = np.zeros(abs(nqclfb[nobs]), np.float32)
+            fac = np.zeros(abs(nqclfb[nobs]), np.float64)
 
             ncells = 0
             while True:

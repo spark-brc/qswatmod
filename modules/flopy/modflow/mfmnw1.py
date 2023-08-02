@@ -158,23 +158,23 @@ class ModflowMnw1(Package):
     @staticmethod
     def get_default_dtype(structured=True):
         if structured:
-            return np.dtype([('mnw_no', np.int),
-                             ('k', np.int),
-                             ('i', np.int),
-                             ('j', np.int),
-                             ('qdes', np.float32),
+            return np.dtype([('mnw_no', np.int_),
+                             ('k', np.int_),
+                             ('i', np.int_),
+                             ('j', np.int_),
+                             ('qdes', np.float64),
                              ('mntxt', np.object),
-                             ('qwval', np.float32),
-                             ('rw', np.float32),
-                             ('skin', np.float32),
-                             ('hlim', np.float32),
-                             ('href', np.float32),
+                             ('qwval', np.float64),
+                             ('rw', np.float64),
+                             ('skin', np.float64),
+                             ('hlim', np.float64),
+                             ('href', np.float64),
                              ('dd', np.object),
                              ('iqwgrp', np.object),
                              ('cpc', np.object),
                              ('qcut', np.object),
-                             ('qfrcmn', np.float32),
-                             ('qfrcmx', np.float32),
+                             ('qfrcmn', np.float64),
+                             ('qfrcmx', np.float64),
                              ('label', np.object)])
         else:
             pass

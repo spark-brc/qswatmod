@@ -11,7 +11,7 @@ from . import shapefile_utils
 from . import vtk
 
 
-NC_PRECISION_TYPE = {np.float64: "f8", np.float32: "f4", np.int: "i4",
+NC_PRECISION_TYPE = {np.float64: "f8", np.float64: "f4", np.int_: "i4",
                      np.int64: "i4", np.int32: "i4"}
 
 path = os.path.split(netcdf.__file__)[0]
@@ -121,7 +121,7 @@ def _add_output_nc_variable(f, times, shape3d, out_obj, var_name, logger=None,
             var_name))
 
     array = np.zeros((len(times), shape3d[0], shape3d[1], shape3d[2]),
-                     dtype=np.float32)
+                     dtype=np.float64)
     array[:] = np.NaN
     for i, t in enumerate(times):
         if t in out_obj.recordarray["totim"]:
@@ -143,7 +143,7 @@ def _add_output_nc_variable(f, times, shape3d, out_obj, var_name, logger=None,
             if mask_array3d is not None and a.shape == mask_array3d.shape:
                 a[mask_array3d] = np.NaN
             try:
-                array[i, :, :, :] = a.astype(np.float32)
+                array[i, :, :, :] = a.astype(np.float64)
             except Exception as e:
                 estr = "error assigning {0} data to array for time {1}:{2}".format(
                     var_name + text.decode().strip().lower(), t, str(e))
@@ -767,7 +767,7 @@ def transient2d_export(f, t2d, fmt=None, **kwargs):
         array = t2d.array
         # f.log("getting 4D array for {0}".format(t2d.name_base))
         with np.errstate(invalid="ignore"):
-            if array.dtype not in [int, np.int, np.int32, np.int64]:
+            if array.dtype not in [int, np.int_, np.int32, np.int64]:
                 if mask is not None:
                     array[:, 0, mask] = np.NaN
                 array[array <= min_valid] = np.NaN
@@ -920,7 +920,7 @@ def array3d_export(f, u3d, fmt=None, **kwargs):
         # runtime warning issued in some cases - need to track down cause
         # happens when NaN is already in array
         with np.errstate(invalid="ignore"):
-            if array.dtype not in [int, np.int, np.int32, np.int64]:
+            if array.dtype not in [int, np.int_, np.int32, np.int64]:
                 # if u3d.model.modelgrid.bas6 is not None and "ibound" not
                 # in var_name:
                 #    array[u3d.model.modelgrid.bas6.ibound.array == 0] =
@@ -1052,7 +1052,7 @@ def array2d_export(f, u2d, fmt=None, **kwargs):
         # f.log("getting 2D array for {0}".format(u2d.name))
 
         with np.errstate(invalid="ignore"):
-            if array.dtype not in [int, np.int, np.int32, np.int64]:
+            if array.dtype not in [int, np.int_, np.int32, np.int64]:
                 if modelgrid.idomain is not None and \
                                 "ibound" not in u2d.name.lower() and \
                                 "idomain" not in u2d.name.lower():

@@ -32,7 +32,7 @@ class FlopyBinaryData(object):
             self.real = np.float64
             self.floattype = 'f8'
         else:
-            self.real = np.float32
+            self.real = np.float64
             self.floattype = 'f4'
         self.realbyte = self.real(1).nbytes
         return

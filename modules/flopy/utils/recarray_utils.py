@@ -23,7 +23,7 @@ def create_empty_recarray(length, dtype, default_value=0):
     --------
     >>> import numpy as np
     >>> import flopy
-    >>> dtype = np.dtype([('x', np.float32), ('y', np.float32)])
+    >>> dtype = np.dtype([('x', np.float64), ('y', np.float64)])
     >>> ra = flopy.utils.create_empty_recarray(10, dtype)
 
     """
@@ -87,7 +87,7 @@ def recarray(array, dtype):
     --------
     >>> import numpy as np
     >>> import flopy
-    >>> dtype = np.dtype([('x', np.float32), ('y', np.float32)])
+    >>> dtype = np.dtype([('x', np.float64), ('y', np.float64)])
     >>> arr = [(1., 2.), (10., 20.), (100., 200.)]
     >>> ra = flopy.utils.recarray(arr, dtype)
 

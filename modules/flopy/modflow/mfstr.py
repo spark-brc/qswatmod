@@ -378,7 +378,7 @@ class ModflowStr(Package):
         # get an empty recarray that corresponds to dtype
         dtype, dtype2 = ModflowStr.get_default_dtype(structured=structured)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
         return (
         create_empty_recarray(ncells, dtype=dtype, default_value=-1.0E+10),
         create_empty_recarray(nss, dtype=dtype2, default_value=0))
@@ -386,28 +386,28 @@ class ModflowStr(Package):
     @staticmethod
     def get_default_dtype(structured=True):
         if structured:
-            dtype = np.dtype([("k", np.int), ("i", np.int), ("j", np.int),
-                              ("segment", np.int), ("reach", np.int),
-                              ("flow", np.float32), ("stage", np.float32),
-                              ("cond", np.float32), ("sbot", np.float32),
-                              ("stop", np.float32),
-                              ("width", np.float32), ("slope", np.float32),
-                              ("rough", np.float32)])
+            dtype = np.dtype([("k", np.int_), ("i", np.int_), ("j", np.int_),
+                              ("segment", np.int_), ("reach", np.int_),
+                              ("flow", np.float64), ("stage", np.float64),
+                              ("cond", np.float64), ("sbot", np.float64),
+                              ("stop", np.float64),
+                              ("width", np.float64), ("slope", np.float64),
+                              ("rough", np.float64)])
         else:
-            dtype = np.dtype([("node", np.int),
-                              ("segment", np.int), ("reach", np.int),
-                              ("flow", np.float32), ("stage", np.float32),
-                              ("cond", np.float32), ("sbot", np.float32),
-                              ("stop", np.float32),
-                              ("width", np.float32), ("slope", np.float32),
-                              ("rough", np.float32)])
+            dtype = np.dtype([("node", np.int_),
+                              ("segment", np.int_), ("reach", np.int_),
+                              ("flow", np.float64), ("stage", np.float64),
+                              ("cond", np.float64), ("sbot", np.float64),
+                              ("stop", np.float64),
+                              ("width", np.float64), ("slope", np.float64),
+                              ("rough", np.float64)])
 
-        dtype2 = np.dtype([("itrib01", np.int), ("itrib02", np.int),
-                           ("itrib03", np.int), ("itrib04", np.int),
-                           ("itrib05", np.int), ("itrib06", np.int),
-                           ("itrib07", np.int), ("itrib08", np.int),
-                           ("itrib09", np.int), ("itrib10", np.int),
-                           ("iupseg", np.int)])
+        dtype2 = np.dtype([("itrib01", np.int_), ("itrib02", np.int_),
+                           ("itrib03", np.int_), ("itrib04", np.int_),
+                           ("itrib05", np.int_), ("itrib06", np.int_),
+                           ("itrib07", np.int_), ("itrib08", np.int_),
+                           ("itrib09", np.int_), ("itrib10", np.int_),
+                           ("iupseg", np.int_)])
         return dtype, dtype2
 
     def ncells(self):
@@ -678,13 +678,13 @@ class ModflowStr(Package):
 
                         #  get appropriate parval
                         if model.mfpar.pval is None:
-                            parval = np.float(par_dict['parval'])
+                            parval = np.float64(par_dict['parval'])
                         else:
                             try:
-                                parval = np.float(
+                                parval = np.float64(
                                     model.mfpar.pval.pval_dict[pname])
                             except:
-                                parval = np.float(par_dict['parval'])
+                                parval = np.float64(par_dict['parval'])
 
                         # fill current parameter data (par_current)
                         for ibnd, t in enumerate(data_dict):

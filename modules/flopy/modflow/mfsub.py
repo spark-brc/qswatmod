@@ -318,16 +318,16 @@ class ModflowSub(Package):
         self.sfv = None
         if nndb > 0:
             self.ln = Util2d(model, (nndb,), np.int32, ln, name='ln')
-            self.hc = Util3d(model, (nndb, nrow, ncol), np.float32, hc,
+            self.hc = Util3d(model, (nndb, nrow, ncol), np.float64, hc,
                              name='hc',
                              locat=self.unit_number[0])
-            self.sfe = Util3d(model, (nndb, nrow, ncol), np.float32, sfe,
+            self.sfe = Util3d(model, (nndb, nrow, ncol), np.float64, sfe,
                               name='sfe',
                               locat=self.unit_number[0])
-            self.sfv = Util3d(model, (nndb, nrow, ncol), np.float32, sfv,
+            self.sfv = Util3d(model, (nndb, nrow, ncol), np.float64, sfv,
                               name='sfv',
                               locat=self.unit_number[0])
-            self.com = Util3d(model, (nndb, nrow, ncol), np.float32, com,
+            self.com = Util3d(model, (nndb, nrow, ncol), np.float64, com,
                               name='com',
                               locat=self.unit_number[0])
         # delay bed data
@@ -339,19 +339,19 @@ class ModflowSub(Package):
         self.nz = None
         if ndb > 0:
             self.ldn = Util2d(model, (ndb,), np.int32, ldn, name='ldn')
-            self.rnb = Util3d(model, (ndb, nrow, ncol), np.float32, rnb,
+            self.rnb = Util3d(model, (ndb, nrow, ncol), np.float64, rnb,
                               name='rnb',
                               locat=self.unit_number[0])
-            self.dstart = Util3d(model, (ndb, nrow, ncol), np.float32, dstart,
+            self.dstart = Util3d(model, (ndb, nrow, ncol), np.float64, dstart,
                                  name='dstart',
                                  locat=self.unit_number[0])
-            self.dhc = Util3d(model, (ndb, nrow, ncol), np.float32, dhc,
+            self.dhc = Util3d(model, (ndb, nrow, ncol), np.float64, dhc,
                               name='dhc',
                               locat=self.unit_number[0])
-            self.dcom = Util3d(model, (ndb, nrow, ncol), np.float32, dcom,
+            self.dcom = Util3d(model, (ndb, nrow, ncol), np.float64, dcom,
                                name='dcom',
                                locat=self.unit_number[0])
-            self.dz = Util3d(model, (ndb, nrow, ncol), np.float32, dz,
+            self.dz = Util3d(model, (ndb, nrow, ncol), np.float64, dz,
                              name='dz',
                              locat=self.unit_number[0])
             self.nz = Util3d(model, (ndb, nrow, ncol), np.int32, nz, name='nz',
@@ -566,7 +566,7 @@ class ModflowSub(Package):
                 sys.stdout.write('  loading sub dataset 4\n')
             rnb = [0] * ndb
             for k in range(ndb):
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'rnb delay bed {}'.format(k + 1),
                                 ext_unit_dict)
                 rnb[k] = t
@@ -585,35 +585,35 @@ class ModflowSub(Package):
                 if model.verbose:
                     sys.stdout.write(
                         '  loading sub dataset 5 for layer {}\n'.format(kk))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'hc layer {}'.format(kk), ext_unit_dict)
                 hc[k] = t
                 # sfe
                 if model.verbose:
                     sys.stdout.write(
                         '  loading sub dataset 6 for layer {}\n'.format(kk))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'sfe layer {}'.format(kk), ext_unit_dict)
                 sfe[k] = t
                 # sfv
                 if model.verbose:
                     sys.stdout.write(
                         '  loading sub dataset 7 for layer {}\n'.format(kk))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'sfv layer {}'.format(kk), ext_unit_dict)
                 sfv[k] = t
                 # com
                 if model.verbose:
                     sys.stdout.write(
                         '  loading sub dataset 8 for layer {}\n'.format(kk))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'com layer {}'.format(kk), ext_unit_dict)
                 com[k] = t
 
         # dp
         dp = None
         if ndb > 0:
-            dp = np.zeros((nmz, 3), dtype=np.float32)
+            dp = np.zeros((nmz, 3), dtype=np.float64)
             for k in range(nmz):
                 if model.verbose:
                     msg = 2 * ' ' + 'loading sub dataset 9 for material ' + \
@@ -641,7 +641,7 @@ class ModflowSub(Package):
                     msg = 2 * ' ' + 'loading sub dataset 10 for ' + \
                           'layer {}\n'.format(kk)
                     sys.stdout.write(msg)
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'dstart layer {}'.format(kk),
                                 ext_unit_dict)
                 dstart[k] = t
@@ -650,7 +650,7 @@ class ModflowSub(Package):
                     msg = 2 * ' ' + 'loading sub dataset 11 for ' + \
                           'layer {}\n'.format(kk)
                     sys.stdout.write(msg)
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'dhc layer {}'.format(kk),
                                 ext_unit_dict)
                 dhc[k] = t
@@ -659,7 +659,7 @@ class ModflowSub(Package):
                     msg = 2 * ' ' + 'loading sub dataset 12 for ' + \
                           'layer {}\n'.format(kk)
                     sys.stdout.write(msg)
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'dcom layer {}'.format(kk),
                                 ext_unit_dict)
                 dcom[k] = t
@@ -668,7 +668,7 @@ class ModflowSub(Package):
                     msg = 2 * ' ' + 'loading sub dataset 13 for ' + \
                           'layer {}\n'.format(kk)
                     sys.stdout.write(msg)
-                t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                 'dz layer {}'.format(kk),
                                 ext_unit_dict)
                 dz[k] = t

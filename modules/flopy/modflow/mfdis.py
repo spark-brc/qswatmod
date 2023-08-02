@@ -166,19 +166,19 @@ class ModflowDis(Package):
         self.laycbd = Util2d(model, (self.nlay,), np.int32, laycbd,
                              name='laycbd')
         self.laycbd[-1] = 0  # bottom layer must be zero
-        self.delr = Util2d(model, (self.ncol,), np.float32, delr, name='delr',
+        self.delr = Util2d(model, (self.ncol,), np.float64, delr, name='delr',
                            locat=self.unit_number[0])
-        self.delc = Util2d(model, (self.nrow,), np.float32, delc, name='delc',
+        self.delc = Util2d(model, (self.nrow,), np.float64, delc, name='delc',
                            locat=self.unit_number[0])
-        self.top = Util2d(model, (self.nrow, self.ncol), np.float32,
+        self.top = Util2d(model, (self.nrow, self.ncol), np.float64,
                           top, name='model_top', locat=self.unit_number[0])
         self.botm = Util3d(model, (self.nlay + sum(self.laycbd),
-                                   self.nrow, self.ncol), np.float32, botm,
+                                   self.nrow, self.ncol), np.float64, botm,
                            'botm', locat=self.unit_number[0])
-        self.perlen = Util2d(model, (self.nper,), np.float32, perlen,
+        self.perlen = Util2d(model, (self.nper,), np.float64, perlen,
                              name='perlen')
         self.nstp = Util2d(model, (self.nper,), np.int32, nstp, name='nstp')
-        self.tsmult = Util2d(model, (self.nper,), np.float32, tsmult,
+        self.tsmult = Util2d(model, (self.nper,), np.float64, tsmult,
                              name='tsmult')
         self.steady = Util2d(model, (self.nper,), np.bool,
                              steady, name='steady')
@@ -285,7 +285,7 @@ class ModflowDis(Package):
                 totim.append(t)
                 if m > 1:
                     dt *= m
-        return np.array(totim, dtype=np.float)
+        return np.array(totim, dtype=np.float64)
 
     def get_final_totim(self):
         """
@@ -567,7 +567,7 @@ class ModflowDis(Package):
             thk.append(self.botm[k - 1] - self.botm[k])
         self.__thickness = Util3d(self.parent, (self.nlay + sum(self.laycbd),
                                                 self.nrow, self.ncol),
-                                  np.float32, thk, name='thickness')
+                                  np.float64, thk, name='thickness')
 
     @property
     def thickness(self):
@@ -585,7 +585,7 @@ class ModflowDis(Package):
         for k in range(1, self.nlay + sum(self.laycbd)):
             thk.append(self.botm[k - 1] - self.botm[k])
         return Util3d(self.parent, (self.nlay + sum(self.laycbd),
-                                    self.nrow, self.ncol), np.float32,
+                                    self.nrow, self.ncol), np.float64,
                       thk, name='thickness')
 
     def write_file(self, check=True):
@@ -852,13 +852,13 @@ class ModflowDis(Package):
                   '{0} layers, {1} rows, {2} columns, and {3} stress periods'.format(
                       nlay, nrow, ncol, nper))
             print('   loading laycbd...')
-        laycbd = np.zeros(nlay, dtype=np.int)
+        laycbd = np.zeros(nlay, dtype=np.int_)
         d = 0
         while True:
             line = f.readline()
             raw = line.strip('\n').split()
             for val in raw:
-                if (np.int(val)) != 0:
+                if (np.int_(val)) != 0:
                     laycbd[d] = 1
                 d += 1
                 if d == nlay:
@@ -868,17 +868,17 @@ class ModflowDis(Package):
         # dataset 3 -- delr
         if model.verbose:
             print('   loading delr...')
-        delr = Util2d.load(f, model, (ncol,), np.float32, 'delr',
+        delr = Util2d.load(f, model, (ncol,), np.float64, 'delr',
                            ext_unit_dict)
         # dataset 4 -- delc
         if model.verbose:
             print('   loading delc...')
-        delc = Util2d.load(f, model, (nrow,), np.float32, 'delc',
+        delc = Util2d.load(f, model, (nrow,), np.float64, 'delc',
                            ext_unit_dict)
         # dataset 5 -- top
         if model.verbose:
             print('   loading top...')
-        top = Util2d.load(f, model, (nrow, ncol), np.float32, 'top',
+        top = Util2d.load(f, model, (nrow, ncol), np.float64, 'top',
                           ext_unit_dict)
         # dataset 6 -- botm
         ncbd = laycbd.sum()
@@ -887,10 +887,10 @@ class ModflowDis(Package):
             print('      for {} layers and '.format(nlay) +
                   '{} confining beds'.format(ncbd))
         if nlay > 1:
-            botm = Util3d.load(f, model, (nlay + ncbd, nrow, ncol), np.float32,
+            botm = Util3d.load(f, model, (nlay + ncbd, nrow, ncol), np.float64,
                                'botm', ext_unit_dict)
         else:
-            botm = Util3d.load(f, model, (nlay, nrow, ncol), np.float32,
+            botm = Util3d.load(f, model, (nlay, nrow, ncol), np.float64,
                                'botm',
                                ext_unit_dict)
         # dataset 7 -- stress period info

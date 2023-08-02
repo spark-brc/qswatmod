@@ -657,7 +657,7 @@ class ModflowSfr2(Package):
         # get an empty recarray that corresponds to dtype
         dtype = ModflowSfr2.get_default_reach_dtype(structured=structured)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
         d = create_empty_recarray(nreaches, dtype, default_value=default_value)
         d['reachID'] = np.arange(1, nreaches + 1)
         return d
@@ -667,7 +667,7 @@ class ModflowSfr2(Package):
         # get an empty recarray that corresponds to dtype
         dtype = ModflowSfr2.get_default_segment_dtype()
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
         d = create_empty_recarray(nsegments, dtype,
                                   default_value=default_value)
         return d
@@ -676,75 +676,75 @@ class ModflowSfr2(Package):
     def get_default_reach_dtype(structured=True):
         if structured:
             # include node column for structured grids (useful for indexing)
-            return np.dtype([('node', np.int),
-                             ('k', np.int),
-                             ('i', np.int),
-                             ('j', np.int),
-                             ('iseg', np.int),
-                             ('ireach', np.int),
-                             ('rchlen', np.float32),
-                             ('strtop', np.float32),
-                             ('slope', np.float32),
-                             ('strthick', np.float32),
-                             ('strhc1', np.float32),
-                             ('thts', np.float32),
-                             ('thti', np.float32),
-                             ('eps', np.float32),
-                             ('uhc', np.float32),
-                             ('reachID', np.int),
-                             ('outreach', np.int)])
+            return np.dtype([('node', np.int_),
+                             ('k', np.int_),
+                             ('i', np.int_),
+                             ('j', np.int_),
+                             ('iseg', np.int_),
+                             ('ireach', np.int_),
+                             ('rchlen', np.float64),
+                             ('strtop', np.float64),
+                             ('slope', np.float64),
+                             ('strthick', np.float64),
+                             ('strhc1', np.float64),
+                             ('thts', np.float64),
+                             ('thti', np.float64),
+                             ('eps', np.float64),
+                             ('uhc', np.float64),
+                             ('reachID', np.int_),
+                             ('outreach', np.int_)])
         else:
-            return np.dtype([('node', np.int),
-                             ('iseg', np.int),
-                             ('ireach', np.int),
-                             ('rchlen', np.float32),
-                             ('strtop', np.float32),
-                             ('slope', np.float32),
-                             ('strthick', np.float32),
-                             ('strhc1', np.float32),
-                             ('thts', np.float32),
-                             ('thti', np.float32),
-                             ('eps', np.float32),
-                             ('uhc', np.float32),
-                             ('reachID', np.int),
-                             ('outreach', np.int)])
+            return np.dtype([('node', np.int_),
+                             ('iseg', np.int_),
+                             ('ireach', np.int_),
+                             ('rchlen', np.float64),
+                             ('strtop', np.float64),
+                             ('slope', np.float64),
+                             ('strthick', np.float64),
+                             ('strhc1', np.float64),
+                             ('thts', np.float64),
+                             ('thti', np.float64),
+                             ('eps', np.float64),
+                             ('uhc', np.float64),
+                             ('reachID', np.int_),
+                             ('outreach', np.int_)])
 
     @staticmethod
     def get_default_segment_dtype():
-        return np.dtype([('nseg', np.int),
-                         ('icalc', np.int),
-                         ('outseg', np.int),
-                         ('iupseg', np.int),
-                         ('iprior', np.int),
-                         ('nstrpts', np.int),
-                         ('flow', np.float32),
-                         ('runoff', np.float32),
-                         ('etsw', np.float32),
-                         ('pptsw', np.float32),
-                         ('roughch', np.float32),
-                         ('roughbk', np.float32),
-                         ('cdpth', np.float32),
-                         ('fdpth', np.float32),
-                         ('awdth', np.float32),
-                         ('bwdth', np.float32),
-                         ('hcond1', np.float32),
-                         ('thickm1', np.float32),
-                         ('elevup', np.float32),
-                         ('width1', np.float32),
-                         ('depth1', np.float32),
-                         ('thts1', np.float32),
-                         ('thti1', np.float32),
-                         ('eps1', np.float32),
-                         ('uhc1', np.float32),
-                         ('hcond2', np.float32),
-                         ('thickm2', np.float32),
-                         ('elevdn', np.float32),
-                         ('width2', np.float32),
-                         ('depth2', np.float32),
-                         ('thts2', np.float32),
-                         ('thti2', np.float32),
-                         ('eps2', np.float32),
-                         ('uhc2', np.float32)])
+        return np.dtype([('nseg', np.int_),
+                         ('icalc', np.int_),
+                         ('outseg', np.int_),
+                         ('iupseg', np.int_),
+                         ('iprior', np.int_),
+                         ('nstrpts', np.int_),
+                         ('flow', np.float64),
+                         ('runoff', np.float64),
+                         ('etsw', np.float64),
+                         ('pptsw', np.float64),
+                         ('roughch', np.float64),
+                         ('roughbk', np.float64),
+                         ('cdpth', np.float64),
+                         ('fdpth', np.float64),
+                         ('awdth', np.float64),
+                         ('bwdth', np.float64),
+                         ('hcond1', np.float64),
+                         ('thickm1', np.float64),
+                         ('elevup', np.float64),
+                         ('width1', np.float64),
+                         ('depth1', np.float64),
+                         ('thts1', np.float64),
+                         ('thti1', np.float64),
+                         ('eps1', np.float64),
+                         ('uhc1', np.float64),
+                         ('hcond2', np.float64),
+                         ('thickm2', np.float64),
+                         ('elevdn', np.float64),
+                         ('width2', np.float64),
+                         ('depth2', np.float64),
+                         ('thts2', np.float64),
+                         ('thti2', np.float64),
+                         ('eps2', np.float64),
+                         ('uhc2', np.float64)])
 
     @staticmethod
     def load(f, model, nper=None, gwt=False, nsol=1, ext_unit_dict=None):

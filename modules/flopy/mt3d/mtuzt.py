@@ -198,7 +198,7 @@ class Mt3dUzt(Package):
         # Note: list is used for multi-species, NOT for stress periods!
         if cuzinf is not None:
             self.cuzinf = []
-            t2d = Transient2d(model, (nrow, ncol), np.float32, cuzinf,
+            t2d = Transient2d(model, (nrow, ncol), np.float64, cuzinf,
                               name='cuzinf1', locat=self.unit_number[0])
             self.cuzinf.append(t2d)
             if ncomp > 1:
@@ -211,13 +211,13 @@ class Mt3dUzt(Package):
                         print('UZT: setting cuzinf for component ' + \
                               str(icomp) + ' to zero. kwarg name ' + name)
 
-                    t2d = Transient2d(model, (nrow, ncol), np.float32, val,
+                    t2d = Transient2d(model, (nrow, ncol), np.float64, val,
                                       name=name, locat=self.unit_number[0])
                     self.cuzinf.append(t2d)
 
         if cuzet is not None:
             self.cuzet = []
-            t2d = Transient2d(model, (nrow, ncol), np.float32, cuzet,
+            t2d = Transient2d(model, (nrow, ncol), np.float64, cuzet,
                               name='cuzet1', locat=self.unit_number[0])
             self.cuzet.append(t2d)
             if ncomp > 1:
@@ -230,13 +230,13 @@ class Mt3dUzt(Package):
                         print('UZT: setting cuzet for component ' + \
                               str(icomp) + ' to zero. kwarg name ' + name)
 
-                    t2d = Transient2d(model, (nrow, ncol), np.float32, val,
+                    t2d = Transient2d(model, (nrow, ncol), np.float64, val,
                                       name=name, locat=self.unit_number[0])
                     self.cuzet.append(t2d)
 
         if cgwet is not None:
             self.cgwet = []
-            t2d = Transient2d(model, (nrow, ncol), np.float32, cgwet,
+            t2d = Transient2d(model, (nrow, ncol), np.float64, cgwet,
                               name='cgwet1', locat=self.unit_number[0])
             self.cgwet.append(t2d)
             if ncomp > 1:
@@ -249,7 +249,7 @@ class Mt3dUzt(Package):
                         print('UZT: setting cgwet for component ' + \
                               str(icomp) + ' to zero. kwarg name ' + name)
 
-                    t2d = Transient2d(model, (nrow, ncol), np.float32, val,
+                    t2d = Transient2d(model, (nrow, ncol), np.float64, val,
                                       name=name, locat=self.unit_number[0])
                     self.cgwet.append(t2d)
 
@@ -428,40 +428,40 @@ class Mt3dUzt(Package):
 
         cuzinf = None
         # At least one species being simulated, so set up a place holder
-        t2d = Transient2d(model, (nrow, ncol), np.float32, 0.0, name='cuzinf',
+        t2d = Transient2d(model, (nrow, ncol), np.float64, 0.0, name='cuzinf',
                           locat=0)
         cuzinf = {0: t2d}
         if ncomp > 1:
             for icomp in range(2, ncomp + 1):
                 name = 'cuzinf' + str(icomp)
-                t2d = Transient2d(model, (nrow, ncol), np.float32, 0.0,
+                t2d = Transient2d(model, (nrow, ncol), np.float64, 0.0,
                                   name=name, locat=0)
                 kwargs[name] = {0: t2d}
 
         # Repeat cuzinf initialization procedure for cuzet only if iet != 0
         if iet != 0:
             cuzet = None
-            t2d = Transient2d(model, (nrow, ncol), np.float32, 0.0,
+            t2d = Transient2d(model, (nrow, ncol), np.float64, 0.0,
                               name='cuzet',
                               locat=0)
             cuzet = {0: t2d}
             if ncomp > 1:
                 for icomp in range(2, ncomp + 1):
                     name = 'cuzet' + str(icomp)
-                    t2d = Transient2d(model, (nrow, ncol), np.float32, 0.0,
+                    t2d = Transient2d(model, (nrow, ncol), np.float64, 0.0,
                                       name=name, locat=0)
                     kwargs[name] = {0: t2d}
 
             # Repeat cuzinf initialization procedures for cgwet
             cgwet = None
-            t2d = Transient2d(model, (nrow, ncol), np.float32, 0.0,
+            t2d = Transient2d(model, (nrow, ncol), np.float64, 0.0,
                               name='cgwet',
                               locat=0)
             cgwet = {0: t2d}
             if ncomp > 1:
                 for icomp in range(2, ncomp + 1):
                     name = 'cgwet' + str(icomp)
-                    t2d = Transient2d(model, (nrow, ncol), np.float32, 0.0,
+                    t2d = Transient2d(model, (nrow, ncol), np.float64, 0.0,
                                       name=name, locat=0)
                     kwargs[name] = {0: t2d}
         elif iet == 0:
@@ -484,7 +484,7 @@ class Mt3dUzt(Package):
                 if model.verbose:
                     print('   Reading CUZINF array for kper ' \
                           '{0:5d}'.format(iper + 1))
-                t = Util2d.load(f, model, (nrow, ncol), np.float32, 'cuzinf',
+                t = Util2d.load(f, model, (nrow, ncol), np.float64, 'cuzinf',
                                 ext_unit_dict)
                 cuzinf[iper] = t
 
@@ -494,7 +494,7 @@ class Mt3dUzt(Package):
                         name = 'cuzinf' + str(icomp)
                         if model.verbose:
                             print('   loading {}...'.format(name))
-                        t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                        t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                         name, ext_unit_dict)
                         cuzinficomp = kwargs[name]
                         cuzinficomp[iper] = t
@@ -526,7 +526,7 @@ class Mt3dUzt(Package):
                     if model.verbose:
                         print('   Reading CUZET array for kper ' \
                               '{0:5d}'.format(iper + 1))
-                    t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                    t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                     'cuzet',
                                     ext_unit_dict)
                     cuzet[iper] = t
@@ -537,7 +537,7 @@ class Mt3dUzt(Package):
                             name = 'cuzet' + str(icomp)
                             if model.verbose:
                                 print('   loading {}'.format(name))
-                            t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                            t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                             name, ext_unit_dict)
                             cuzeticomp = kwargs[name]
                             cuzeticomp[iper] = t
@@ -568,7 +568,7 @@ class Mt3dUzt(Package):
                     if incuzet >= 0:
                         print('   Reading CGWET array for kper ' \
                               '{0:5d}'.format(iper + 1))
-                    t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                    t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                     'cgwet',
                                     ext_unit_dict)
                     cgwet[iper] = t
@@ -579,7 +579,7 @@ class Mt3dUzt(Package):
                             name = 'cgwet' + str(icomp)
                             if model.verbose:
                                 print('   loading {}...'.format(name))
-                            t = Util2d.load(f, model, (nrow, ncol), np.float32,
+                            t = Util2d.load(f, model, (nrow, ncol), np.float64,
                                             name, ext_unit_dict)
                             cgweticomp = kwargs[name]
                             cgweticomp[iper] = t

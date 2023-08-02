@@ -131,7 +131,7 @@ class LayerFile(object):
         self.iposarray = []
 
         if precision == 'single':
-            self.realtype = np.float32
+            self.realtype = np.float64
         elif precision == 'double':
             self.realtype = np.float64
         else:
