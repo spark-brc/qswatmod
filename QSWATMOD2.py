@@ -5,9 +5,9 @@
                                  A QGIS plugin
  This plugin displays the result of SM simulation
                               -------------------
-        begin                : 2020-01-02  -- recent updated: 2020-04-22
+        begin                : 2020-01-02  -- recent updated: 2023-08-02
         git sha              : $Format:%H$
-        copyright            : (C) 2020 by Seongyu Park
+        copyright            : (C) 2023 by Seongyu Park
         email                : seonggyu.park@brc.tamus.edu
  ***************************************************************************/
 
