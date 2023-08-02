@@ -1,4 +1,3 @@
-
 This repository contains only source codes.
 All other materials: example dataset and tutorial document can be downloaded from the QSWATMOD2 repository or following links.
 - [Installer](https://github.com/spark-brc/QSWATMOD2/raw/main/Installer/QSWATMOD2.exe): QSWATMOD2.exe
