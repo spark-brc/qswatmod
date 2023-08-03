@@ -1212,7 +1212,7 @@ class QSWATMOD2(object):
     def copyProjectfolder(self):
         # Location of the plugin which depend on user name
         plugindir = self.plugin_dir
-        # Definition of the projectfolder for copy
+        # Definition of the project folder for copy
         In_folder = os.path.normpath(plugindir + "/FOLDER_FOR_COPY")
         # name of the QGIS project stored in a QlineEdit
         Project_Name = self.dlg.lineEdit_Project_Name.text()
@@ -1810,14 +1810,18 @@ class QSWATMOD2(object):
             msgBox.exec_()
             self.dlg.tabWidget.setTabEnabled(2, True)
 
-        self.define_sim_period()            
+        self.define_sim_period()
 
-
+    # NOTE: let's use the latest version of SWAT-MODFLOW3
+    # https://github.com/spark-brc/SWAT-MODFLOW3
     def run_SM(self):
         import subprocess
         output_dir = QSWATMOD_path_dict['SMfolder']
-        # name = "SWAT-MODFLOW3.exe"
-        name = "swatmf_rev210621.exe"
+
+        if os.path.isfile(os.path.join(output_dir, "SWAT-MODFLOW3.exe")):
+            name = "SWAT-MODFLOW3.exe"
+        if os.path.isfile(os.path.join(output_dir, "swatmf_rel230803.exe")):
+            name = "swatmf_rel230803.exe"
         exe_file = os.path.normpath(os.path.join(output_dir, name ))
 
         # os.startfile(File_Physical)
