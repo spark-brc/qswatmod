@@ -1713,7 +1713,6 @@ class QSWATMOD2(object):
         self.dlg.progressBar_sm_link.setValue(0)
         self.dlg.textEdit_sm_link_log.append('======== Start Linking Process =========')
 
-
         # Calculate HRU area
         linking_process.calculate_hru_area(self)
         self.dlg.progressBar_sm_link.setValue(20)         

@@ -117,6 +117,7 @@ def read_mf_head_dates(self):
             msgBox.setWindowTitle("Created!")
             msgBox.setText("'mf_hd_monthly.shp' file has been created in 'swatmf_results' group!")
             msgBox.exec_()
+
     elif self.dlg.checkBox_head.isChecked() and self.dlg.radioButton_mf_results_y.isChecked():
         filename = "swatmf_out_MF_head_yearly"
         # Open "swatmf_out_MF_head" file
