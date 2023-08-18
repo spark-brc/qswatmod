@@ -1371,7 +1371,6 @@ class QSWATMOD2(object):
             inInfo = QFileInfo(inFileName[0])
             inFile = inInfo.fileName()
             pattern = os.path.splitext(inFileName[0])[0] + '.*'
-
             # inName = os.path.splitext(inFile)[0]
             inName = 'hru_org'
             for f in glob.iglob(pattern):
@@ -1381,7 +1380,6 @@ class QSWATMOD2(object):
                 else:
                     outfile = posixpath.join(output_dir, inName + suffix)             
                 shutil.copy(f, outfile)
-
             # check suffix whether .gpkg or .shp
             if suffix == ".gpkg":
                 if os.name == 'nt':
@@ -1411,6 +1409,8 @@ class QSWATMOD2(object):
             swat_group.insertChildNode(0, QgsLayerTreeLayer(layer))
             self.dlg.lineEdit_hru_shapefile.setText(hru_gpkg)
             self.mfOptionOn() # enable
+            # check whether hru id should be created
+            linking_process.create_hru_id(self)
 
 
     # navigate to the raster of the hru for SWAT+
