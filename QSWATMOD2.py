@@ -1820,8 +1820,8 @@ class QSWATMOD2(object):
 
         if os.path.isfile(os.path.join(output_dir, "SWAT-MODFLOW3.exe")):
             name = "SWAT-MODFLOW3.exe"
-        if os.path.isfile(os.path.join(output_dir, "swatmf_rel230803.exe")):
-            name = "swatmf_rel230803.exe"
+        if os.path.isfile(os.path.join(output_dir, "swatmf_rel230818.exe")):
+            name = "swatmf_rel230818.exe"
         exe_file = os.path.normpath(os.path.join(output_dir, name ))
 
         # os.startfile(File_Physical)
