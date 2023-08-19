@@ -1449,7 +1449,7 @@ class QSWATMOD2(object):
             layer = QgsProject.instance().addMapLayer(layer)
             self.dlg.lineEdit_hru_rasterfile.setText(hru_shp)    
 
-    # NOTE: for swatp-mf6
+    # NOTE: swatp-mf6 
     ###### SWAT+
     # def create_hru(self):
     #   linking_process.convert_r_v(self)
