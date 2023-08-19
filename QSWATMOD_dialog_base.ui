@@ -6118,7 +6118,7 @@ SWAT-MODFLOW Simulation</string>
                       </font>
                      </property>
                      <property name="title">
-                      <string>Not activatable in this version 2.5</string>
+                      <string>Not activatable in this version 2.6</string>
                      </property>
                      <property name="checkable">
                       <bool>false</bool>
@@ -7815,7 +7815,7 @@ SWAT-MODFLOW Simulation</string>
           </font>
          </property>
          <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#0000ff;&quot;&gt;- Version: 2.5-&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#0000ff;&quot;&gt;- Version: 2.6-&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
