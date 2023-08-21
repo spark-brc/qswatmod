@@ -4,16 +4,15 @@ the ModflowStr class as `flopy.modflow.ModflowStr`.
 
 Additional information for this MODFLOW package can be found at the `Online
 MODFLOW Guide
-<http://water.usgs.gov/ogw/modflow/MODFLOW-2005-Guide/str.htm>`_.
+<https://water.usgs.gov/ogw/modflow/MODFLOW-2005-Guide/str.html>`_.
 
 """
-import sys
-
 import numpy as np
-from ..utils import MfList
+
 from ..pakbase import Package
-from .mfparbc import ModflowParBc as mfparbc
+from ..utils import MfList, read_fixed_var, write_fixed_var
 from ..utils.recarray_utils import create_empty_recarray
+from .mfparbc import ModflowParBc as mfparbc
 
 
 class ModflowStr(Package):
@@ -61,6 +60,20 @@ class ModflowStr(Package):
         datasets 6 and 8 and the dtype for datasets 9 and 10 data in
         stress_period_data and segment_data dictionaries.
         (default is None)
+    irdflg : integer or dictionary
+        is a integer or dictionary containing a integer flag, when positive
+        suppresses printing of the stream input data for a stress period. If
+        an integer is passed, all stress periods will use the same value.
+        If a dictionary is passed, stress periods not in the dictionary will
+        assigned a value of 1. Default is None which will assign a value of 1
+        to all stress periods.
+    iptflg : integer or dictionary
+        is a integer or dictionary containing a integer flag, when positive
+        suppresses printing of stream results for a stress period. If an
+        integer is passed, all stress periods will use the same value.
+        If a dictionary is passed, stress periods not in the dictionary will
+        assigned a value of 1. Default is None which will assign a value of 1
+        to all stress periods.
     stress_period_data : dictionary of reach data
         Each dictionary contains a list of str reach data for a stress period.
 
@@ -164,7 +177,10 @@ class ModflowStr(Package):
             }
 
     options : list of strings
-        Package options. (default is None).
+        Package options. Auxiliary variables included as options should be
+        constructed as options=['AUXILIARY IFACE', 'AUX xyx']. Either
+        'AUXILIARY' or 'AUX' can be specified (case insensitive).
+        (default is None).
     extension : string
         Filename extension (default is 'str')
     unitnumber : int
@@ -198,73 +214,67 @@ class ModflowStr(Package):
     >>> import flopy
     >>> m = flopy.modflow.Modflow()
     >>> strd = {}
-    >>> strd[0] = [[2, 3, 4, 15.6, 1050., -4]]  #this river boundary will be
+    >>> strd[0] = [[2, 3, 4, 15.6, 1050., -4]]  #this str boundary will be
     >>>                                         #applied to all stress periods
-    >>> str8 = flopy.modflow.ModflowStr(m, stress_period_data=strd)
+    >>> str = flopy.modflow.ModflowStr(m, stress_period_data=strd)
 
     """
 
-    def __init__(self, model, mxacts=0, nss=0, ntrib=0, ndiv=0, icalc=0,
-                 const=86400., ipakcb=None, istcb2=None,
-                 dtype=None, stress_period_data=None, segment_data=None,
-                 extension='str', unitnumber=None, filenames=None,
-                 options=None, **kwargs):
-        """
-        Package constructor.
-
-        """
+    def __init__(
+        self,
+        model,
+        mxacts=0,
+        nss=0,
+        ntrib=0,
+        ndiv=0,
+        icalc=0,
+        const=86400.0,
+        ipakcb=None,
+        istcb2=None,
+        dtype=None,
+        stress_period_data=None,
+        segment_data=None,
+        irdflg=None,
+        iptflg=None,
+        extension="str",
+        unitnumber=None,
+        filenames=None,
+        options=None,
+        **kwargs,
+    ):
         # set default unit number of one is not specified
         if unitnumber is None:
-            unitnumber = ModflowStr.defaultunit()
+            unitnumber = ModflowStr._defaultunit()
 
         # set filenames
-        if filenames is None:
-            filenames = [None, None, None]
-        elif isinstance(filenames, str):
-            filenames = [filenames, None, None]
-        elif isinstance(filenames, list):
-            if len(filenames) < 3:
-                for idx in range(len(filenames), 3):
-                    filenames.append(None)
+        filenames = self._prepare_filenames(filenames, 3)
 
         # update external file information with cbc output, if necessary
         if ipakcb is not None:
-            fname = filenames[1]
-            model.add_output_file(ipakcb, fname=fname,
-                                  package=ModflowStr.ftype())
+            model.add_output_file(
+                ipakcb, fname=filenames[1], package=self._ftype()
+            )
         else:
             ipakcb = 0
 
         if istcb2 is not None:
-            fname = filenames[2]
-            model.add_output_file(istcb2, fname=fname,
-                                  package=ModflowStr.ftype())
+            model.add_output_file(
+                istcb2, fname=filenames[2], package=self._ftype()
+            )
         else:
             ipakcb = 0
 
-        # set filenames
-        if filenames is None:
-            filenames = [None]
-        elif isinstance(filenames, str):
-            filenames = [filenames]
+        # call base package constructor
+        super().__init__(
+            model,
+            extension=extension,
+            name=self._ftype(),
+            unit_number=unitnumber,
+            filenames=filenames[0],
+        )
 
-        # Fill namefile items
-        name = [ModflowStr.ftype()]
-        units = [unitnumber]
-        extra = ['']
-
-        # set package name
-        fname = [filenames[0]]
-
-        # Call ancestor's init to set self.parent, extension, name and
-        # unit number
-        Package.__init__(self, model, extension=extension, name=name,
-                         unit_number=units, extra=extra, filenames=fname)
-
-        self.heading = '# {} package for '.format(self.name[0]) + \
-                       ' {}, '.format(model.version_types[model.version]) + \
-                       'generated by Flopy.'
-        self.url = 'str.htm'
+        self._generate_heading()
+        self.url = "str.html"
         self.mxacts = mxacts
         self.nss = nss
         self.icalc = icalc
@@ -276,8 +286,10 @@ class ModflowStr(Package):
 
         # issue exception if ntrib is greater than 10
         if ntrib > 10:
-            raise Exception('ModflowStr error: ntrib must be less that 10: ' +
-                            'specified value = {}'.format(ntrib))
+            raise Exception(
+                "ModflowStr error: ntrib must be less that 10: "
+                "specified value = {}".format(ntrib)
+            )
 
         if options is None:
             options = []
@@ -285,6 +297,45 @@ class ModflowStr(Package):
 
         # parameters are not supported
         self.npstr = 0
+
+        # dataset 5
+        # check type of irdflg and iptflg
+        msg = ""
+        if irdflg is not None and not isinstance(irdflg, (int, dict)):
+            msg = "irdflg"
+        if iptflg is not None and not isinstance(iptflg, (int, dict)):
+            if len(msg) > 0:
+                msg += " and "
+            msg += "iptflg"
+        if len(msg) > 0:
+            msg += " must be an integer or a dictionary"
+            raise TypeError(msg)
+
+        # process irdflg
+        self.irdflg = {}
+        for n in range(self.parent.nper):
+            if irdflg is None:
+                self.irdflg[n] = 1
+            elif isinstance(irdflg, int):
+                self.irdflg[n] = irdflg
+            elif isinstance(irdflg, dict):
+                if n in irdflg:
+                    self.irdflg[n] = irdflg[n]
+                else:
+                    self.irdflg[n] = 1
+
+        # process iptflg
+        self.iptflg = {}
+        for n in range(self.parent.nper):
+            if iptflg is None:
+                self.iptflg[n] = 1
+            elif isinstance(iptflg, int):
+                self.iptflg[n] = iptflg
+            elif isinstance(iptflg, dict):
+                if n in iptflg:
+                    self.iptflg[n] = iptflg[n]
+                else:
+                    self.iptflg[n] = 1
 
         # determine dtype for dataset 6
         if dtype is not None:
@@ -296,16 +347,17 @@ class ModflowStr(Package):
                 aux_names = []
                 it = 0
                 while True:
-                    if 'aux' in options[it].lower():
-                        aux_names.append(options[it + 1].lower())
-                        it += 1
+                    if "aux" in options[it].lower():
+                        t = options[it].split()
+                        aux_names.append(t[-1].lower())
                     it += 1
-                    if it > len(options):
+                    if it >= len(options):
                         break
             if len(aux_names) < 1:
                 aux_names = None
-            d, d2 = self.get_empty(1, 1, aux_names=aux_names,
-                                   structured=self.parent.structured)
+            d, d2 = self.get_empty(
+                1, 1, aux_names=aux_names, structured=self.parent.structured
+            )
             self.dtype = d.dtype
             self.dtype2 = d2.dtype
 
@@ -316,27 +368,30 @@ class ModflowStr(Package):
                 if isinstance(d, list):
                     d = np.array(d)
                 if isinstance(d, np.recarray):
-                    e = 'ModflowStr error: recarray dtype: ' + \
-                        str(d.dtype) + ' does not match ' + \
-                        'self dtype: ' + str(self.dtype)
+                    e = (
+                        "ModflowStr error: recarray dtype: {} does not match "
+                        "self dtype: {}".format(d.dtype, self.dtype)
+                    )
                     assert d.dtype == self.dtype, e
                 elif isinstance(d, np.ndarray):
-                    d = np.core.records.fromarrays(d.transpose(),
-                                                   dtype=self.dtype)
+                    d = np.core.records.fromarrays(
+                        d.transpose(), dtype=self.dtype
+                    )
                 elif isinstance(d, int):
                     if model.verbose:
                         if d < 0:
-                            msg = 3 * ' ' + \
-                                  'reusing str data from previous stress period'
-                            print(msg)
+                            print(
+                                "   reusing str data from previous "
+                                "stress period"
+                            )
                         elif d == 0:
-                            msg = 3 * ' ' + 'no str data for stress ' + \
-                                  'period {}'.format(key)
-                            print(msg)
+                            print(f"   no str data for stress period {key}")
                 else:
-                    e = 'ModflowStr error: unsupported data type: ' + \
-                        str(type(d)) + ' at kper ' + '{0:d}'.format(key)
-                    raise Exception(e)
+                    raise Exception(
+                        "ModflowStr error: unsupported data type: "
+                        "{} at kper {}".format(type(d), key)
+                    )
+
         # add stress_period_data to package
         self.stress_period_data = MfList(self, stress_period_data)
 
@@ -346,28 +401,33 @@ class ModflowStr(Package):
                 if isinstance(d, list):
                     d = np.array(d)
                 if isinstance(d, np.recarray):
-                    e = 'ModflowStr error: recarray dtype: ' + \
-                        str(d.dtype) + ' does not match ' + \
-                        'self dtype: ' + str(self.dtype2)
+                    e = (
+                        "ModflowStr error: recarray dtype: {} does not match "
+                        "self dtype: {}".format(d.dtype, self.dtype2)
+                    )
                     assert d.dtype == self.dtype2, e
                 elif isinstance(d, np.ndarray):
-                    d = np.core.records.fromarrays(d.transpose(),
-                                                   dtype=self.dtype2)
+                    d = np.core.records.fromarrays(
+                        d.transpose(), dtype=self.dtype2
+                    )
                 elif isinstance(d, int):
                     if model.verbose:
                         if d < 0:
-                            msg = 3 * ' ' + 'reusing str segment data ' + \
-                                  'from previous stress period'
-                            print(msg)
+                            print(
+                                "   reusing str segment data "
+                                "from previous stress period"
+                            )
                         elif d == 0:
-                            msg = 3 * ' ' + 'no str segment data for ' + \
-                                  'stress period {}'.format(key)
-                            print(msg)
+                            print(
+                                f"   no str segment data for stress period {key}"
+                            )
                 else:
-                    e = 'ModflowStr error: unsupported data type: ' + \
-                        str(type(d)) + ' at kper ' + '{0:d}'.format(key)
-                    raise Exception(e)
-        # add stress_period_data to package
+                    raise Exception(
+                        "ModflowStr error: unsupported data type: "
+                        "{} at kper {}".format(type(d), key)
+                    )
+
+        # add segment_data to package
         self.segment_data = segment_data
 
         self.parent.add_package(self)
@@ -378,41 +438,76 @@ class ModflowStr(Package):
         # get an empty recarray that corresponds to dtype
         dtype, dtype2 = ModflowStr.get_default_dtype(structured=structured)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
         return (
-        create_empty_recarray(ncells, dtype=dtype, default_value=-1.0E+10),
-        create_empty_recarray(nss, dtype=dtype2, default_value=0))
+            create_empty_recarray(ncells, dtype=dtype, default_value=-1.0e10),
+            create_empty_recarray(nss, dtype=dtype2, default_value=0),
+        )
 
     @staticmethod
     def get_default_dtype(structured=True):
         if structured:
-            dtype = np.dtype([("k", np.int_), ("i", np.int_), ("j", np.int_),
-                              ("segment", np.int_), ("reach", np.int_),
-                              ("flow", np.float64), ("stage", np.float64),
-                              ("cond", np.float64), ("sbot", np.float64),
-                              ("stop", np.float64),
-                              ("width", np.float64), ("slope", np.float64),
-                              ("rough", np.float64)])
+            dtype = np.dtype(
+                [
+                    ("k", int),
+                    ("i", int),
+                    ("j", int),
+                    ("segment", int),
+                    ("reach", int),
+                    ("flow", np.float32),
+                    ("stage", np.float32),
+                    ("cond", np.float32),
+                    ("sbot", np.float32),
+                    ("stop", np.float32),
+                    ("width", np.float32),
+                    ("slope", np.float32),
+                    ("rough", np.float32),
+                ]
+            )
         else:
-            dtype = np.dtype([("node", np.int_),
-                              ("segment", np.int_), ("reach", np.int_),
-                              ("flow", np.float64), ("stage", np.float64),
-                              ("cond", np.float64), ("sbot", np.float64),
-                              ("stop", np.float64),
-                              ("width", np.float64), ("slope", np.float64),
-                              ("rough", np.float64)])
+            dtype = np.dtype(
+                [
+                    ("node", int),
+                    ("segment", int),
+                    ("reach", int),
+                    ("flow", np.float32),
+                    ("stage", np.float32),
+                    ("cond", np.float32),
+                    ("sbot", np.float32),
+                    ("stop", np.float32),
+                    ("width", np.float32),
+                    ("slope", np.float32),
+                    ("rough", np.float32),
+                ]
+            )
 
-        dtype2 = np.dtype([("itrib01", np.int_), ("itrib02", np.int_),
-                           ("itrib03", np.int_), ("itrib04", np.int_),
-                           ("itrib05", np.int_), ("itrib06", np.int_),
-                           ("itrib07", np.int_), ("itrib08", np.int_),
-                           ("itrib09", np.int_), ("itrib10", np.int_),
-                           ("iupseg", np.int_)])
+        dtype2 = np.dtype(
+            [
+                ("itrib01", int),
+                ("itrib02", int),
+                ("itrib03", int),
+                ("itrib04", int),
+                ("itrib05", int),
+                ("itrib06", int),
+                ("itrib07", int),
+                ("itrib08", int),
+                ("itrib09", int),
+                ("itrib10", int),
+                ("iupseg", int),
+            ]
+        )
         return dtype, dtype2
 
-    def ncells(self):
-        # Return the  maximum number of cells that have a stream
-        # (developed for MT3DMS SSM package)
+    def _ncells(self):
+        """Maximum number of cells that have streams (developed for
+        MT3DMS SSM package).
+
+        Returns
+        -------
+        ncells: int
+            maximum number of str cells
+
+        """
         return self.mxacts
 
     def write_file(self):
@@ -424,19 +519,34 @@ class ModflowStr(Package):
         None
 
         """
-        f_str = open(self.fn_path, 'w')
+        # set free variable
+        free = self.parent.free_format_input
+
+        # open the str file
+        f_str = open(self.fn_path, "w")
+
         # dataset 0
-        f_str.write('{0}\n'.format(self.heading))
+        f_str.write(f"{self.heading}\n")
+
         # dataset 1 - parameters not supported on write
+
         # dataset 2
-        line = '{:10d}{:10d}{:10d}{:10d}{:10d}{:10.3f}{:10d}{:10d}'.format(
-            self.mxacts, self.nss,
-            self.ntrib, self.ndiv,
-            self.icalc, self.const,
-            self.ipakcb, self.istcb2)
+        line = write_fixed_var(
+            [
+                self.mxacts,
+                self.nss,
+                self.ntrib,
+                self.ndiv,
+                self.icalc,
+                self.const,
+                self.ipakcb,
+                self.istcb2,
+            ],
+            free=free,
+        )
         for opt in self.options:
-            line += ' ' + str(opt)
-        line += '\n'
+            line = line.rstrip()
+            line += " " + str(opt) + "\n"
         f_str.write(line)
 
         # dataset 3  - parameters not supported on write
@@ -448,17 +558,13 @@ class ModflowStr(Package):
         kpers = list(self.stress_period_data.data.keys())
         kpers.sort()
 
-        if self.parent.bas6.ifrefm:
-            fmt6 = ['{:5d} ', '{:5d} ', '{:5d} ', '{:5d} ', '{:5d} ',
-                    '{:15.7f} ', '{:15.7f} ', '{:15.7f} ', '{:15.7f} ',
-                    '{:15.7f} ']
-            fmt8 = '{:15.7} '
-            fmt9 = '{:10d} '
-        else:
-            fmt6 = ['{:5d}', '{:5d}', '{:5d}', '{:5d}', '{:5d}',
-                    '{:15.4f}', '{:10.3f}', '{:10.3f}', '{:10.3f}', '{:10.3f}']
-            fmt8 = '{:10.4g}'
-            fmt9 = '{:5d}'
+        # set column lengths for fixed format input files for
+        # datasets 6, 8, and 9
+        fmt6 = [5, 5, 5, 5, 5, 15, 10, 10, 10, 10]
+        if not self.parent.structured:
+            del fmt6[1:3]
+        fmt8 = [10, 10, 10]
+        fmt9 = 5
 
         for iper in range(nper):
             if iper not in kpers:
@@ -475,47 +581,60 @@ class ModflowStr(Package):
                     itmp = -1
                 else:
                     itmp = tdata.shape[0]
-            line = '{:10d}{:10d}{:10d}  # stress period {}\n'.format(itmp, 0,
-                                                                     0,
-                                                                     iper + 1)
+            line = "{:10d}{:10d}{:10d}  # stress period {}\n".format(
+                itmp, self.irdflg[iper], self.iptflg[iper], iper + 1
+            )
             f_str.write(line)
             if itmp > 0:
                 tdata = np.recarray.copy(tdata)
                 # dataset 6
                 for line in tdata:
-                    line['k'] += 1
-                    line['i'] += 1
-                    line['j'] += 1
+                    if self.parent.structured:
+                        line["k"] += 1
+                        line["i"] += 1
+                        line["j"] += 1
+                        ds8_idx_from, ds8_idx_to = 10, 12
+                    else:
+                        line["node"] += 1
+                        ds8_idx_from, ds8_idx_to = 8, 10
+                    ds6 = []
                     for idx, v in enumerate(line):
-                        if idx < 10:
-                            f_str.write(fmt6[idx].format(v))
-                        elif idx > 12:
-                            f_str.write('{} '.format(v))
-                    f_str.write('\n')
+                        if idx < ds8_idx_from or idx > ds8_idx_to:
+                            ds6.append(v)
+                        if idx > ds8_idx_to:
+                            fmt6 += [10]
+                    f_str.write(write_fixed_var(ds6, ipos=fmt6, free=free))
+
                 # dataset 8
                 if self.icalc > 0:
                     for line in tdata:
-                        for idx in range(10, 13):
-                            f_str.write(fmt8.format(line[idx]))
-                        f_str.write('\n')
+                        ds8 = []
+                        for idx in range(ds8_idx_from, ds8_idx_to + 1):
+                            ds8.append(line[idx])
+                        f_str.write(write_fixed_var(ds8, ipos=fmt8, free=free))
+
                 # dataset 9
                 if self.ntrib > 0:
                     for line in sdata:
-                        # for idx in range(3):
+                        ds9 = []
                         for idx in range(self.ntrib):
-                            f_str.write(fmt9.format(line[idx]))
-                        f_str.write('\n')
+                            ds9.append(line[idx])
+                        f_str.write(
+                            write_fixed_var(ds9, length=fmt9, free=free)
+                        )
+
                 # dataset 10
                 if self.ndiv > 0:
                     for line in sdata:
-                        # f_str.write('{:10d}\n'.format(line[3]))
-                        f_str.write('{:10d}\n'.format(line[self.ntrib]))
+                        f_str.write(
+                            write_fixed_var([line[-1]], length=10, free=free)
+                        )
 
         # close the str file
         f_str.close()
 
-    @staticmethod
-    def load(f, model, nper=None, ext_unit_dict=None):
+    @classmethod
+    def load(cls, f, model, nper=None, ext_unit_dict=None):
         """
         Load an existing package.
 
@@ -549,45 +668,67 @@ class ModflowStr(Package):
         >>> strm = flopy.modflow.ModflowStr.load('test.str', m)
 
         """
+        # set local variables
+        free = model.free_format_input
+        fmt2 = [10, 10, 10, 10, 10, 10, 10, 10]
+        fmt6 = [5, 5, 5, 5, 5, 15, 10, 10, 10, 10]
+        type6 = [
+            np.int32,
+            np.int32,
+            np.int32,
+            np.int32,
+            np.int32,
+            np.float32,
+            np.float32,
+            np.float32,
+            np.float32,
+            np.float32,
+        ]
+        if not model.structured:
+            del type6[1:3]
+            del fmt6[1:3]
+
+        fmt8 = [10, 10, 10]
+        fmt9 = [5]
 
         if model.verbose:
-            sys.stdout.write('loading str package file...\n')
+            print("loading str package file...")
 
-        openfile = not hasattr(f, 'read')
+        openfile = not hasattr(f, "read")
         if openfile:
             filename = f
-            f = open(filename, 'r')
+            f = open(filename, "r")
 
         # dataset 0 -- header
         while True:
             line = f.readline()
-            if line[0] != '#':
+            if line[0] != "#":
                 break
 
         # read dataset 1 - optional parameters
         npstr, mxl = 0, 0
         t = line.strip().split()
-        if t[0].lower() == 'parameter':
+        if t[0].lower() == "parameter":
             if model.verbose:
-                sys.stdout.write('  loading str dataset 1\n')
-            npstr = int(t[1])
-            mxl = int(t[2])
+                print("  loading str dataset 1")
+            npstr = np.int32(t[1])
+            mxl = np.int32(t[2])
 
             # read next line
             line = f.readline()
 
         # data set 2
         if model.verbose:
-            sys.stdout.write('  loading str dataset 2\n')
-        t = line.strip().split()
-        mxacts = int(t[0])
-        nss = int(t[1])
-        ntrib = int(t[2])
-        ndiv = int(t[3])
-        icalc = int(t[4])
-        const = float(t[5])
-        istcb1 = int(t[6])
-        istcb2 = int(t[7])
+            print("  loading str dataset 2")
+        t = read_fixed_var(line, ipos=fmt2, free=free)
+        mxacts = np.int32(t[0])
+        nss = np.int32(t[1])
+        ntrib = np.int32(t[2])
+        ndiv = np.int32(t[3])
+        icalc = np.int32(t[4])
+        const = np.float32(t[5])
+        istcb1 = np.int32(t[6])
+        istcb2 = np.int32(t[7])
         ipakcb = 0
         try:
             if istcb1 != 0:
@@ -595,68 +736,83 @@ class ModflowStr(Package):
                 model.add_pop_key_list(istcb1)
         except:
             if model.verbose:
-                print('  could not remove unit number {}'.format(istcb1))
+                print(f"  could not remove unit number {istcb1}")
         try:
             if istcb2 != 0:
                 ipakcb = 53
                 model.add_pop_key_list(istcb2)
         except:
             if model.verbose:
-                print('  could not remove unit number {}'.format(istcb2))
+                print(f"  could not remove unit number {istcb2}")
 
         options = []
         aux_names = []
-        if len(t) > 8:
+        naux = 0
+        if "AUX" in line.upper():
+            t = line.strip().split()
             it = 8
             while it < len(t):
                 toption = t[it]
-                if 'aux' in toption.lower():
-                    options.append(' '.join(t[it:it + 2]))
+                if "aux" in toption.lower():
+                    naux += 1
+                    options.append(" ".join(t[it : it + 2]))
                     aux_names.append(t[it + 1].lower())
                     it += 1
                 it += 1
 
         # read parameter data
         if npstr > 0:
-            dt = ModflowStr.get_empty(1, aux_names=aux_names).dtype
-            pak_parms = mfparbc.load(f, npstr, dt, model, ext_unit_dict,
-                                     model.verbose)
+            dt = ModflowStr.get_empty(
+                1, aux_names=aux_names, structured=model.structured
+            ).dtype
+            pak_parms = mfparbc.load(
+                f, npstr, dt, model, ext_unit_dict, model.verbose
+            )
 
         if nper is None:
-            nrow, ncol, nlay, nper = model.get_nrow_ncol_nlay_nper()
+            nper = model.nper
 
+        irdflg = {}
+        iptflg = {}
         stress_period_data = {}
         segment_data = {}
         for iper in range(nper):
             if model.verbose:
-                print("   loading " + str(
-                    ModflowStr) + " for kper {0:5d}".format(iper + 1))
+                print(f"   loading {ModflowStr} for kper {iper + 1:5d}")
             line = f.readline()
-            if line == '':
+            if line == "":
                 break
             t = line.strip().split()
+
+            # set itmp
             itmp = int(t[0])
-            irdflg, iptflg = 0, 0
+
+            # set irdflg and iptflg - initialize to 0 since this is how
+            # MODFLOW would interpret a missing value
+            iflg0, iflg1 = 0, 0
             if len(t) > 1:
-                irdflg = int(t[1])
+                iflg0 = int(t[1])
             if len(t) > 2:
-                iptflg = int(t[2])
+                iflg1 = int(t[2])
+            irdflg[iper] = iflg0
+            iptflg[iper] = iflg1
 
             if itmp == 0:
                 bnd_output = None
                 seg_output = None
-                current, current_seg = ModflowStr.get_empty(itmp, nss,
-                                                            aux_names=aux_names)
+                current, current_seg = ModflowStr.get_empty(
+                    itmp, nss, aux_names=aux_names, structured=model.structured
+                )
             elif itmp > 0:
                 if npstr > 0:
-                    partype = ['cond']
+                    partype = ["cond"]
                     if model.verbose:
                         print("   reading str dataset 7")
                     for iparm in range(itmp):
                         line = f.readline()
                         t = line.strip().split()
                         pname = t[0].lower()
-                        iname = 'static'
+                        iname = "static"
                         try:
                             tn = t[1]
                             c = tn.lower()
@@ -664,74 +820,75 @@ class ModflowStr(Package):
                             if c in instance_dict:
                                 iname = c
                             else:
-                                iname = 'static'
+                                iname = "static"
                         except:
                             if model.verbose:
-                                print('  implicit static instance for ' +
-                                      'parameter {}'.format(pname))
+                                print(
+                                    f"  implicit static instance for parameter {pname}"
+                                )
 
                         par_dict, current_dict = pak_parms.get(pname)
                         data_dict = current_dict[iname]
 
-                        current = ModflowStr.get_empty(par_dict['nlst'],
-                                                       aux_names=aux_names)
+                        current = ModflowStr.get_empty(
+                            par_dict["nlst"],
+                            aux_names=aux_names,
+                            structured=model.structured,
+                        )
 
                         #  get appropriate parval
                         if model.mfpar.pval is None:
-                            parval = np.float64(par_dict['parval'])
+                            parval = float(par_dict["parval"])
                         else:
                             try:
-                                parval = np.float64(
-                                    model.mfpar.pval.pval_dict[pname])
+                                parval = float(
+                                    model.mfpar.pval.pval_dict[pname]
+                                )
                             except:
-                                parval = np.float64(par_dict['parval'])
+                                parval = float(par_dict["parval"])
 
                         # fill current parameter data (par_current)
                         for ibnd, t in enumerate(data_dict):
-                            current[ibnd] = tuple(t[:len(current.dtype.names)])
+                            current[ibnd] = tuple(
+                                t[: len(current.dtype.names)]
+                            )
 
                 else:
                     if model.verbose:
                         print("   reading str dataset 6")
-                    current, current_seg = ModflowStr.get_empty(itmp, nss,
-                                                                aux_names=aux_names)
+                    current, current_seg = ModflowStr.get_empty(
+                        itmp,
+                        nss,
+                        aux_names=aux_names,
+                        structured=model.structured,
+                    )
                     for ibnd in range(itmp):
                         line = f.readline()
-                        t = []
-                        if model.free_format_input:
-                            tt = line.strip().split()
-                            for idx, v in enumerate(tt[:10]):
-                                t.append(v)
-                            for ivar in range(3):
-                                t.append(-1.0E+10)
-                            if len(aux_names) > 0:
-                                for idx, v in enumerate(t[10:]):
-                                    t.append(v)
-                            if len(tt) < len(current.dtype.names) - 3:
-                                raise Exception
-                        else:
-                            ipos = [5, 5, 5, 5, 5, 15, 10, 10, 10, 10]
-                            istart = 0
-                            for ivar in range(len(ipos)):
-                                istop = istart + ipos[ivar]
-                                txt = line[istart:istop]
-                                try:
-                                    t.append(float(txt))
-                                except:
-                                    t.append(0.)
-                                istart = istop
-                            for ivar in range(3):
-                                t.append(-1.0E+10)
-                            if len(aux_names) > 0:
+                        t = read_fixed_var(line, ipos=fmt6, free=free)
+                        v = [tt(vv) for tt, vv in zip(type6, t)]
+                        ii = len(fmt6)
+                        for idx, name in enumerate(current.dtype.names[:ii]):
+                            current[ibnd][name] = v[idx]
+                        if len(aux_names) > 0:
+                            if free:
+                                tt = line.strip().split()[len(fmt6) :]
+                            else:
+                                istart = 0
+                                for i in fmt6:
+                                    istart += i
                                 tt = line[istart:].strip().split()
-                                for ivar in range(len(aux_names)):
-                                    t.append(tt[ivar])
-                        current[ibnd] = tuple(t[:len(current.dtype.names)])
+                            for iaux, name in enumerate(aux_names):
+                                current[ibnd][name] = np.float32(tt[iaux])
 
                 # convert indices to zero-based
-                current['k'] -= 1
-                current['i'] -= 1
-                current['j'] -= 1
+                if model.structured:
+                    current["k"] -= 1
+                    current["i"] -= 1
+                    current["j"] -= 1
+                    ds8_idx_from, ds8_idx_to = 10, 13
+                else:
+                    current["node"] -= 1
+                    ds8_idx_from, ds8_idx_to = 8, 11
 
                 # read dataset 8
                 if icalc > 0:
@@ -739,20 +896,10 @@ class ModflowStr(Package):
                         print("   reading str dataset 8")
                     for ibnd in range(itmp):
                         line = f.readline()
-                        if model.free_format_input:
-                            t = line.strip().split()
-                            v = [float(vt) for vt in t[:3]]
-                        else:
-                            v = []
-                            ipos = [10, 10, 10]
-                            istart = 0
-                            for ivar in range(len(ipos)):
-                                istop = istart + ipos[ivar]
-                                v.append(float(line[istart:istop]))
-                                istart = istop + 1
+                        t = read_fixed_var(line, ipos=fmt8, free=free)
                         ipos = 0
-                        for idx in range(10, 13):
-                            current[ibnd][idx] = v[ipos]
+                        for idx in range(ds8_idx_from, ds8_idx_to):
+                            current[ibnd][idx] = np.float32(t[ipos])
                             ipos += 1
 
                 bnd_output = np.recarray.copy(current)
@@ -763,21 +910,10 @@ class ModflowStr(Package):
                         print("   reading str dataset 9")
                     for iseg in range(nss):
                         line = f.readline()
-                        if model.free_format_input:
-                            t = line.strip().split()
-                            v = [float(vt) for vt in t[:ntrib]]
-                        else:
-                            v = []
-                            ipos = 5
-                            istart = 0
-                            for ivar in range(ntrib):
-                                istop = istart + ipos
-                                try:
-                                    v.append(float(line[istart:istop]))
-                                except:
-                                    v.append(0.)
-                                istart = istop
-                        for idx in range(ntrib):
+                        t = read_fixed_var(line, ipos=fmt9 * ntrib, free=free)
+                        v = [np.float32(vt) for vt in t]
+                        names = current_seg.dtype.names[:ntrib]
+                        for idx, name in enumerate(names):
                             current_seg[iseg][idx] = v[idx]
 
                 # read data set 10
@@ -786,17 +922,8 @@ class ModflowStr(Package):
                         print("   reading str dataset 10")
                     for iseg in range(nss):
                         line = f.readline()
-                        if model.free_format_input:
-                            t = line.strip().split()
-                            v = float(t[0])
-                        else:
-                            ipos = 10
-                            istart = 0
-                            for ivar in range(ndiv):
-                                istop = istart + ipos
-                                v = float(line[istart:istop])
-                                istart = istop
-                        current_seg[iseg][10] = v
+                        t = read_fixed_var(line, length=10, free=free)
+                        current_seg[iseg]["iupseg"] = np.int32(t[0])
 
                 seg_output = np.recarray.copy(current_seg)
 
@@ -818,29 +945,41 @@ class ModflowStr(Package):
         unitnumber = None
         filenames = [None, None, None]
         if ext_unit_dict is not None:
-            unitnumber, filenames[0] = \
-                model.get_ext_dict_attr(ext_unit_dict,
-                                        filetype=ModflowStr.ftype())
+            unitnumber, filenames[0] = model.get_ext_dict_attr(
+                ext_unit_dict, filetype=ModflowStr._ftype()
+            )
             if ipakcb > 0:
-                iu, filenames[1] = \
-                    model.get_ext_dict_attr(ext_unit_dict, unit=ipakcb)
+                iu, filenames[1] = model.get_ext_dict_attr(
+                    ext_unit_dict, unit=ipakcb
+                )
             if abs(istcb2) > 0:
-                iu, filenames[2] = \
-                    model.get_ext_dict_attr(ext_unit_dict, unit=abs(istcb2))
+                iu, filenames[2] = model.get_ext_dict_attr(
+                    ext_unit_dict, unit=abs(istcb2)
+                )
 
-        strpak = ModflowStr(model, mxacts=mxacts, nss=nss,
-                            ntrib=ntrib, ndiv=ndiv, icalc=icalc,
-                            const=const, ipakcb=ipakcb, istcb2=istcb2,
-                            stress_period_data=stress_period_data,
-                            segment_data=segment_data,
-                            options=options, unitnumber=unitnumber,
-                            filenames=filenames)
-        return strpak
+        return cls(
+            model,
+            mxacts=mxacts,
+            nss=nss,
+            ntrib=ntrib,
+            ndiv=ndiv,
+            icalc=icalc,
+            const=const,
+            ipakcb=ipakcb,
+            istcb2=istcb2,
+            iptflg=iptflg,
+            irdflg=irdflg,
+            stress_period_data=stress_period_data,
+            segment_data=segment_data,
+            options=options,
+            unitnumber=unitnumber,
+            filenames=filenames,
+        )
 
     @staticmethod
-    def ftype():
-        return 'STR'
+    def _ftype():
+        return "STR"
 
     @staticmethod
-    def defaultunit():
+    def _defaultunit():
         return 118

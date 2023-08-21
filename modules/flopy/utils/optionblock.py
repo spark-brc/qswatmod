@@ -1,9 +1,9 @@
-from collections import OrderedDict
 import numpy as np
+
 from ..utils import flopy_io
 
 
-class OptionBlock(object):
+class OptionBlock:
     """
     Parent class to for option blocks within
     Modflow-nwt models. This class contains base
@@ -20,31 +20,29 @@ class OptionBlock(object):
         flag to write as single line or block type
 
     """
+
     nested = "nested"
     dtype = "dtype"
     n_nested = "nvars"
     vars = "vars"
     optional = "optional"
 
-    simple_flag = OrderedDict([(dtype, np.bool_),
-                               (nested, False),
-                               (optional, False)])
-    simple_str = OrderedDict([(dtype, str),
-                              (nested, False),
-                              (optional, False)])
-    simple_float = OrderedDict([(dtype, float),
-                                (nested, False),
-                                (optional, False)])
-    simple_int = OrderedDict([(dtype, int),
-                              (nested, False),
-                              (optional, False)])
+    simple_flag = dict([(dtype, np.bool_), (nested, False), (optional, False)])
+    simple_str = dict([(dtype, str), (nested, False), (optional, False)])
+    simple_float = dict([(dtype, float), (nested, False), (optional, False)])
+    simple_int = dict([(dtype, int), (nested, False), (optional, False)])
 
-    simple_tabfile = OrderedDict([(dtype, np.bool_),
-                                  (nested, True),
-                                  (n_nested, 2),
-                                  (vars, OrderedDict([('numtab', simple_int),
-                                                      ('maxval',
-                                                       simple_int)]))])
+    simple_tabfile = dict(
+        [
+            (dtype, np.bool_),
+            (nested, True),
+            (n_nested, 2),
+            (
+                vars,
+                dict([("numtab", simple_int), ("maxval", simple_int)]),
+            ),
+        ]
+    )
 
     def __init__(self, options_line, package, block=True):
         self._context = package._options
@@ -123,8 +121,9 @@ class OptionBlock(object):
                             if v == "None" and d[OptionBlock.optional]:
                                 pass
                             else:
-                                val.append(str((object.__getattribute__(self,
-                                                                        k))))
+                                val.append(
+                                    str(object.__getattribute__(self, k))
+                                )
 
                 if "None" in val:
                     pass
@@ -156,39 +155,35 @@ class OptionBlock(object):
             self.__dict__[key] = value
 
         elif value is None:
-            super(OptionBlock, self).__setattr__(key, value)
+            super().__setattr__(key, value)
 
         elif isinstance(value, np.recarray):
             for name in value.dtype.names:
                 if self._attr_types[name] == np.bool_:
-                    if not isinstance(value, (bool, np.bool_, np.bool)):
-                        raise TypeError(err_msg.format(
-                            self._attr_types[name]))
+                    if not isinstance(value, (bool, np.bool_)):
+                        raise TypeError(err_msg.format(self._attr_types[name]))
                 else:
                     try:
                         value = self._attr_types[name](value)
                     except ValueError:
-                        raise TypeError(err_msg.format(
-                            self._attr_types[name]))
+                        raise TypeError(err_msg.format(self._attr_types[name]))
 
                 self.__dict__[name] = value[name][0]
 
         elif key in self._attr_types:
             if self._attr_types[key] == np.bool_:
-                if not isinstance(value, (bool, np.bool_, np.bool)):
-                    raise TypeError(err_msg.format(
-                        self._attr_types[key]))
+                if not isinstance(value, (bool, np.bool_)):
+                    raise TypeError(err_msg.format(self._attr_types[key]))
             else:
                 try:
                     value = self._attr_types[key](value)
                 except ValueError:
-                    raise TypeError(err_msg.format(
-                        self._attr_types[key]))
+                    raise TypeError(err_msg.format(self._attr_types[key]))
 
             self.__dict__[key] = value
 
         else:
-            super(OptionBlock, self).__setattr__(key, value)
+            super().__setattr__(key, value)
 
     def __getattribute__(self, item):
         """
@@ -246,14 +241,14 @@ class OptionBlock(object):
         """
         # set up all attributes for the class!
         for key, ctx in self._context.items():
-            if ctx[OptionBlock.dtype] in (np.bool_, bool, np.bool):
+            if ctx[OptionBlock.dtype] in (np.bool_, bool):
                 self.__setattr__(key, False)
             else:
                 self.__setattr__(key, None)
 
             if ctx[OptionBlock.nested]:
                 for k, d in ctx[OptionBlock.vars].items():
-                    if d[OptionBlock.dtype] in (np.bool_, bool, np.bool):
+                    if d[OptionBlock.dtype] in (np.bool_, bool):
                         self.__setattr__(k, False)
                     else:
                         self.__setattr__(k, None)
@@ -279,7 +274,7 @@ class OptionBlock(object):
                     ix += 1
 
                 else:
-                    err_msg = "Option: {} not a valid option".format(t[ix])
+                    err_msg = f"Option: {t[ix]} not a valid option"
                     raise KeyError(err_msg)
 
             else:
@@ -330,8 +325,8 @@ class OptionBlock(object):
                 f.write(self.single_line_options)
                 f.write("\n")
 
-    @staticmethod
-    def load_options(options, package):
+    @classmethod
+    def load_options(cls, options, package):
         """
         Loader for the options class. Reads in an options
         block and uses context from option util dictionaries
@@ -352,14 +347,14 @@ class OptionBlock(object):
         """
         context = package._options
 
-        openfile = not hasattr(options, 'read')
+        openfile = not hasattr(options, "read")
         if openfile:
             try:
                 options = open(options, "r")
-            except IOError:
-                err_msg = "Unrecognized type for options" \
-                          " variable: {}".format(type(options))
-                raise TypeError(err_msg)
+            except OSError:
+                raise TypeError(
+                    f"Unrecognized type for options variable: {type(options)}"
+                )
 
         option_line = ""
         while True:
@@ -393,8 +388,7 @@ class OptionBlock(object):
                                 valid = True
 
                             if not valid:
-                                err_msg = "Invalid type set to variable " \
-                                          "{} in option block".format(k)
+                                err_msg = f"Invalid type set to variable {k} in option block"
                                 raise TypeError(err_msg)
 
                             option_line += t[ix] + " "
@@ -403,12 +397,10 @@ class OptionBlock(object):
             else:
                 if openfile:
                     options.close()
-                return OptionBlock(options_line=option_line,
-                                   package=package)
+                return cls(options_line=option_line, package=package)
 
 
-class OptionUtil(object):
-
+class OptionUtil:
     @staticmethod
     def isfloat(s):
         """
@@ -483,8 +475,7 @@ class OptionUtil(object):
                 pass
 
         if not valid:
-            err_msg = "Invalid type set to variable " \
-                      "{} in option block".format(val)
+            err_msg = f"Invalid type set to variable {val} in option block"
             raise TypeError(err_msg)
 
         return valid

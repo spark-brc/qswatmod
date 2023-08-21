@@ -1,13 +1,27 @@
 import os
+import shlex
+
 import numpy as np
+
+
+def clean_filename(file_name):
+    if (
+        file_name[0] in PyListUtil.quote_list
+        and file_name[-1] in PyListUtil.quote_list
+    ):
+        # quoted string
+        # keep entire string and remove the quotes
+        f_name = file_name.strip('"')
+        return f_name.strip("'")
+    return file_name
 
 
 def clean_name(name):
     # remove bad characters
-    clean_string = name.replace(' ', '_')
-    clean_string = clean_string.replace('-', '_')
+    clean_string = name.replace(" ", "_")
+    clean_string = clean_string.replace("-", "_")
     # remove anything after a parenthesis
-    index = clean_string.find('(')
+    index = clean_string.find("(")
     if index != -1:
         clean_string = clean_string[0:index]
     return clean_string
@@ -21,7 +35,7 @@ def find_keyword(arr_line, keyword_dict):
         if not DatumUtil.is_int(word) and not DatumUtil.is_float(word):
             arr_line_lower.append(word.lower())
     # look for constants in order of most words to least words
-    key = ''
+    key = ""
     for num_words in range(len(arr_line_lower), -1, -1):
         key = tuple(arr_line_lower[0:num_words])
         if len(key) > 0 and key in keyword_dict:
@@ -38,7 +52,7 @@ def max_tuple_abs_size(some_tuple):
     return max_size
 
 
-class DatumUtil(object):
+class DatumUtil:
     @staticmethod
     def is_int(str):
         try:
@@ -61,13 +75,16 @@ class DatumUtil(object):
 
     @staticmethod
     def is_basic_type(obj):
-        if isinstance(obj, str) or isinstance(obj, int) or \
-                isinstance(obj, float):
+        if (
+            isinstance(obj, str)
+            or isinstance(obj, int)
+            or isinstance(obj, float)
+        ):
             return True
         return False
 
 
-class PyListUtil(object):
+class PyListUtil:
     """
     Class contains miscellaneous methods to work with and compare python lists
 
@@ -80,6 +97,8 @@ class PyListUtil(object):
 
     Methods
     -------
+    is_iterable : (obj : unknown) : boolean
+        determines if obj is iterable
     is_empty_list : (current_list : list) : boolean
         determines if an n-dimensional list is empty
     con_convert : (data : string, data_type : type that has conversion
@@ -108,10 +127,23 @@ class PyListUtil(object):
     save_array(filename : string, multi_array : list)
         saves 'multi_array' to the file 'filename'
     """
-    numeric_chars = {'0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0,
-                     '6': 0, '7': 0, '8': 0, '9': 0, '.': 0, '-': 0}
+
+    numeric_chars = {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0,
+        ".": 0,
+        "-": 0,
+    }
     quote_list = {"'", '"'}
-    delimiter_list = {',': 1}
+    delimiter_list = {",": 1}
     delimiter_used = None
     line_num = 0
     consistent_delim = False
@@ -125,14 +157,24 @@ class PyListUtil(object):
 
     @staticmethod
     def has_one_item(current_list):
-        if not isinstance(current_list, list) and not isinstance(current_list,
-                                                                 np.ndarray):
+        if not isinstance(current_list, list) and not isinstance(
+            current_list, np.ndarray
+        ):
             return True
         if len(current_list) != 1:
             return False
-        if (isinstance(current_list[0], list) or
-            isinstance(current_list, np.ndarray)) and \
-                len(current_list[0] != 0):
+        if (
+            isinstance(current_list[0], list)
+            or isinstance(current_list, np.ndarray)
+        ) and len(current_list[0] != 0):
+            return False
+        return True
+
+    @staticmethod
+    def is_iterable(obj):
+        try:
+            iterator = iter(obj)
+        except TypeError:
             return False
         return True
 
@@ -155,56 +197,71 @@ class PyListUtil(object):
     def max_multi_dim_list_size(current_list):
         max_length = -1
         for item in current_list:
-            if len(item) > max_length:
+            if isinstance(item, str):
+                return len(current_list)
+            elif len(item) > max_length:
                 max_length = len(item)
         return max_length
 
     @staticmethod
     def first_item(current_list):
-        if not isinstance(current_list, list):
+        if not isinstance(current_list, list) and not isinstance(
+            current_list, np.ndarray
+        ):
             return current_list
 
         for item in current_list:
-            if isinstance(item, list):
+            if isinstance(item, list) or isinstance(item, np.ndarray):
                 # still in a list of lists, recurse
                 return PyListUtil.first_item(item)
             else:
                 return item
 
     @staticmethod
-    def next_item(current_list, new_list=True, nesting_change=0,
-                  end_of_list=True):
+    def next_item(
+        current_list, new_list=True, nesting_change=0, end_of_list=True
+    ):
         # returns the next item in a nested list along with other information:
         # (<next item>, <end of list>, <entering new list>,
         #  <change in nesting level>
-        if not isinstance(current_list, list) and \
-                not isinstance(current_list, np.ndarray):
+        if not isinstance(current_list, list) and not isinstance(
+            current_list, np.ndarray
+        ):
             yield (current_list, end_of_list, new_list, nesting_change)
         else:
             list_size = 1
             for item in current_list:
-                if isinstance(item, list) or isinstance(current_list,
-                                                        np.ndarray):
+                if isinstance(item, list) or isinstance(
+                    current_list, np.ndarray
+                ):
                     # still in a list of lists, recurse
-                    for item in PyListUtil.next_item(item, list_size == 1,
-                                                     nesting_change + 1,
-                                                     list_size ==
-                                                     len(current_list)):
+                    for item in PyListUtil.next_item(
+                        item,
+                        list_size == 1,
+                        nesting_change + 1,
+                        list_size == len(current_list),
+                    ):
                         yield item
                     nesting_change = -(nesting_change + 1)
                 else:
-                    yield (item, list_size == len(current_list),
-                           list_size == 1, nesting_change)
+                    yield (
+                        item,
+                        list_size == len(current_list),
+                        list_size == 1,
+                        nesting_change,
+                    )
                     nesting_change = 0
                 list_size += 1
 
     @staticmethod
     def next_list(current_list):
-        if not isinstance(current_list[0], list):
+        if not isinstance(current_list[0], list) and not isinstance(
+            current_list[0], np.ndarray
+        ):
             yield current_list
         else:
             for lst in current_list:
-                if isinstance(lst[0], list):
+                if isinstance(lst[0], list) or isinstance(lst[0], np.ndarray):
                     for lst in PyListUtil.next_list(lst):
                         yield lst
                 else:
@@ -217,6 +274,13 @@ class PyListUtil(object):
             return False
         return True
 
+    def riv_array_comp(self, first_array, second_array):
+        for line_first, line_second in zip(first_array, second_array):
+            diff = np.abs(line_first[0][2] - line_second[0][2])
+            if diff > self.max_error:
+                return False
+        return True
+
     @staticmethod
     def reset_delimiter_used():
         PyListUtil.delimiter_used = None
@@ -225,82 +289,90 @@ class PyListUtil(object):
 
     @staticmethod
     def split_data_line(line, external_file=False, delimiter_conf_length=15):
-        if PyListUtil.line_num > delimiter_conf_length and \
-                PyListUtil.consistent_delim:
+        if (
+            PyListUtil.line_num > delimiter_conf_length
+            and PyListUtil.consistent_delim
+        ):
             # consistent delimiter has been found.  continue using that
             # delimiter without doing further checks
             if PyListUtil.delimiter_used is None:
-                comment_split = line.strip().split('#', 1)
+                comment_split = line.split("#", 1)
                 clean_line = comment_split[0].strip().split()
             else:
-                comment_split = line.strip().split('#', 1)
-                clean_line = comment_split[0].strip().split(
-                    PyListUtil.delimiter_used)
+                comment_split = line.split("#", 1)
+                clean_line = (
+                    comment_split[0].strip().split(PyListUtil.delimiter_used)
+                )
                 if len(comment_split) > 1:
-                    clean_line.append('#')
-                    clean_line.append(comment_split[1])
+                    clean_line.append("#")
+                    clean_line.append(comment_split[1].strip())
         else:
             # compare against the default split option without comments split
-            comment_split = line.strip().split('#', 1)
-            clean_line = comment_split[0].strip().split()
+            comment_split = line.split("#", 1)
+            # first try standard split preserving quotes
+            clean_line = shlex.split(comment_split[0].strip(), posix=False)
             if len(comment_split) > 1:
-                clean_line.append('#')
-                clean_line.append(comment_split[1])
+                clean_line.append("#")
+                clean_line.append(comment_split[1].strip())
             # try different delimiters and use the one the breaks the data
             # apart the most
             max_split_size = len(clean_line)
             max_split_type = None
+            max_split_list = clean_line
             for delimiter in PyListUtil.delimiter_list:
-                comment_split = line.strip().split('#')
+                comment_split = line.split("#")
                 alt_split = comment_split[0].strip().split(delimiter)
                 if len(comment_split) > 1:
-                    alt_split.append('#')
-                    alt_split.append(comment_split[1])
+                    alt_split.append("#")
+                    alt_split.append(comment_split[1].strip())
                 alt_split_len = len(alt_split)
                 if alt_split_len > max_split_size:
                     max_split_size = len(alt_split)
                     max_split_type = delimiter
+                    max_split_list = alt_split
                 elif alt_split_len == max_split_size:
-                    if max_split_type not in PyListUtil.delimiter_list or \
-                            PyListUtil.delimiter_list[delimiter] < \
-                            PyListUtil.delimiter_list[max_split_type]:
+                    if (
+                        max_split_type not in PyListUtil.delimiter_list
+                        or PyListUtil.delimiter_list[delimiter]
+                        < PyListUtil.delimiter_list[max_split_type]
+                    ):
                         max_split_size = len(alt_split)
                         max_split_type = delimiter
+                        max_split_list = alt_split
 
-            if max_split_type is not None:
-                clean_line = line.strip().split(max_split_type)
+            if max_split_type is not None and max_split_size > 1:
+                clean_line = max_split_list
                 if PyListUtil.line_num == 0:
                     PyListUtil.delimiter_used = max_split_type
                 elif PyListUtil.delimiter_used != max_split_type:
                     PyListUtil.consistent_delim = False
-            PyListUtil.line_num += 1
+            if max_split_size > 1:
+                PyListUtil.line_num += 1
 
         arr_fixed_line = []
         index = 0
         # loop through line to fix quotes and delimiters
-        while index < len(clean_line):
+        len_cl = len(clean_line)
+        while index < len_cl:
             item = clean_line[index]
             if item and item not in PyListUtil.delimiter_list:
                 if item and item[0] in PyListUtil.quote_list:
                     # starts with a quote, handle quoted text
                     if item[-1] in PyListUtil.quote_list:
+                        # if quoted on both ends, remove quotes
                         arr_fixed_line.append(item[1:-1])
                     else:
                         arr_fixed_line.append(item[1:])
                         # loop until trailing quote found
-                        while index < len(clean_line):
+                        while index < len_cl:
                             index += 1
-                            if index < len(clean_line):
+                            if index < len_cl:
                                 item = clean_line[index]
                                 if item[-1] in PyListUtil.quote_list:
-                                    arr_fixed_line[-1] = \
-                                        '{} {}'.format(arr_fixed_line[-1],
-                                                       item[:-1])
+                                    arr_fixed_line[-1] += f" {item[:-1]}"
                                     break
                                 else:
-                                    arr_fixed_line[-1] = \
-                                        '{} {}'.format(arr_fixed_line[-1],
-                                                       item)
+                                    arr_fixed_line[-1] += f" {item}"
                 else:
                     # no quote, just append
                     arr_fixed_line.append(item)
@@ -315,21 +387,23 @@ class PyListUtil(object):
             # of text
             if text:
                 while text and (
-                        text[0] not in PyListUtil.numeric_chars or text[-1]
-                        not in PyListUtil.numeric_chars):
+                    text[0] not in PyListUtil.numeric_chars
+                    or text[-1] not in PyListUtil.numeric_chars
+                ):
                     if text[0] not in PyListUtil.numeric_chars:
                         text = text[1:]
                     if text and text[-1] not in PyListUtil.numeric_chars:
                         text = text[:-1]
         return text
 
-    def save_array_diff(self, first_array, second_array, first_array_name,
-                        second_array_name):
+    def save_array_diff(
+        self, first_array, second_array, first_array_name, second_array_name
+    ):
         try:
             diff = first_array - second_array
             self.save_array(first_array_name, first_array)
             self.save_array(second_array_name, second_array)
-            self.save_array('debug_array_diff.txt', diff)
+            self.save_array("debug_array_diff.txt", diff)
         except:
             print("An error occurred while outputting array differences.")
             return False
@@ -338,26 +412,26 @@ class PyListUtil(object):
     # Saves an array with up to three dimensions
     def save_array(self, filename, multi_array):
         file_path = os.path.join(self.path, filename)
-        with open(file_path, 'w') as outfile:
-            outfile.write('{}\n'.format(str(multi_array.shape)))
+        with open(file_path, "w") as outfile:
+            outfile.write(f"{multi_array.shape}\n")
             if len(multi_array.shape) == 4:
                 for slice in multi_array:
                     for second_slice in slice:
                         for third_slice in second_slice:
                             for item in third_slice:
-                                outfile.write(' {:10.3e}'.format(item))
-                            outfile.write('\n')
-                        outfile.write('\n')
-                    outfile.write('\n')
+                                outfile.write(f" {item:10.3e}")
+                            outfile.write("\n")
+                        outfile.write("\n")
+                    outfile.write("\n")
             elif len(multi_array.shape) == 3:
                 for slice in multi_array:
-                    np.savetxt(outfile, slice, fmt='%10.3e')
-                    outfile.write('\n')
+                    np.savetxt(outfile, slice, fmt="%10.3e")
+                    outfile.write("\n")
             else:
-                np.savetxt(outfile, multi_array, fmt='%10.3e')
+                np.savetxt(outfile, multi_array, fmt="%10.3e")
 
 
-class MultiList():
+class MultiList:
     """
     Class for storing objects in an n-dimensional list which can be iterated
     through as a single list.
@@ -412,8 +486,10 @@ class MultiList():
             if callback is not None:
                 self.build_list(callback)
         else:
-            raise Exception('MultiList requires either a mdlist or a shape '
-                            'at initialization.')
+            raise Exception(
+                "MultiList requires either a mdlist or a shape "
+                "at initialization."
+            )
 
     def __getitem__(self, k):
         if isinstance(k, list) or isinstance(k, tuple):
@@ -442,8 +518,10 @@ class MultiList():
         # ONLY SUPPORTS 1 OR 2 DIMENSIONAL MULTI-LISTS
         # TODO: REWRITE TO SUPPORT N-DIMENSIONAL MULTI-LISTS
         if len(self.list_shape) > 2:
-            raise Exception('Increment_dimension currently only supports 1 '
-                            'or 2 dimensional multi-lists')
+            raise Exception(
+                "Increment_dimension currently only supports 1 "
+                "or 2 dimensional multi-lists"
+            )
         if len(self.list_shape) == 1:
             self.multi_dim_list.append(callback(len(self.list_shape)))
             self.list_shape = (self.list_shape[0] + 1,)
@@ -452,18 +530,21 @@ class MultiList():
                 new_row_idx = len(self.multi_dim_list)
                 self.multi_dim_list.append([])
                 for index in range(0, self.list_shape[1]):
-                    self.multi_dim_list[-1].append(callback((new_row_idx,
-                                                             index)))
+                    self.multi_dim_list[-1].append(
+                        callback((new_row_idx, index))
+                    )
                 self.list_shape = (self.list_shape[0] + 1, self.list_shape[1])
             elif dimension == 2:
                 new_col_idx = len(self.multi_dim_list[0])
                 for index in range(0, self.list_shape[0]):
-                    self.multi_dim_list[index].append(callback((index,
-                                                                new_col_idx)))
+                    self.multi_dim_list[index].append(
+                        callback((index, new_col_idx))
+                    )
                 self.list_shape = (self.list_shape[0], self.list_shape[1] + 1)
             else:
-                raise Exception('For two dimensional lists "dimension" must '
-                                'be 1 or 2.')
+                raise Exception(
+                    'For two dimensional lists "dimension" must ' "be 1 or 2."
+                )
 
     def build_list(self, callback):
         entry_points = [(self.multi_dim_list, self.first_index())]
@@ -483,8 +564,9 @@ class MultiList():
                             new_location = (len(entry_point) - 1,)
                         else:
                             new_location = ((len(entry_point[0]) - 1), val)
-                        new_entry_points.append((entry_point[0][-1],
-                                                 new_location))
+                        new_entry_points.append(
+                            (entry_point[0][-1], new_location)
+                        )
                     else:
                         entry_point[0].append(callback(entry_point[1]))
             entry_points = new_entry_points
@@ -502,6 +584,8 @@ class MultiList():
         return shape_size
 
     def in_shape(self, indexes):
+        if isinstance(indexes, int):
+            indexes = [indexes]
         for index, item in zip(indexes, self.list_shape):
             if index > item:
                 return False
@@ -533,7 +617,7 @@ class MultiList():
         aii = ArrayIndexIter(self.list_shape, True)
         index_num = 0
         while index_num <= n:
-            index = aii.next()
+            index = next(aii)
             index_num += 1
         return index
 
@@ -550,7 +634,7 @@ class MultiList():
         return MultiListIter(self.multi_dim_list, False)
 
 
-class ArrayIndexIter(object):
+class ArrayIndexIter:
     def __init__(self, array_shape, index_as_tuple=False):
         self.array_shape = array_shape
         self.current_location = []
@@ -568,8 +652,10 @@ class ArrayIndexIter(object):
     def __next__(self):
         if self.first_item:
             self.first_item = False
-            if self.current_location[self.current_index] < \
-                    self.end_location[self.current_index]:
+            if (
+                self.current_location[self.current_index]
+                < self.end_location[self.current_index]
+            ):
                 if len(self.current_location) > 1 or self.index_as_tuple:
                     return tuple(self.current_location)
                 else:
@@ -588,10 +674,8 @@ class ArrayIndexIter(object):
                 self.current_index -= 1
         raise StopIteration()
 
-    next = __next__  # Python 2 support
 
-
-class MultiListIter(object):
+class MultiListIter:
     def __init__(self, multi_list, detailed_info=False, iter_leaf_lists=False):
         self.multi_list = multi_list
         self.detailed_info = detailed_info
@@ -610,10 +694,8 @@ class MultiListIter(object):
         else:
             return next_val[0]
 
-    next = __next__  # Python 2 support
 
-
-class ConstIter(object):
+class ConstIter:
     def __init__(self, value):
         self.value = value
 
@@ -623,14 +705,12 @@ class ConstIter(object):
     def __next__(self):
         return self.value
 
-    next = __next__  # Python 2 support
 
-
-class FileIter(object):
+class FileIter:
     def __init__(self, file_path):
         self.eof = False
         try:
-            self._fd = open(file_path, 'r')
+            self._fd = open(file_path, "r")
         except:
             self.eof = True
         self._current_data = None
@@ -644,8 +724,9 @@ class FileIter(object):
         if self.eof:
             raise StopIteration()
         else:
-            while self._current_data is not None and \
-                    self._data_index >= len(self._current_data):
+            while self._current_data is not None and self._data_index >= len(
+                self._current_data
+            ):
                 self._next_line()
                 self._data_index = 0
                 if self.eof:
@@ -665,10 +746,8 @@ class FileIter(object):
             return
         self._current_data = PyListUtil.split_data_line(data_line)
 
-    next = __next__  # Python 2 support
 
-
-class NameIter(object):
+class NameIter:
     def __init__(self, name, first_not_numbered=True):
         self.name = name
         self.iter_num = -1
@@ -682,12 +761,10 @@ class NameIter(object):
         if self.iter_num == 0 and self.first_not_numbered:
             return self.name
         else:
-            return '{}_{}'.format(self.name, self.iter_num)
-
-    next = __next__  # Python 2 support
+            return f"{self.name}_{self.iter_num}"
 
 
-class PathIter(object):
+class PathIter:
     def __init__(self, path, first_not_numbered=True):
         self.path = path
         self.name_iter = NameIter(path[-1], first_not_numbered)
@@ -696,6 +773,4 @@ class PathIter(object):
         return self
 
     def __next__(self):
-        return self.path[0:-1] + (self.name_iter.__next__(),)
-
-    next = __next__  # Python 2 support
+        return self.path[0:-1] + (next(self.name_iter),)

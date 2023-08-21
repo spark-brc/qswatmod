@@ -20,29 +20,46 @@
     --------
 
     """
-from .mfreadnam import parsenamefile
-from .util_array import Util3d, Util2d, Transient2d, Transient3d, read1d
-from .util_list import MfList
-from .binaryfile import BinaryHeader, HeadFile, UcnFile, CellBudgetFile, \
-    HeadUFile
-from .formattedfile import FormattedHeadFile
-from .modpathfile import PathlineFile, EndpointFile, TimeseriesFile
-from .swroutputfile import SwrStage, SwrBudget, SwrFlow, SwrExchange, \
-    SwrStructure
-from .observationfile import HydmodObs, SwrObs, Mf6Obs
-from .reference import SpatialReference, SpatialReferenceUnstructured, \
-    crs, TemporalReference
-from .mflistfile import MfListBudget, MfusgListBudget, SwtListBudget, \
-    SwrListBudget, Mf6ListBudget
-from .check import check, get_neighbors
-from .utils_def import FlopyBinaryData, totim_to_datetime
+from .utl_import import import_optional_dependency  # isort:skip
+from . import get_modflow as get_modflow_module
+from .binaryfile import (
+    BinaryHeader,
+    CellBudgetFile,
+    HeadFile,
+    HeadUFile,
+    UcnFile,
+)
+from .check import check
 from .flopy_io import read_fixed_var, write_fixed_var
-from .zonbud import ZoneBudget, read_zbarray, write_zbarray
-from .mfgrdfile import MfGrdFile
-from .postprocessing import get_transmissivities
-from .sfroutputfile import SfrFile
-from .recarray_utils import create_empty_recarray, ra_slice
+from .formattedfile import FormattedHeadFile
+
+get_modflow = get_modflow_module.run_main
+from .gridintersect import GridIntersect, ModflowGridIndices
+from .mflistfile import (
+    Mf6ListBudget,
+    MfListBudget,
+    MfusgListBudget,
+    SwrListBudget,
+    SwtListBudget,
+)
+from .mfreadnam import parsenamefile
+from .modpathfile import EndpointFile, PathlineFile, TimeseriesFile
 from .mtlistfile import MtListBudget
+from .observationfile import HydmodObs, Mf6Obs, SwrObs
 from .optionblock import OptionBlock
+from .postprocessing import get_specific_discharge, get_transmissivities
 from .rasters import Raster
-from .gridintersect import GridIntersect,ModflowGridIndices
+from .recarray_utils import create_empty_recarray, ra_slice
+from .reference import TemporalReference
+from .sfroutputfile import SfrFile
+from .swroutputfile import (
+    SwrBudget,
+    SwrExchange,
+    SwrFlow,
+    SwrStage,
+    SwrStructure,
+)
+from .util_array import Transient2d, Transient3d, Util2d, Util3d, read1d
+from .util_list import MfList
+from .utils_def import FlopyBinaryData, totim_to_datetime
+from .zonbud import ZBNetOutput, ZoneBudget, ZoneBudget6, ZoneFile6

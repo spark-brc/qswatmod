@@ -951,8 +951,9 @@ class BaseModel(ModelInterface):
                     continue
                 s = '{:14s} {:5d}  {}'.format(
                         p.name[i], p.unit_number[i], p.file_name[i])
-                if p.extra[i]:
-                    s += ' ' + p.extra[i]
+                # NOTE: commented out due to no extra attribute
+                # if p.extra[i]:
+                #     s += ' ' + p.extra[i]
                 lines.append(s)
         return '\n'.join(lines) + '\n'
 

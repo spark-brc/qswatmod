@@ -1,18 +1,119 @@
 import numpy as np
+
+from ..discretization import StructuredGrid
 from ..modflow import Modflow
 from .util_array import Util2d, Util3d
 
 
-class Lgr(object):
+class SimpleRegularGrid:
+    """
+    Simple object for representing regular MODFLOW grid information.
 
-    def __init__(self, nlayp, nrowp, ncolp, delrp, delcp, topp, botmp,
-                 idomainp, ncpp=3, ncppl=1, xllp=0., yllp=0.):
+    Parameters
+    ----------
+    nlay : int
+        number of layers
+    nrow : int
+        number of rows
+    ncol : int
+        number of columns
+    delr : ndarray
+        delr array
+    delc : ndarray
+        delc array
+    top : ndarray
+        top array (nrow, ncol)
+    botm : ndarray
+        botm array (nlay, nrow, ncol)
+    idomain : ndarray
+        idomain array (nlay, nrow, ncol)
+    xorigin : float
+        x location of grid lower left corner
+    yorigin : float
+        y location of grid lower left corner
+    """
+
+    def __init__(
+        self,
+        nlay,
+        nrow,
+        ncol,
+        delr,
+        delc,
+        top,
+        botm,
+        idomain,
+        xorigin,
+        yorigin,
+    ):
+        # enforce compliance
+        assert delr.shape == (ncol,)
+        assert delc.shape == (nrow,)
+        assert top.shape == (nrow, ncol)
+        assert botm.shape == (nlay, nrow, ncol)
+        assert idomain.shape == (nlay, nrow, ncol)
+
+        self.nlay = nlay
+        self.nrow = nrow
+        self.ncol = ncol
+        self.delr = delr
+        self.delc = delc
+        self.top = top
+        self.botm = botm
+        self.idomain = idomain
+        self.xorigin = xorigin
+        self.yorigin = yorigin
+        return
+
+    @property
+    def modelgrid(self):
+        mg = StructuredGrid(
+            delc=self.delc,
+            delr=self.delr,
+            top=self.top,
+            botm=self.botm,
+            idomain=self.idomain,
+            xoff=self.xorigin,
+            yoff=self.yorigin,
+        )
+        return mg
+
+    def get_gridprops_dis6(self):
+        gridprops = {
+            "xorigin": self.xorigin,
+            "yorigin": self.yorigin,
+            "nlay": self.nlay,
+            "nrow": self.nrow,
+            "ncol": self.ncol,
+            "delr": self.delr,
+            "delc": self.delc,
+            "top": self.top,
+            "botm": self.botm,
+            "idomain": self.idomain,
+        }
+        return gridprops
+
+
+class Lgr:
+    def __init__(
+        self,
+        nlayp,
+        nrowp,
+        ncolp,
+        delrp,
+        delcp,
+        topp,
+        botmp,
+        idomainp,
+        ncpp=3,
+        ncppl=1,
+        xllp=0.0,
+        yllp=0.0,
+    ):
         """
 
         Parameters
         ----------
-        parent : flopy.modflow.Modflow
-            parent model
         nlayp : int
             parent layers
         nrowp : int
@@ -50,21 +151,30 @@ class Lgr(object):
         self.ncolp = ncolp
 
         m = Modflow()
-        self.delrp = Util2d(m, (ncolp,), np.float64, delrp, 'delrp').array
-        self.delcp = Util2d(m, (nrowp,), np.float64, delcp, 'delcp').array
-        self.topp = Util2d(m, (nrowp, ncolp), np.float64, topp, 'topp').array
-        self.botmp = Util3d(m, (nlayp, nrowp, ncolp), np.float64, botmp,
-                            'botmp').array
+        self.delrp = Util2d(m, (ncolp,), np.float32, delrp, "delrp").array
+        self.delcp = Util2d(m, (nrowp,), np.float32, delcp, "delcp").array
+        self.topp = Util2d(m, (nrowp, ncolp), np.float32, topp, "topp").array
+        self.botmp = Util3d(
+            m, (nlayp, nrowp, ncolp), np.float32, botmp, "botmp"
+        ).array
 
         # idomain
         assert idomainp.shape == (nlayp, nrowp, ncolp)
         self.idomain = idomainp
         idxl, idxr, idxc = np.where(idomainp == 0)
-        assert idxl.shape[0] > 1, 'no zero values found in idomain'
+        assert idxl.shape[0] > 1, "no zero values found in idomain"
 
         # # child cells per parent and child cells per parent layer
         self.ncpp = ncpp
-        self.ncppl = Util2d(m, (nlayp,), np.int_, ncppl, 'ncppl').array
+        self.ncppl = Util2d(m, (nlayp,), np.int32, ncppl, "ncppl").array
+
+        # calculate ibcl which is the bottom child layer (one based) in each
+        # parent layer
+        self.ibcl = np.zeros(self.nlayp, dtype=int)
+        self.ibcl[0] = self.ncppl[0]
+        for k in range(1, self.nlayp):
+            if self.ncppl[k] > 0:
+                self.ibcl[k] = self.ibcl[k - 1] + self.ncppl[k]
 
         # parent lower left
         self.xllp = xllp
@@ -86,8 +196,8 @@ class Lgr(object):
         # assign child properties
         self.delr, self.delc = self.get_delr_delc()
         self.top, self.botm = self.get_top_botm()
-        self.xll = xllp + self.delrp[0: self.npcbeg].sum()
-        self.yll = yllp + self.delcp[self.nprend + 1:].sum()
+        self.xll = xllp + self.delrp[0 : self.npcbeg].sum()
+        self.yll = yllp + self.delcp[self.nprend + 1 :].sum()
 
         return
 
@@ -122,13 +232,13 @@ class Lgr(object):
         jstart = 0
         jend = self.ncpp
         for j in range(self.npcbeg, self.npcend + 1):
-            delr[jstart: jend] = self.delrp[j - 1] / self.ncpp
+            delr[jstart:jend] = self.delrp[j] / self.ncpp
             jstart = jend
             jend = jstart + self.ncpp
         istart = 0
         iend = self.ncpp
         for i in range(self.nprbeg, self.nprend + 1):
-            delc[istart: iend] = self.delcp[i - 1] / self.ncpp
+            delc[istart:iend] = self.delcp[i] / self.ncpp
             istart = iend
             iend = istart + self.ncpp
         return delr, delc
@@ -152,12 +262,16 @@ class Lgr(object):
                 for kp in range(self.nplbeg, self.nplend + 1):
                     top = pbotm[kp, ip, jp]
                     bot = pbotm[kp + 1, ip, jp]
-                    dz = (top - bot) / self.ncppl[kp - 1]
-                    for _ in range(self.ncppl[kp - 1]):
-                        botm[kc, icrowstart:icrowend,
-                        iccolstart: iccolend] = botm[kc - 1,
-                                                icrowstart:icrowend,
-                                                iccolstart: iccolend] - dz
+                    dz = (top - bot) / self.ncppl[kp]
+                    for _ in range(self.ncppl[kp]):
+                        botm[kc, icrowstart:icrowend, iccolstart:iccolend] = (
+                            botm[
+                                kc - 1,
+                                icrowstart:icrowend,
+                                iccolstart:iccolend,
+                            ]
+                            - dz
+                        )
                         kc += 1
         return botm[0], botm[1:]
 
@@ -180,8 +294,9 @@ class Lgr(object):
 
         """
         assert parent_array.shape == (self.nrowp, self.ncolp)
-        child_array = np.empty((self.nrow, self.ncol),
-                                dtype=parent_array.dtype)
+        child_array = np.empty(
+            (self.nrow, self.ncol), dtype=parent_array.dtype
+        )
         for ip in range(self.nprbeg, self.nprend + 1):
             for jp in range(self.npcbeg, self.npcend + 1):
                 icrowstart = (ip - self.nprbeg) * self.ncpp
@@ -205,7 +320,7 @@ class Lgr(object):
             idomain array for the child model
 
         """
-        idomain = np.ones((self.nlay, self.nrow, self.ncol), dtype=np.int_)
+        idomain = np.ones((self.nlay, self.nrow, self.ncol), dtype=int)
         for kc in range(self.nlay):
             for ic in range(self.nrow):
                 for jc in range(self.ncol):
@@ -239,9 +354,9 @@ class Lgr(object):
 
         """
 
-        assert 0 <= kc < self.nlay, 'layer must be >= 0 and < child nlay'
-        assert 0 <= ic < self.nrow, 'layer must be >= 0 and < child nrow'
-        assert 0 <= jc < self.ncol, 'layer must be >= 0 and < child ncol'
+        assert 0 <= kc < self.nlay, "layer must be >= 0 and < child nlay"
+        assert 0 <= ic < self.nrow, "layer must be >= 0 and < child nrow"
+        assert 0 <= jc < self.ncol, "layer must be >= 0 and < child ncol"
 
         parentlist = []
         (kp, ip, jp) = self.get_parent_indices(kc, ic, jc)
@@ -273,7 +388,7 @@ class Lgr(object):
         # parent cell to top is not possible
 
         # parent cell to bottom
-        if kc + 1 == self.ncppl[kp]:
+        if kc + 1 == self.ibcl[kp]:
             if kp + 1 < self.nlayp:
                 if self.idomain[kp + 1, ip, jp] != 0:
                     parentlist.append(((kp + 1, ip, jp), -3))
@@ -330,11 +445,16 @@ class Lgr(object):
                 for jc in range(ncolc):
                     plist = self.get_parent_connections(kc, ic, jc)
                     for (kp, ip, jp), idir in plist:
-
                         if cidomain[kc, ic, jc] == 0:
                             continue
 
                         # horizontal or vertical connection
+                        # 1 if a child cell horizontally connected to a parent
+                        #   cell
+                        # 2 if more than one child cells horizontally connected
+                        #   to parent cell
+                        # 0 if a vertical connection
+
                         ihc = 1
                         if self.ncppl[kp] > 1:
                             ihc = 2
@@ -344,13 +464,13 @@ class Lgr(object):
                         # angldegx
                         angle = None
                         if angldegx:
-                            angle = 180.  # -x, west
+                            angle = 180.0  # -x, west
                             if idir == 2:
-                                angle = 270.  # -y, south
+                                angle = 270.0  # -y, south
                             elif idir == -1:
-                                angle = 0.  # +x, east
+                                angle = 0.0  # +x, east
                             elif idir == -2:
-                                angle = 90.  # +y, north
+                                angle = 90.0  # +y, north
 
                         # vertical connection
                         cl1 = None
@@ -400,3 +520,63 @@ class Lgr(object):
                             exg.append(cd)
                         exglist.append(exg)
         return exglist
+
+    @property
+    def parent(self):
+        """
+        Return a SimpleRegularGrid object for the parent model
+
+        Returns
+        -------
+            simple_regular_grid : SimpleRegularGrid
+                simple grid object containing grid information for the parent
+
+        """
+        simple_regular_grid = SimpleRegularGrid(
+            self.nlayp,
+            self.nrowp,
+            self.ncolp,
+            self.delrp,
+            self.delcp,
+            self.topp,
+            self.botmp,
+            self.idomain,
+            self.xllp,
+            self.yllp,
+        )
+        return simple_regular_grid
+
+    @property
+    def child(self):
+        """
+        Return a SimpleRegularGrid object for the child model
+
+        Returns
+        -------
+            simple_regular_grid : SimpleRegularGrid
+                simple grid object containing grid information for the child
+
+        """
+        delrc, delcc = self.get_delr_delc()
+        idomainc = self.get_idomain()  # child idomain
+        topc = self.top
+        botmc = self.botm
+        child_dis_shp = self.get_shape()
+        nlayc = child_dis_shp[0]
+        nrowc = child_dis_shp[1]
+        ncolc = child_dis_shp[2]
+        xorigin = self.xll
+        yorigin = self.yll
+        simple_regular_grid = SimpleRegularGrid(
+            nlayc,
+            nrowc,
+            ncolc,
+            delrc,
+            delcc,
+            topc,
+            botmc,
+            idomainc,
+            xorigin,
+            yorigin,
+        )
+        return simple_regular_grid

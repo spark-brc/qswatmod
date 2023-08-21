@@ -4,15 +4,14 @@ the ModflowPar class as `flopy.modflow.ModflowPar`.
 
 
 """
-
-import sys
 import numpy as np
-from .mfzon import ModflowZon
-from .mfpval import ModflowPval
+
 from .mfmlt import ModflowMlt
+from .mfpval import ModflowPval
+from .mfzon import ModflowZon
 
 
-class ModflowPar(object):
+class ModflowPar:
     """
     Class for loading mult, zone, pval, and parameter data for MODFLOW packages
     that use array data (LPF, UPW, RCH, EVT). Class also includes methods to
@@ -72,17 +71,15 @@ class ModflowPar(object):
                 zone_key = key
         if zone_key is not None:
             try:
-                self.zone = ModflowZon.load(zone.filename, model,
-                                            ext_unit_dict=ext_unit_dict)
+                self.zone = ModflowZon.load(
+                    zone.filename, model, ext_unit_dict=ext_unit_dict
+                )
                 if model.verbose:
-                    sys.stdout.write('   {} package load...success\n' \
-                                     .format(self.zone.name[0]))
+                    print(f"   {self.zone.name[0]} package load...success")
                 ext_unit_dict.pop(zone_key)
                 model.remove_package("ZONE")
             except BaseException as o:
-                sys.stdout.write(
-                    '   {} package load...failed\n      {!s}'.format('ZONE',
-                                                                     o))
+                print(f"   ZONE package load...failed\n      {o!s}")
         return
 
     def set_mult(self, model, ext_unit_dict):
@@ -119,17 +116,15 @@ class ModflowPar(object):
                 mult_key = key
         if mult_key is not None:
             try:
-                self.mult = ModflowMlt.load(mult.filename, model,
-                                            ext_unit_dict=ext_unit_dict)
+                self.mult = ModflowMlt.load(
+                    mult.filename, model, ext_unit_dict=ext_unit_dict
+                )
                 if model.verbose:
-                    sys.stdout.write('   {} package load...success\n' \
-                                     .format(self.mult.name[0]))
+                    print(f"   {self.mult.name[0]} package load...success")
                 ext_unit_dict.pop(mult_key)
                 model.remove_package("MULT")
             except BaseException as o:
-                sys.stdout.write(
-                    '   {} package load...failed\n      {!s}'.format('MULT',
-                                                                     o))
+                print(f"   MULT package load...failed\n      {o!s}")
 
         return
 
@@ -167,17 +162,15 @@ class ModflowPar(object):
                 pval_key = key
         if pval_key is not None:
             try:
-                self.pval = ModflowPval.load(pval.filename, model,
-                                             ext_unit_dict=ext_unit_dict)
+                self.pval = ModflowPval.load(
+                    pval.filename, model, ext_unit_dict=ext_unit_dict
+                )
                 if model.verbose:
-                    sys.stdout.write('   {} package load...success\n' \
-                                     .format(self.pval.name[0]))
+                    print(f"   {self.pval.name[0]} package load...success")
                 ext_unit_dict.pop(pval_key)
                 model.remove_package("PVAL")
             except BaseException as o:
-                sys.stdout.write(
-                    '   {} package load...failed\n      {!s}'.format('PVAL',
-                                                                     o))
+                print(f"   PVAL package load...failed\n      {o!s}")
 
         return
 
@@ -217,17 +210,17 @@ class ModflowPar(object):
                 t = line.strip().split()
                 parnam = t[0].lower()
                 if verbose:
-                    print('   loading parameter "{}"...'.format(parnam))
+                    print(f'   loading parameter "{parnam}"...')
                 partyp = t[1].lower()
                 if partyp not in par_types:
                     par_types.append(partyp)
-                parval = np.float64(t[2])
-                nclu = np.int_(t[3])
+                parval = float(t[2])
+                nclu = int(t[3])
                 clusters = []
                 for nc in range(nclu):
                     line = f.readline()
                     t = line.strip().split()
-                    lay = np.int_(t[0])
+                    lay = int(t[0])
                     s = t[1]
                     if len(s) > 10:
                         s = s[0:10]
@@ -239,7 +232,7 @@ class ModflowPar(object):
                     iarr = []
                     for iv in t[3:]:
                         try:
-                            iz = int(np.int_(iv))
+                            iz = int(iv)
                             if iz != 0:
                                 iarr.append(iz)
                         except:
@@ -247,8 +240,12 @@ class ModflowPar(object):
 
                     clusters.append([lay, mltarr, zonarr, iarr])
                 # add parnam to parm_dict
-                parm_dict[parnam] = {'partyp': partyp, 'parval': parval,
-                                     'nclu': nclu, 'clusters': clusters}
+                parm_dict[parnam] = {
+                    "partyp": partyp,
+                    "parval": parval,
+                    "nclu": nclu,
+                    "clusters": clusters,
+                }
 
         return par_types, parm_dict
 
@@ -291,18 +288,18 @@ class ModflowPar(object):
 
 
         """
-        dtype = np.float64
+        dtype = np.float32
         data = np.zeros(shape, dtype=dtype)
         for key, tdict in parm_dict.items():
-            partyp, parval = tdict['partyp'], tdict['parval']
-            nclu, clusters = tdict['nclu'], tdict['clusters']
+            partyp, parval = tdict["partyp"], tdict["parval"]
+            nclu, clusters = tdict["nclu"], tdict["clusters"]
             if model.mfpar.pval is None:
-                pv = np.float64(parval)
+                pv = float(parval)
             else:
                 try:
-                    pv = np.float64(model.mfpar.pval.pval_dict[key.lower()])
+                    pv = float(model.mfpar.pval.pval_dict[key.lower()])
                 except:
-                    pv = np.float64(parval)
+                    pv = float(parval)
             # print partyp, parval, nclu, clusters
             if partyp == findkey:
                 for [layer, mltarr, zonarr, izones] in clusters:
@@ -316,17 +313,19 @@ class ModflowPar(object):
                     if foundlayer:
                         model.parameter_load = True
                         cluster_data = np.zeros(shape, dtype=dtype)
-                        if mltarr.lower() == 'none':
+                        if mltarr.lower() == "none":
                             mult = np.ones(shape, dtype=dtype)
                         else:
                             mult = model.mfpar.mult.mult_dict[mltarr.lower()][
-                                   :, :]
-                        if zonarr.lower() == 'all':
+                                :, :
+                            ]
+                        if zonarr.lower() == "all":
                             cluster_data = pv * mult
                         else:
                             mult_save = np.copy(mult)
-                            za = model.mfpar.zone.zone_dict[zonarr.lower()][:,
-                                 :]
+                            za = model.mfpar.zone.zone_dict[zonarr.lower()][
+                                :, :
+                            ]
                             # build a multiplier for all of the izones
                             mult = np.zeros(shape, dtype=dtype)
                             for iz in izones:
