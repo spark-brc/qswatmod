@@ -30,7 +30,7 @@
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>0</y>
+        <y>-434</y>
         <width>573</width>
         <height>948</height>
        </rect>
@@ -1694,7 +1694,7 @@ MODFLOW River</string>
              </font>
             </property>
             <property name="title">
-             <string>Evapotranspiration</string>
+             <string>Evapotranspiration (optional)</string>
             </property>
             <property name="checkable">
              <bool>true</bool>
@@ -2256,7 +2256,7 @@ MODFLOW model</string>
  <connections/>
  <buttongroups>
   <buttongroup name="buttonGroup"/>
-  <buttongroup name="buttonGroup_initialH"/>
   <buttongroup name="buttonGroup_aq_thic"/>
+  <buttongroup name="buttonGroup_initialH"/>
  </buttongroups>
 </ui>
