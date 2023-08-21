@@ -412,7 +412,7 @@ def get_pyshp_field_dtypes(code):
     """Returns a numpy dtype for a pyshp field type."""
     dtypes = {'N': np.int_,
               'F': np.float64,
-              'L': np.bool,
+              'L': np.bool_,
               'C': np.object}
     return dtypes.get(code, np.object)
 

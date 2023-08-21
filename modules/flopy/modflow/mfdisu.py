@@ -332,7 +332,7 @@ class ModflowDisU(Package):
         self.nstp = Util2d(model, (self.nper,), np.int32, nstp, name='nstp')
         self.tsmult = Util2d(model, (self.nper,), np.float64, tsmult,
                              name='tsmult')
-        self.steady = Util2d(model, (self.nper,), np.bool,
+        self.steady = Util2d(model, (self.nper,), np.bool_,
                              steady, name='steady')
 
         self.itmuni_dict = {0: "undefined", 1: "seconds", 2: "minutes",

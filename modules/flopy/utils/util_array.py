@@ -444,7 +444,7 @@ class Util3d(DataInterface):
         this package will be added.
     shape : length 3 tuple
         shape of the 3-D array, typically (nlay,nrow,ncol)
-    dtype : [np.int32, np.float64, np.bool]
+    dtype : [np.int32, np.float64, np.bool_]
         the type of the data
     value : variable
         the data to be assigned to the 3-D array.
@@ -898,7 +898,7 @@ class Transient3d(DataInterface):
         this package will be added.
     shape : length 3 tuple
         shape of the 3-D transient arrays, typically (nlay,nrow,ncol)
-    dtype : [np.int32, np.float64, np.bool]
+    dtype : [np.int32, np.float64, np.bool_]
         the type of the data
     value : variable
         the data to be assigned to the 3-D arrays. Typically a dict
@@ -1139,7 +1139,7 @@ class Transient2d(DataInterface):
         this package will be added.
     shape : length 2 tuple
         shape of the 2-D transient arrays, typically (nrow,ncol)
-    dtype : [np.int32, np.float64, np.bool]
+    dtype : [np.int32, np.float64, np.bool_]
         the type of the data
     value : variable
         the data to be assigned to the 2-D arrays. Typically a dict
@@ -1576,7 +1576,7 @@ class Util2d(DataInterface):
         this package will be added.
     shape : tuple
         Shape of the 1- or 2-D array
-    dtype : [np.int32, np.float64, np.bool]
+    dtype : [np.int32, np.float64, np.bool_]
         the type of the data
     value : variable
         the data to be assigned to the 1- or 2-D array.
@@ -1707,7 +1707,7 @@ class Util2d(DataInterface):
                 warn('Util2d: setting integer dtype from {0} to int32'
                      .format(dtype))
             dtype = np.int32
-        if dtype not in [np.int32, np.float64, np.bool]:
+        if dtype not in [np.int32, np.float64, np.bool_]:
             raise TypeError('Util2d:unsupported dtype: ' + str(dtype))
 
         if name is not None:
@@ -2568,17 +2568,17 @@ class Util2d(DataInterface):
             value = np.array(value)
 
         if isinstance(value, bool):
-            if self._dtype == np.bool:
+            if self._dtype == np.bool_:
                 try:
-                    self.__value = np.bool(value)
+                    self.__value = np.bool_(value)
 
                 except:
                     raise Exception('Util2d:could not cast ' +
-                                    'boolean value to type "np.bool": ' +
+                                    'boolean value to type "np.bool_": ' +
                                     str(value))
             else:
                 raise Exception('Util2d:value type is bool, ' +
-                                ' but dtype not set as np.bool')
+                                ' but dtype not set as np.bool_')
         elif isinstance(value, str):
             if os.path.exists(value):
                 self.__value = value
