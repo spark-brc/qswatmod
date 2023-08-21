@@ -1,26 +1,16 @@
+import os
+import warnings
+from typing import Union
+
 import numpy as np
 
-try:
-    import rasterio
-except ImportError:
-    rasterio = None
+from .geometry import Polygon
+from .utl_import import import_optional_dependency
 
-try:
-    import affine
-except ImportError:
-    affine = None
+warnings.simplefilter("always", DeprecationWarning)
 
-try:
-    import scipy
-except ImportError:
-    scipy = None
 
-try:
-    import shapely
-except ImportError:
-    shapely = None
-
-class Raster(object):
+class Raster:
     """
     The Raster object is used for cropping, sampling raster values,
     and re-sampling raster values to grids, and provides methods to
@@ -49,37 +39,41 @@ class Raster(object):
 
     Examples
     --------
-    >>> from QSWATMOD2.modules.flopy.utils import Raster
+    >>> from flopy.utils import Raster
     >>>
     >>> rio = Raster.load("myraster.tif")
 
     """
-    FLOAT32 = (float, np.float64, np.float64, np.float_)
+
+    FLOAT32 = (float, np.float32, np.float_)
     FLOAT64 = (np.float64,)
-    INT8 = (np.int8,)
-    INT16 = (np.int16,)
-    INT32 = (int, np.int_, np.int32, np.int_)
-    INT64 = (np.int64,)
+    INT8 = (np.int8, np.uint8)
+    INT16 = (np.int16, np.uint16)
+    INT32 = (int, np.int32, np.uint32, np.uint, np.uintc, np.uint32)
+    INT64 = (np.int64, np.uint64)
 
-    def __init__(self, array, bands, crs, transform,
-                 nodataval, driver="GTiff", rio_ds=None):
-        if rasterio is None:
-            msg = 'Raster(): error ' + \
-                  'importing rasterio - try "pip install rasterio"'
-            raise ImportError(msg)
-        else:
-            from rasterio.crs import CRS
+    def __init__(
+        self,
+        array,
+        bands,
+        crs,
+        transform,
+        nodataval,
+        driver="GTiff",
+        rio_ds=None,
+    ):
+        from .geometry import point_in_polygon
 
-        if affine is None:
-            msg = 'Raster(): error ' + \
-                  'importing affine - try "pip install affine"'
-            raise ImportError(msg)
+        rasterio = import_optional_dependency("rasterio")
+        from rasterio.crs import CRS
 
+        self._affine = import_optional_dependency("affine")
+
+        self._point_in_polygon = point_in_polygon
         self._array = array
         self._bands = bands
 
-        meta = {"driver": driver,
-                "nodata": nodataval}
+        meta = {"driver": driver, "nodata": nodataval}
 
         # create metadata dictionary
         if array.dtype in Raster.FLOAT32:
@@ -97,7 +91,7 @@ class Raster(object):
         else:
             raise TypeError("dtype cannot be determined from Raster")
 
-        meta['dtype'] = dtype
+        meta["dtype"] = dtype
 
         if isinstance(crs, CRS):
             pass
@@ -108,22 +102,23 @@ class Raster(object):
         else:
             TypeError("crs type not understood, provide an epsg or proj4")
 
-        meta['crs'] = crs
+        meta["crs"] = crs
 
         count, height, width = array.shape
-        meta['count'] = count
-        meta['height'] = height
-        meta['width'] = width
+        meta["count"] = count
+        meta["height"] = height
+        meta["width"] = width
 
-        if not isinstance(transform, affine.Affine):
+        if not isinstance(transform, self._affine.Affine):
             raise TypeError("Transform must be defined by an Affine object")
 
-        meta['transform'] = transform
+        meta["transform"] = transform
 
         self._meta = meta
         self._dataset = None
-        self.__arr_dict = {self._bands[b]: arr for
-                           b, arr in enumerate(self._array)}
+        self.__arr_dict = {
+            self._bands[b]: arr for b, arr in enumerate(self._array)
+        }
 
         self.__xcenters = None
         self.__ycenters = None
@@ -136,9 +131,9 @@ class Raster(object):
         """
         Returns a tuple of xmin, xmax, ymin, ymax boundaries
         """
-        height = self._meta['height']
-        width = self._meta['width']
-        transform = self._meta['transform']
+        height = self._meta["height"]
+        width = self._meta["width"]
+        transform = self._meta["transform"]
         xmin = transform[2]
         ymax = transform[5]
         xmax, ymin = transform * (width, height)
@@ -162,7 +157,7 @@ class Raster(object):
         """
         if self._dataset is None:
             if isinstance(self._meta["nodata"], list):
-                nodata = tuple(self._meta['nodata'])
+                nodata = tuple(self._meta["nodata"])
             elif isinstance(self._meta["nodata"], tuple):
                 nodata = self._meta["nodata"]
             else:
@@ -211,26 +206,30 @@ class Raster(object):
         x0, x1, y0, y1 = self.bounds
 
         # adjust bounds to centroids
-        x0 += xd / 2.
-        x1 -= xd / 2.
-        y0 += yd / 2.
-        y1 -= yd / 2.
+        x0 += xd / 2.0
+        x1 -= xd / 2.0
+        y0 += yd / 2.0
+        y1 -= yd / 2.0
 
         x = np.linspace(x0, x1, xlen)
         y = np.linspace(y1, y0, ylen)
         self.__xcenters, self.__ycenters = np.meshgrid(x, y)
 
-    def sample_point(self, x, y, band):
+    def sample_point(self, *point, band=1):
         """
         Method to get nearest raster value at a user provided
         point
 
         Parameters
         ----------
-        x : float
-            x coordinate
-        y : float
-            y coordinate
+        *point : point geometry representation
+            accepted data types:
+            x, y values : ex. sample_point(1, 3, band=1)
+            tuple of x, y: ex sample_point((1, 3), band=1)
+            shapely.geometry.Point
+            geojson.Point
+            flopy.geometry.Point
+
         band : int
             raster band to re-sample
 
@@ -238,6 +237,15 @@ class Raster(object):
         -------
             value : float
         """
+        from .geospatial_utils import GeoSpatialUtil
+
+        if isinstance(point[0], (tuple, list, np.ndarray)):
+            point = point[0]
+
+        geom = GeoSpatialUtil(point, shapetype="Point")
+
+        x, y = geom.points
+
         # 1: get grid.
         rxc = self.xcenters
         ryc = self.ycenters
@@ -261,21 +269,21 @@ class Raster(object):
 
         return value
 
-    def sample_polygon(self, polygon, band, invert=False):
+    def sample_polygon(self, polygon, band, invert=False, **kwargs):
         """
         Method to get an unordered list of raster values that are located
         within a arbitrary polygon
 
         Parameters
         ----------
-        polygon : (shapely.geometry.Polygon or GeoJSON-like dict)
-            The values should be a GeoJSON-like dict or object
-            implements the Python geo interface protocal.
+        polygon : list, geojson, shapely.geometry, shapefile.Shape
+            sample_polygon method accepts any of these geometries:
 
-            Alternatively if the user supplies the vectors
-            of a polygon in the format [(x0, y0), ..., (xn, yn)]
-            a single shapely polygon will be created for
-            cropping the data
+            a list of (x, y) points, ex. [(x1, y1), ...]
+            geojson Polygon object
+            shapely Polygon object
+            shapefile Polygon shape
+            flopy Polygon shape
 
         band : int
             raster band to re-sample
@@ -290,8 +298,10 @@ class Raster(object):
 
         """
         if band not in self.bands:
-            err = "Band number is not recognized, use self.bands for a list " \
-                  "of raster bands"
+            err = (
+                "Band number is not recognized, use self.bands for a list "
+                "of raster bands"
+            )
             raise AssertionError(err)
 
         if self._dataset is not None:
@@ -303,7 +313,7 @@ class Raster(object):
                     arr_dict[b] = t
 
         else:
-            mask = self._intersection(polygon, invert)
+            mask = self._intersection(polygon, invert, **kwargs)
 
             arr_dict = {}
             for b, arr in self.__arr_dict.items():
@@ -312,7 +322,15 @@ class Raster(object):
 
         return arr_dict[band]
 
-    def resample_to_grid(self, xc, yc, band, method="nearest"):
+    def resample_to_grid(
+        self,
+        modelgrid,
+        band,
+        method="nearest",
+        multithread=False,
+        thread_pool=2,
+        extrapolate_edges=False,
+    ):
         """
         Method to resample the raster data to a
         user supplied grid of x, y coordinates.
@@ -322,49 +340,137 @@ class Raster(object):
 
         Parameters
         ----------
-        xc : np.ndarray or list
-            an array of x-cell centers
-        yc : np.ndarray or list
-            an array of y-cell centers
+        modelgrid : flopy.Grid object
+            model grid to sample data from
         band : int
             raster band to re-sample
         method : str
-            scipy interpolation method options
+            resampling methods
 
-            "linear" for bi-linear interpolation
-            "nearest" for nearest neighbor
-            "cubic" for bi-cubic interpolation
+            ``linear`` for bi-linear interpolation
+
+            ``nearest`` for nearest neighbor
+
+            ``cubic`` for bi-cubic interpolation
+
+            ``mean`` for mean sampling
+
+            ``median`` for median sampling
+
+            ``min`` for minimum sampling
+
+            ``max`` for maximum sampling
+
+            `'mode'` for majority sampling
+
+        multithread : bool
+            DEPRECATED boolean flag indicating if multithreading should be
+            used with the ``mean`` and ``median`` sampling methods
+        thread_pool : int
+            DEPRECATED number of threads to use for mean and median sampling
+        extrapolate_edges : bool
+            boolean flag indicating if areas without data should be filled
+            using the ``nearest`` interpolation method. This option
+            has no effect when using the ``nearest`` interpolation method.
 
         Returns
         -------
             np.array
         """
-        if scipy is None:
-            print('Raster().resample_to_grid(): error ' + \
-                  'importing scipy - try "pip install scipy"')
+        if multithread:
+            warnings.warn(
+                "multithread option has been deprecated and will be removed "
+                "in flopy version 3.3.8"
+            )
+
+        import_optional_dependency("scipy")
+        rasterstats = import_optional_dependency("rasterstats")
+        from scipy.interpolate import griddata
+
+        method = method.lower()
+        if method in ("linear", "nearest", "cubic"):
+            xc = modelgrid.xcellcenters
+            yc = modelgrid.ycellcenters
+
+            data_shape = xc.shape
+            xc = xc.flatten()
+            yc = yc.flatten()
+            # step 1: create grid from raster bounds
+            rxc = self.xcenters
+            ryc = self.ycenters
+
+            # step 2: flatten grid
+            rxc = rxc.flatten()
+            ryc = ryc.flatten()
+
+            # step 3: get array
+            if method == "cubic":
+                arr = self.get_array(band, masked=False)
+            else:
+                arr = self.get_array(band, masked=True)
+            arr = arr.flatten()
+
+            # step 3: use griddata interpolation to snap to grid
+            data = griddata(
+                (rxc, ryc),
+                arr,
+                (xc, yc),
+                method=method,
+            )
+
+        elif method in ("median", "mean", "min", "max", "mode"):
+            # these methods are slow and could use speed ups
+            data_shape = modelgrid.xcellcenters.shape
+
+            if method == "mode":
+                method = "majority"
+            xv, yv = modelgrid.cross_section_vertices
+            polygons = [list(zip(x, yv[ix])) for ix, x in enumerate(xv)]
+            polygons = [Polygon(p) for p in polygons]
+            rstr = self.get_array(band, masked=False)
+            affine = self._meta["transform"]
+            nodata = self.nodatavals[0]
+            zs = rasterstats.zonal_stats(
+                polygons, rstr, affine=affine, stats=[method], nodata=nodata
+            )
+            data = np.array(
+                [z[method] if z[method] is not None else np.nan for z in zs]
+            )
+
         else:
-            from scipy.interpolate import griddata
+            raise TypeError(f"{method} method not supported")
 
-        data_shape = xc.shape
-        xc = xc.flatten()
-        yc = yc.flatten()
-        # step 1: create grid from raster bounds
-        rxc = self.xcenters
-        ryc = self.ycenters
+        if extrapolate_edges and method != "nearest":
+            xc = modelgrid.xcellcenters
+            yc = modelgrid.ycellcenters
 
-        # step 2: flatten grid
-        rxc = rxc.flatten()
-        ryc = ryc.flatten()
+            xc = xc.flatten()
+            yc = yc.flatten()
 
-        # step 3: get array
-        if method == "cubic":
-            arr = self.get_array(band, masked=False)
-        else:
-            arr = self.get_array(band, masked=True)
-        arr = arr.flatten()
+            # step 1: create grid from raster bounds
+            rxc = self.xcenters
+            ryc = self.ycenters
 
-        # step 3: use griddata interpolation to snap to grid
-        data = griddata((rxc, ryc), arr, (xc, yc), method=method)
+            # step 2: flatten grid
+            rxc = rxc.flatten()
+            ryc = ryc.flatten()
+
+            arr = self.get_array(band, masked=True).flatten()
+
+            # filter out nan values from the original dataset
+            if np.isnan(np.sum(arr)):
+                idx = np.isfinite(arr)
+                rxc = rxc[idx]
+                ryc = ryc[idx]
+                arr = arr[idx]
+
+            extrapolate = griddata(
+                (rxc, ryc),
+                arr,
+                (xc, yc),
+                method="nearest",
+            )
+            data = np.where(np.isnan(data), extrapolate, data)
 
         # step 4: return grid to user in shape provided
         data.shape = data_shape
@@ -381,14 +487,14 @@ class Raster(object):
 
         Parameters
         ----------
-        polygon : (shapely.geometry.Polygon or GeoJSON-like dict)
-            The values should be a GeoJSON-like dict or object
-            implements the Python geo interface protocal.
+        polygon : list, geojson, shapely.geometry, shapefile.Shape
+            crop method accepts any of these geometries:
 
-            Alternatively if the user supplies the vectors
-            of a polygon in the format [(x0, y0), ..., (xn, yn)]
-            a single shapely polygon will be created for
-            cropping the data
+            a list of (x, y) points, ex. [(x1, y1), ...]
+            geojson Polygon object
+            shapely Polygon object
+            shapefile Polygon shape
+            flopy Polygon shape
 
         invert : bool
             Default value is False. If invert is True then the
@@ -404,21 +510,6 @@ class Raster(object):
             self.__ycenters = None
 
         else:
-            # crop from user supplied points using numpy
-            if rasterio is None:
-                msg = 'Raster().crop(): error ' + \
-                      'importing rasterio try "pip install rasterio"'
-                raise ImportError(msg)
-            else:
-                from rasterio.mask import mask
-
-            if affine is None:
-                msg = 'Raster(),crop(): error ' + \
-                      'importing affine - try "pip install affine"'
-                raise ImportError(msg)
-            else:
-                from affine import Affine
-
             mask = self._intersection(polygon, invert)
 
             xc = self.xcenters
@@ -434,10 +525,7 @@ class Raster(object):
             ymin = np.nanmin(yba)
             ymax = np.nanmax(yba)
 
-            bbox = [(xmin, ymin),
-                    (xmin, ymax),
-                    (xmax, ymax),
-                    (xmax, ymin)]
+            bbox = [(xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin)]
 
             # step 5: use bounding box to crop array
             xind = []
@@ -455,18 +543,18 @@ class Raster(object):
             ymii = np.min(yind)
             ymai = np.max(yind)
 
-            crp_mask = mask[ymii:ymai + 1, xmii:xmai + 1]
+            crp_mask = mask[ymii : ymai + 1, xmii : xmai + 1]
             nodata = self._meta["nodata"]
             if not isinstance(nodata, float) and not isinstance(nodata, int):
                 try:
                     nodata = nodata[0]
                 except (IndexError, TypeError):
-                    nodata = -1.0e+38
+                    nodata = -1.0e38
                     self._meta["nodata"] = nodata
 
             arr_dict = {}
             for band, arr in self.__arr_dict.items():
-                t = arr[ymii:ymai + 1, xmii:xmai + 1]
+                t = arr[ymii : ymai + 1, xmii : xmai + 1]
                 t[~crp_mask] = nodata
                 arr_dict[band] = t
 
@@ -475,15 +563,21 @@ class Raster(object):
             # adjust xmin, ymax back to appropriate grid locations
             xd = abs(self._meta["transform"][0])
             yd = abs(self._meta["transform"][4])
-            xmin -= xd / 2.
-            ymax += yd / 2.
+            xmin -= xd / 2.0
+            ymax += yd / 2.0
 
             # step 6: update metadata including a new Affine
             self._meta["height"] = crp_mask.shape[0]
             self._meta["width"] = crp_mask.shape[1]
-            transform = self._meta['transform']
-            self._meta["transform"] = Affine(transform[0], transform[1], xmin,
-                                             transform[3], transform[4], ymax)
+            transform = self._meta["transform"]
+            self._meta["transform"] = self._affine.Affine(
+                transform[0],
+                transform[1],
+                xmin,
+                transform[3],
+                transform[4],
+                ymax,
+            )
             self.__xcenters = None
             self.__ycenters = None
 
@@ -494,14 +588,14 @@ class Raster(object):
 
         Parameters
         ----------
-        polygon : (shapely.geometry.Polygon or GeoJSON-like dict)
-            The values should be a GeoJSON-like dict or object
-            implements the Python geo interface protocal.
+        polygon : list, geojson, shapely.geometry, shapefile.Shape
+            _sample_rio_dataset method accepts any of these geometries:
 
-            Alternatively if the user supplies the vectors
-            of a polygon in the format [(x0, y0), ..., (xn, yn)]
-            a single shapely polygon will be created for
-            cropping the data
+            a list of (x, y) points, ex. [(x1, y1), ...]
+            geojson Polygon object
+            shapely Polygon object
+            shapefile Polygon shape
+            flopy Polygon shape
 
         invert : bool
             Default value is False. If invert is True then the
@@ -512,57 +606,50 @@ class Raster(object):
             tuple : (arr_dict, raster_crp_meta)
 
         """
-        if rasterio is None:
-            msg = 'Raster()._sample_rio_dataset(): error ' + \
-                  'importing rasterio try "pip install rasterio"'
-            raise ImportError(msg)
-        else:
-            from rasterio.mask import mask
+        import_optional_dependency("rasterio")
+        from rasterio.mask import mask
 
-        if shapely is None:
-            msg = 'Raster()._sample_rio_dataset(): error ' + \
-                  'importing shapely - try "pip install shapely"'
-            raise ImportError(msg)
-        else:
-            from shapely import geometry
+        from .geospatial_utils import GeoSpatialUtil
 
+        if isinstance(polygon, (list, tuple, np.ndarray)):
+            polygon = [polygon]
 
-        if isinstance(polygon, list) or isinstance(polygon, np.ndarray):
-            shapes = [geometry.Polygon([[x, y] for x, y in polygon])]
+        geom = GeoSpatialUtil(polygon, shapetype="Polygon")
+        shapes = [geom]
 
-        else:
-            shapes = [polygon]
-
-        rstr_crp, rstr_crp_affine = mask(self._dataset,
-                                         shapes,
-                                         crop=True,
-                                         invert=invert)
+        rstr_crp, rstr_crp_affine = mask(
+            self._dataset, shapes, crop=True, invert=invert
+        )
 
         rstr_crp_meta = self._dataset.meta.copy()
-        rstr_crp_meta.update({"driver": "GTiff",
-                              "height": rstr_crp.shape[1],
-                              "width": rstr_crp.shape[2],
-                              "transform": rstr_crp_affine})
+        rstr_crp_meta.update(
+            {
+                "driver": "GTiff",
+                "height": rstr_crp.shape[1],
+                "width": rstr_crp.shape[2],
+                "transform": rstr_crp_affine,
+            }
+        )
 
         arr_dict = {self.bands[b]: arr for b, arr in enumerate(rstr_crp)}
 
         return arr_dict, rstr_crp_meta
 
-    def _intersection(self, polygon, invert):
+    def _intersection(self, polygon, invert, **kwargs):
         """
         Internal method to create an intersection mask, used for cropping
         arrays and sampling arrays.
 
         Parameters
         ----------
-        polygon : (shapely.geometry.Polygon or GeoJSON-like dict)
-            The values should be a GeoJSON-like dict or object
-            implements the Python geo interface protocal.
+        polygon : list, geojson, shapely.geometry, shapefile.Shape
+            _intersection method accepts any of these geometries:
 
-            Alternatively if the user supplies the vectors
-            of a polygon in the format [(x0, y0), ..., (xn, yn)]
-            a single shapely polygon will be created for
-            cropping the data
+            a list of (x, y) points, ex. [(x1, y1), ...]
+            geojson Polygon object
+            shapely Polygon object
+            shapefile Polygon shape
+            flopy Polygon shape
 
         invert : bool
             Default value is False. If invert is True then the
@@ -573,33 +660,18 @@ class Raster(object):
             mask : np.ndarray (dtype = bool)
 
         """
-        if shapely is None:
-            msg = 'Raster()._intersection(): error ' + \
-                  'importing shapely try "pip install shapely"'
-            raise ImportError(msg)
-        else:
-            from shapely import geometry
+        # the convert kwarg is to speed up the resample_to_grid method
+        #  which already provides the proper datatype to _intersect()
+        convert = kwargs.pop("convert", True)
+        if convert:
+            from .geospatial_utils import GeoSpatialUtil
 
-        # step 1: check the data type in shapes
-        if isinstance(polygon, geometry.Polygon):
-            polygon = list(polygon.exterior.coords)
+            if isinstance(polygon, (list, tuple, np.ndarray)):
+                polygon = [polygon]
 
-        elif isinstance(polygon, dict):
-            # geojson, get coordinates=
-            if polygon['geometry']['type'].lower() == "polygon":
-                polygon = [[x, y] for x, y in
-                           polygon["geometry"]["coordinates"]]
+            geom = GeoSpatialUtil(polygon, shapetype="Polygon")
 
-            else:
-                raise TypeError("Shape type must be a polygon")
-
-        elif isinstance(polygon, np.ndarray):
-            # numpy array, change to a list
-            polygon = list(polygon)
-
-        else:
-            # this is a list of coordinates
-            pass
+            polygon = list(geom.points[0])
 
         # step 2: create a grid of centoids
         xc = self.xcenters
@@ -609,56 +681,6 @@ class Raster(object):
         mask = self._point_in_polygon(xc, yc, polygon)
         if invert:
             mask = np.invert(mask)
-
-        return mask
-
-    @staticmethod
-    def _point_in_polygon(xc, yc, polygon):
-        """
-        Use the ray casting algorithm to determine if a point
-        is within a polygon. Enables very fast
-        intersection calculations!
-
-        Parameters
-        ----------
-        xc : np.ndarray
-            array of xpoints
-        yc : np.ndarray
-            array of ypoints
-        polygon : iterable (list)
-            polygon vertices [(x0, y0),....(xn, yn)]
-            note: polygon can be open or closed
-
-        Returns
-        -------
-        mask: np.array
-            True value means point is in polygon!
-
-        """
-        x0, y0 = polygon[0]
-        xt, yt = polygon[-1]
-
-        # close polygon if it isn't already
-        if (x0, y0) != (xt, yt):
-            polygon.append((x0, y0))
-
-        ray_count = np.zeros(xc.shape, dtype=int)
-        num = len(polygon)
-        j = num - 1
-        for i in range(num):
-
-            tmp = polygon[i][0] + (polygon[j][0] - polygon[i][0]) * \
-                  (yc - polygon[i][1]) / (polygon[j][1] - polygon[i][1])
-
-            comp = np.where(((polygon[i][1] > yc) ^ (polygon[j][1] > yc))
-                            & (xc < tmp))
-
-            j = i
-            if len(comp[0]) > 0:
-                ray_count[comp[0], comp[1]] += 1
-
-        mask = np.ones(xc.shape, dtype=bool)
-        mask[ray_count % 2 == 0] = False
 
         return mask
 
@@ -691,6 +713,7 @@ class Raster(object):
 
         if masked:
             for v in self.nodatavals:
+                array = array.astype(float)
                 array[array == v] = np.nan
 
         return array
@@ -706,10 +729,7 @@ class Raster(object):
             output raster .tif file name
 
         """
-        if rasterio is None:
-            msg = 'Raster().write(): error ' + \
-                  'importing rasterio - try "pip install rasterio"'
-            raise ImportError(msg)
+        rasterio = import_optional_dependency("rasterio")
 
         if not name.endswith(".tif"):
             name += ".tif"
@@ -719,32 +739,36 @@ class Raster(object):
                 foo.write(arr, band)
 
     @staticmethod
-    def load(raster):
+    def load(raster: Union[str, os.PathLike]):
         """
         Static method to load a raster file
         into the raster object
 
         Parameters
         ----------
-        raster : str
+        raster : str or PathLike
+            The path to the raster file
 
         Returns
         -------
-            Raster object
+            A Raster object
 
         """
-        if rasterio is None:
-            msg = 'Raster().load(): error ' + \
-                  'importing rasterio - try "pip install rasterio"'
-            raise ImportError(msg)
+        rasterio = import_optional_dependency("rasterio")
 
         dataset = rasterio.open(raster)
         array = dataset.read()
         bands = dataset.indexes
         meta = dataset.meta
 
-        return Raster(array, bands, meta["crs"], meta['transform'],
-                      meta['nodata'], meta['driver'])
+        return Raster(
+            array,
+            bands,
+            meta["crs"],
+            meta["transform"],
+            meta["nodata"],
+            meta["driver"],
+        )
 
     def plot(self, ax=None, contour=False, **kwargs):
         """
@@ -767,15 +791,16 @@ class Raster(object):
             ax : matplotlib.pyplot.axes
 
         """
-        if rasterio is None:
-            msg = 'Raster().plot(): error ' + \
-                  'importing rasterio - try "pip install rasterio"'
-            raise ImportError(msg)
-        else:
-            from rasterio.plot import show
+        import_optional_dependency("rasterio")
+        from rasterio.plot import show
 
         if self._dataset is not None:
-            ax = show(self._dataset, ax=ax, contour=contour, **kwargs)
+            ax = show(
+                self._dataset,
+                ax=ax,
+                contour=contour,
+                **kwargs,
+            )
 
         else:
             d0 = len(self.__arr_dict)
@@ -793,9 +818,13 @@ class Raster(object):
                 i += 1
 
             data = np.ma.masked_where(data == self.nodatavals, data)
-            ax = show(data, ax=ax, contour=contour,
-                      transform=self._meta["transform"],
-                      **kwargs)
+            ax = show(
+                data,
+                ax=ax,
+                contour=contour,
+                transform=self._meta["transform"],
+                **kwargs,
+            )
 
         return ax
 
@@ -818,12 +847,8 @@ class Raster(object):
             ax : matplotlib.pyplot.axes
 
         """
-        if rasterio is None:
-            msg = 'Raster().histogram(): error ' + \
-                  'importing rasterio - try "pip install rasterio"'
-            raise ImportError(msg)
-        else:
-            from rasterio.plot import show_hist
+        import_optional_dependency("rasterio")
+        from rasterio.plot import show_hist
 
         if "alpha" not in kwargs:
             kwargs["alpha"] = 0.3

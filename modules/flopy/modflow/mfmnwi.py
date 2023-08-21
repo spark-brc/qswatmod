@@ -1,9 +1,5 @@
-import sys
-
-from ..utils.flopy_io import line_parse, pop_item
-
 from ..pakbase import Package
-from ..utils import check
+from ..utils.flopy_io import line_parse, pop_item
 
 
 class ModflowMnwi(Package):
@@ -59,12 +55,21 @@ class ModflowMnwi(Package):
 
     """
 
-    def __init__(self, model, wel1flag=None, qsumflag=None, byndflag=None,
-                 mnwobs=1, wellid_unit_qndflag_qhbflag_concflag=None,
-                 extension='mnwi', unitnumber=None, filenames=None):
+    def __init__(
+        self,
+        model,
+        wel1flag=None,
+        qsumflag=None,
+        byndflag=None,
+        mnwobs=1,
+        wellid_unit_qndflag_qhbflag_concflag=None,
+        extension="mnwi",
+        unitnumber=None,
+        filenames=None,
+    ):
         # set default unit number of one is not specified
         if unitnumber is None:
-            unitnumber = ModflowMnwi.defaultunit()
+            unitnumber = ModflowMnwi._defaultunit()
 
         # determine the number of unique unit numbers in dataset 3
         unique_units = []
@@ -76,69 +81,64 @@ class ModflowMnwi(Package):
 
         # set filenames
         nfn = 4 + len(unique_units)
-        if filenames is None:
-            filenames = [None for x in range(nfn)]
-        elif isinstance(filenames, str):
-            filenames = [filenames] + [None for x in range(nfn)]
-        elif isinstance(filenames, list):
-            if len(filenames) < nfn:
-                n = nfn - len(filenames) + 1
-                filenames = filenames + [None for x in range(n)]
+        filenames = self._prepare_filenames(filenames, nfn)
 
         # update external file information with unit_pc output, if necessary
         if wel1flag is not None:
-            fname = filenames[1]
-            model.add_output_file(wel1flag, fname=fname,
-                                  extension='wel1',
-                                  binflag=False,
-                                  package=ModflowMnwi.ftype())
+            model.add_output_file(
+                wel1flag,
+                fname=filenames[1],
+                extension="wel1",
+                binflag=False,
+                package=self._ftype(),
+            )
         else:
             wel1flag = 0
 
         # update external file information with unit_ts output, if necessary
         if qsumflag is not None:
-            fname = filenames[2]
-            model.add_output_file(qsumflag, fname=fname,
-                                  extension='qsum',
-                                  binflag=False,
-                                  package=ModflowMnwi.ftype())
+            model.add_output_file(
+                qsumflag,
+                fname=filenames[2],
+                extension="qsum",
+                binflag=False,
+                package=self._ftype(),
+            )
         else:
             qsumflag = 0
 
         # update external file information with ipunit output, if necessary
         if byndflag is not None:
-            fname = filenames[3]
-            model.add_output_file(byndflag, fname=fname,
-                                  extension='bynd',
-                                  binflag=False,
-                                  package=ModflowMnwi.ftype())
+            model.add_output_file(
+                byndflag,
+                fname=filenames[3],
+                extension="bynd",
+                binflag=False,
+                package=self._ftype(),
+            )
         else:
             byndflag = 0
 
-        idx = 4
-        for iu in unique_units:
-            fname = filenames[idx]
-            model.add_output_file(iu, fname=fname,
-                                  extension='{:04d}.mnwobs'.format(iu),
-                                  binflag=False,
-                                  package=ModflowMnwi.ftype())
-            idx += 1
+        for idx, iu in enumerate(unique_units, 4):
+            model.add_output_file(
+                iu,
+                fname=filenames[idx],
+                extension=f"{iu:04d}.mnwobs",
+                binflag=False,
+                package=self._ftype(),
+            )
 
-        name = [ModflowMnwi.ftype()]
-        units = [unitnumber]
-        extra = ['']
+        # call base package constructor
+        super().__init__(
+            model,
+            extension=extension,
+            name=self._ftype(),
+            unit_number=unitnumber,
+            filenames=filenames[0],
+        )
 
-        # set package name
-        fname = [filenames[0]]
-
-        # Call ancestor's init to set self.parent, extension, name and unit number
-        Package.__init__(self, model, extension=extension, name=name,
-                         unit_number=units, extra=extra, filenames=fname)
-
-        self.url = 'mnwi.htm'
-        self.heading = '# {} package for '.format(self.name[0]) + \
-                       ' {}, '.format(model.version_types[model.version]) + \
-                       'generated by Flopy.'
+        self.url = "mnwi.html"
+        self._generate_heading()
         # integer flag indicating output to be written for each MNW node at
         # the end of each stress period
         self.wel1flag = wel1flag
@@ -151,24 +151,33 @@ class ModflowMnwi(Package):
         self.mnwobs = mnwobs
         # list of lists containing wells and related information to be
         # output (length = [MNWOBS][4or5])
-        self.wellid_unit_qndflag_qhbflag_concflag = wellid_unit_qndflag_qhbflag_concflag
+        self.wellid_unit_qndflag_qhbflag_concflag = (
+            wellid_unit_qndflag_qhbflag_concflag
+        )
 
         # -input format checks:
-        assert self.wel1flag >= 0, 'WEL1flag must be greater than or equal to zero.'
-        assert self.qsumflag >= 0, 'QSUMflag must be greater than or equal to zero.'
-        assert self.byndflag >= 0, 'BYNDflag must be greater than or equal to zero.'
+        assert (
+            self.wel1flag >= 0
+        ), "WEL1flag must be greater than or equal to zero."
+        assert (
+            self.qsumflag >= 0
+        ), "QSUMflag must be greater than or equal to zero."
+        assert (
+            self.byndflag >= 0
+        ), "BYNDflag must be greater than or equal to zero."
 
         if len(self.wellid_unit_qndflag_qhbflag_concflag) != self.mnwobs:
-            print('WARNING: number of listed well ids to be ' +
-                  'monitored does not match MNWOBS.')
+            print(
+                "WARNING: number of listed well ids to be "
+                "monitored does not match MNWOBS."
+            )
 
         self.parent.add_package(self)
 
-    @staticmethod
-    def load(f, model, nper=None, gwt=False, nsol=1, ext_unit_dict=None):
-
+    @classmethod
+    def load(cls, f, model, nper=None, gwt=False, nsol=1, ext_unit_dict=None):
         if model.verbose:
-            sys.stdout.write('loading mnw2 package file...\n')
+            print("loading mnw2 package file...")
 
         structured = model.structured
         if nper is None:
@@ -176,10 +185,10 @@ class ModflowMnwi(Package):
             # otherwise iterations from 0, nper won't run
             nper = 1 if nper == 0 else nper
 
-        openfile = not hasattr(f, 'read')
+        openfile = not hasattr(f, "read")
         if openfile:
             filename = f
-            f = open(filename, 'r')
+            f = open(filename, "r")
 
         # dataset 1
         line = line_parse(next(f))
@@ -190,7 +199,6 @@ class ModflowMnwi(Package):
             model.add_pop_key_list(qsumflag)
         if byndflag > 0:
             model.add_pop_key_list(byndflag)
-
 
         # dataset 2
         unique_units = []
@@ -222,32 +230,41 @@ class ModflowMnwi(Package):
         unitnumber = None
         filenames = [None for x in range(nfn)]
         if ext_unit_dict is not None:
-            unitnumber, filenames[0] = \
-                model.get_ext_dict_attr(ext_unit_dict,
-                                        filetype=ModflowMnwi.ftype())
+            unitnumber, filenames[0] = model.get_ext_dict_attr(
+                ext_unit_dict, filetype=ModflowMnwi._ftype()
+            )
             if wel1flag > 0:
-                iu, filenames[1] = \
-                    model.get_ext_dict_attr(ext_unit_dict, unit=wel1flag)
+                iu, filenames[1] = model.get_ext_dict_attr(
+                    ext_unit_dict, unit=wel1flag
+                )
             if qsumflag > 0:
-                iu, filenames[2] = \
-                    model.get_ext_dict_attr(ext_unit_dict, unit=qsumflag)
+                iu, filenames[2] = model.get_ext_dict_attr(
+                    ext_unit_dict, unit=qsumflag
+                )
             if byndflag > 0:
-                iu, filenames[3] = \
-                    model.get_ext_dict_attr(ext_unit_dict, unit=byndflag)
+                iu, filenames[3] = model.get_ext_dict_attr(
+                    ext_unit_dict, unit=byndflag
+                )
             idx = 4
             for unit in unique_units:
-                iu, filenames[idx] = \
-                    model.get_ext_dict_attr(ext_unit_dict, unit=unit)
+                iu, filenames[idx] = model.get_ext_dict_attr(
+                    ext_unit_dict, unit=unit
+                )
                 idx += 1
 
+        return cls(
+            model,
+            wel1flag=wel1flag,
+            qsumflag=qsumflag,
+            byndflag=byndflag,
+            mnwobs=mnwobs,
+            wellid_unit_qndflag_qhbflag_concflag=wellid_unit_qndflag_qhbflag_concflag,
+            extension="mnwi",
+            unitnumber=unitnumber,
+            filenames=filenames,
+        )
 
-        return ModflowMnwi(model, wel1flag=wel1flag, qsumflag=qsumflag,
-                           byndflag=byndflag, mnwobs=mnwobs,
-                           wellid_unit_qndflag_qhbflag_concflag=wellid_unit_qndflag_qhbflag_concflag,
-                           extension='mnwi', unitnumber=unitnumber,
-                           filenames=filenames)
-
-    def check(self, f=None, verbose=True, level=1):
+    def check(self, f=None, verbose=True, level=1, checktype=None):
         """
         Check mnwi package data for common errors.
 
@@ -276,11 +293,10 @@ class ModflowMnwi(Package):
         >>> m = flopy.modflow.Modflow.load('model.nam')
         >>> m.mnwi.check()
         """
-        chk = check(self, f=f, verbose=verbose, level=level)
+        chk = self._get_check(f, verbose, level, checktype)
         if "MNW2" not in self.parent.get_package_list():
-            desc = '\r    MNWI package present without MNW2 package.'
-            chk._add_to_summary(type='Warning', value=0,
-                                desc=desc)
+            desc = "\r    MNWI package present without MNW2 package."
+            chk._add_to_summary(type="Warning", value=0, desc=desc)
 
         chk.summarize()
         return chk
@@ -296,20 +312,20 @@ class ModflowMnwi(Package):
         """
 
         # -open file for writing
-        f = open(self.fn_path, 'w')
+        f = open(self.fn_path, "w")
 
         # header not supported
         # # -write header
         # f.write('{}\n'.format(self.heading))
 
         # dataset 1 - WEL1flag QSUMflag SYNDflag
-        line = '{:10d}'.format(self.wel1flag)
-        line += '{:10d}'.format(self.qsumflag)
-        line += '{:10d}\n'.format(self.byndflag)
+        line = f"{self.wel1flag:10d}"
+        line += f"{self.qsumflag:10d}"
+        line += f"{self.byndflag:10d}\n"
         f.write(line)
 
         # dataset 2 - MNWOBS
-        f.write('{:10d}\n'.format(self.mnwobs))
+        f.write(f"{self.mnwobs:10d}\n")
 
         # dataset 3 -  WELLID UNIT QNDflag QBHflag {CONCflag}
         # (Repeat MNWOBS times)
@@ -319,28 +335,34 @@ class ModflowMnwi(Package):
             unit = t[1]
             qndflag = t[2]
             qhbflag = t[3]
-            assert qndflag >= 0, 'QNDflag must be greater than or equal to zero.'
-            assert qhbflag >= 0, 'QHBflag must be greater than or equal to zero.'
-            line = '{:20s} '.format(wellid)
-            line += '{:5d} '.format(unit)
-            line += '{:5d} '.format(qndflag)
-            line += '{:5d} '.format(qhbflag)
+            assert (
+                qndflag >= 0
+            ), "QNDflag must be greater than or equal to zero."
+            assert (
+                qhbflag >= 0
+            ), "QHBflag must be greater than or equal to zero."
+            line = f"{wellid:20s} "
+            line += f"{unit:5d} "
+            line += f"{qndflag:5d} "
+            line += f"{qhbflag:5d} "
             if nitems == 5:
                 concflag = t[4]
-                assert 0 <= concflag <= 3, \
-                    'CONCflag must be an integer between 0 and 3.'
-                assert isinstance(concflag, int), \
-                    'CONCflag must be an integer between 0 and 3.'
-                line += '{:5d} '.format(concflag)
-            line += '\n'
+                assert (
+                    0 <= concflag <= 3
+                ), "CONCflag must be an integer between 0 and 3."
+                assert isinstance(
+                    concflag, int
+                ), "CONCflag must be an integer between 0 and 3."
+                line += f"{concflag:5d} "
+            line += "\n"
             f.write(line)
 
         f.close()
 
     @staticmethod
-    def ftype():
-        return 'MNWI'
+    def _ftype():
+        return "MNWI"
 
     @staticmethod
-    def defaultunit():
+    def _defaultunit():
         return 58

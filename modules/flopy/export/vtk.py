@@ -1,980 +1,1981 @@
-from __future__ import print_function, division
+"""
+The vtk module provides functionality for exporting model inputs and
+outputs to VTK.
+"""
+
 import os
+import warnings
+from pathlib import Path
+from typing import Union
+
 import numpy as np
-from ..discretization import StructuredGrid
-from ..datbase import DataType, DataInterface
-from QSWATMOD2.modules.flopy.utils import binaryfile as bf
-from QSWATMOD2.modules.flopy.utils import HeadFile
-import numpy.ma as ma
-import struct
-import sys
 
-# Module for exporting vtk from QSWATMOD2.modules.flopy
+from ..datbase import DataInterface, DataType
+from ..utils import Util3d, import_optional_dependency
 
-# BINARY *********************************************
-np_to_struct = {'int8': 'b',
-                'uint8': 'B',
-                'int16': 'h',
-                'uint16': 'H',
-                'int32': 'i',
-                'uint32': 'I',
-                'int64': 'q',
-                'uint64': 'Q',
-                'float32': 'f',
-                'float64': 'd'}
+warnings.simplefilter("always", DeprecationWarning)
 
 
-class BinaryXml:
+VTKIGNORE = (
+    "vkcb",
+    "perlen",
+    "steady",
+    "tsmult",
+    "nstp",
+    "iac",
+    "ja",
+    "ihc",
+    "cl12",
+    "hwva",
+    "angldegx",
+    "angledegx",
+)
+
+
+class Pvd:
     """
-    Helps write binary vtk files
+    Simple class to build a Paraview Data File (PVD)
+
+    """
+
+    def __init__(self):
+        self.__data = [
+            '<?xml version="1.0"?>\n',
+            '<VTKFile type="Collection" version="0.1" '
+            'byte_order="LittleEndian" compressor="vtkZLibDataCompressor">\n',
+            "<Collection>\n",
+        ]
+
+    def add_timevalue(self, file, timevalue):
+        """
+        Method to add a Dataset record to the pvd file
+
+        Parameters
+        ----------
+        file : os.PathLike or str
+            vtu file name
+        timevalue : float
+            time step value in model time
+        """
+        file = Path(file)
+        if file.suffix != ".vtu":
+            file = file.with_suffix(".vtu")
+
+        record = (
+            f'<DataSet timestep="{timevalue}" group="" '
+            f'part="0" file="{file.name}"/>\n'
+        )
+        self.__data.append(record)
+
+    def write(self, f):
+        """
+        Method to write a pvd file from the PVD object.
+
+        Parameters
+        ----------
+        f : os.PathLike or str
+            PVD file name
+
+        """
+        f = Path(f)
+        if f.suffix != ".pvd":
+            f = f.with_suffix(".pvd")
+
+        with f.open("w") as foo:
+            foo.writelines(self.__data)
+            foo.write("</Collection>\n")
+            foo.write("</VTKFile>")
+
+
+class Vtk:
+    """
+    Class that builds VTK objects and exports models to VTK files
+
 
     Parameters
     ----------
-
-    file_path : str
-        output file path
-
-    """
-    def __init__(self, file_path):
-        self.stream = open(file_path, "wb")
-        self.open_tag = False
-        self.current = []
-        self.stream.write(b'<?xml version="1.0"?>')
-        if sys.byteorder == "little":
-            self.byte_order = '<'
-        else:
-            self.byte_order = '>'
-
-    def write_size(self, block_size):
-        # size is a 64 bit unsigned integer
-        byte_order = self.byte_order + 'Q'
-        block_size = struct.pack(byte_order, block_size)
-        self.stream.write(block_size)
-
-    def write_array(self, data):
-        assert (data.flags['C_CONTIGUOUS'] or data.flags['F_CONTIGUOUS'])
-
-        # ravel in fortran order
-        dd = np.ravel(data, order='F')
-
-        data_format = self.byte_order + str(data.size) + np_to_struct[
-            data.dtype.name]
-        binary_data = struct.pack(data_format, *dd)
-        self.stream.write(binary_data)
-
-    def write_coord_arrays(self, x, y, z):
-        # check that arrays are the same shape and data type
-        assert (x.size == y.size == z.size)
-        assert (x.dtype.itemsize == y.dtype.itemsize == z.dtype.itemsize)
-
-        # check if arrays are contiguous
-        assert (x.flags['C_CONTIGUOUS'] or x.flags['F_CONTIGUOUS'])
-        assert (y.flags['C_CONTIGUOUS'] or y.flags['F_CONTIGUOUS'])
-        assert (z.flags['C_CONTIGUOUS'] or z.flags['F_CONTIGUOUS'])
-
-        data_format = self.byte_order + str(1) + \
-            np_to_struct[x.dtype.name]
-
-        xrav = np.ravel(x, order='F')
-        yrav = np.ravel(y, order='F')
-        zrav = np.ravel(z, order='F')
-
-        for idx in range(x.size):
-            bx = struct.pack(data_format, xrav[idx])
-            by = struct.pack(data_format, yrav[idx])
-            bz = struct.pack(data_format, zrav[idx])
-            self.stream.write(bx)
-            self.stream.write(by)
-            self.stream.write(bz)
-
-    def close(self):
-        assert (not self.open_tag)
-        self.stream.close()
-
-    def open_element(self, tag):
-        if self.open_tag:
-            self.stream.write(b">")
-        tag_string = "\n<%s" % tag
-        self.stream.write(str.encode(tag_string))
-        self.open_tag = True
-        self.current.append(tag)
-        return self
-
-    def close_element(self, tag=None):
-        if tag:
-            assert (self.current.pop() == tag)
-            if self.open_tag:
-                self.stream.write(b">")
-                self.open_tag = False
-            string = "\n</%s>" % tag
-            self.stream.write(str.encode(string))
-        else:
-            self.stream.write(b"/>")
-            self.open_tag = False
-            self.current.pop()
-        return self
-
-    def add_text(self, text):
-        if self.open_tag:
-            self.stream.write(b">\n")
-            self.open_tag = False
-        self.stream.write(str.encode(text))
-        return self
-
-    def add_attributes(self, **kwargs):
-        assert self.open_tag
-        for key in kwargs:
-            st = ' %s="%s"' % (key, kwargs[key])
-            self.stream.write(str.encode(st))
-        return self
-
-# END BINARY *********************************************
-
-
-def start_tag(f, tag, indent_level, indent_char='  '):
-    # starts xml tag
-    s = indent_level * indent_char + tag
-    indent_level += 1
-    f.write(s + '\n')
-    return indent_level
-
-
-def end_tag(f, tag, indent_level, indent_char='  '):
-    # ends xml tag
-    indent_level -= 1
-    s = indent_level * indent_char + tag
-    f.write(s + '\n')
-    return indent_level
-
-
-class _Array(object):
-    # class to store array and tell if array is 2d
-    def __init__(self, array, array2d):
-        self.array = array
-        self.array2d = array2d
-
-
-def _get_basic_modeltime(perlen_list):
-    modeltim = 0
-    totim = []
-    for tim in perlen_list:
-        totim.append(modeltim)
-        modeltim += tim
-    return totim
-
-
-class Vtk(object):
-    """
-    Class to build VTK object for exporting flopy vtk
-
-    Parameters
-    ----------
-
-    model : MFModel
-        flopy model instance
-    verbose : bool
-        if True, stdout is verbose
-    nanval : float
-        no data value, default is -1e20
+    model : flopy.ModelInterface object
+        any flopy model object, example flopy.modflow.Modflow() object
+    modelgrid : flopy.discretization.Grid object
+        any flopy modelgrid object, example. VertexGrid
+    vertical_exageration : float
+        floating point value to scale vertical exageration of the vtk points
+        default is 1.
+    binary : bool
+        flag that indicates if Vtk will write a binary or text file. Binary
+        is prefered as paraview has a bug (8/4/2021) where is cannot represent
+        NaN values from ASCII (non xml) files. In this case no-data values
+        are set to 1e+30.
+    xml : bool
+        flag to write xml based VTK files
+    pvd : bool
+        boolean flag to write a paraview pvd file for transient data. This
+        file maps vtk files to a model time.
+    shared_points : bool
+        boolean flag to share points in grid polyhedron construction. Default
+        is False, as paraview has a bug (8/4/2021) where some polyhedrons will
+        not properly close when using shared points. If shared_points is True
+        file size will be slightly smaller.
     smooth : bool
-        If True will create smooth output surface
+        boolean flag to interpolate vertex elevations based on shared cell
+        elevations. Default is False.
     point_scalars : bool
-        if True will output point scalar values, this will set smooth to True.
-
-    Attributes
-    ----------
-
-    arrays : dict
-        Stores data arrays added to VTK object
+        boolen flag to write interpolated data at each point based "shared
+        vertices".
 
     """
 
-    def __init__(self, model, verbose=None, nanval=-1e+20, smooth=False,
-                 point_scalars=False):
+    def __init__(
+        self,
+        model=None,
+        modelgrid=None,
+        vertical_exageration=1,
+        binary=True,
+        xml=False,
+        pvd=False,
+        shared_points=False,
+        smooth=False,
+        point_scalars=False,
+    ):
+        vtk = import_optional_dependency("vtk")
 
-        if point_scalars:
-            smooth = True
+        if model is None and modelgrid is None:
+            raise AssertionError(
+                "A model or modelgrid must be provided to use Vtk"
+            )
 
-        if verbose is None:
-            verbose = model.verbose
-        self.verbose = verbose
+        elif model is not None:
+            self.modelgrid = model.modelgrid
+            self.modeltime = model.modeltime
+        else:
+            self.modelgrid = modelgrid
+            self.modeltime = None
 
-        # set up variables
-        self.model = model
-        self.modelgrid = model.modelgrid
-        self.arrays = {}
-        self.shape = (self.modelgrid.nlay, self.modelgrid.nrow,
-                      self.modelgrid.ncol)
-        self.shape2d = (self.shape[1], self.shape[2])
-        self.nlay = self.modelgrid.nlay
-        self.nrow = self.modelgrid.nrow
-        self.ncol = self.modelgrid.ncol
-        self.ncol = self.modelgrid.ncol
-        self.nanval = nanval
+        self.binary = binary
+        self.xml = xml
+        self.pvd = pvd
 
-        self.cell_type = 11
-        self.arrays = {}
+        if self.pvd and not self.xml:
+            print(
+                "Switching to xml, ASCII and standard binary are not "
+                "supported by Paraview's PVD reader"
+            )
+            self.xml = True
 
+        self.vertical_exageration = vertical_exageration
+        self.shared_points = shared_points
         self.smooth = smooth
         self.point_scalars = point_scalars
 
-        # check if structured grid, vtk only supports structured grid
-        assert (isinstance(self.modelgrid, StructuredGrid))
+        self.verts = self.modelgrid.verts
+        self.nnodes = self.modelgrid.nnodes
 
-        # cbd
-        self.cbd_on = False
+        # check if iverts is has closed verts
+        self.iverts = []
+        for iv in self.modelgrid.iverts:
+            if iv[0] == iv[-1]:
+                iv = iv[:-1]
+            self.iverts.append(iv)
 
-        # get ibound
-        if self.modelgrid.idomain is None:
-            # ibound = None
-            ibound = np.ones(self.shape)
+        nvpl = 0
+        for iv in self.iverts:
+            nvpl += len(iv)
+
+        self.nvpl = nvpl
+
+        # method to accomodate DISU grids, do not use modelgrid.ncpl!
+        self.ncpl = len(self.iverts)
+        if self.nnodes == len(self.iverts):
+            self.nlay = 1
         else:
-            ibound = self.modelgrid.idomain
-            # build cbd ibound
-            if ibound is not None and hasattr(self.model, 'dis') and \
-                    hasattr(self.model.dis, 'laycbd'):
+            self.nlay = self.modelgrid.nlay
 
-                self.cbd = np.where(self.model.dis.laycbd.array > 0)
-                ibound = np.insert(ibound, self.cbd[0] + 1, ibound[self.cbd[
-                                                                    0], :, :],
-                                   axis=0)
-                self.cbd_on = True
+        self._laycbd = self.modelgrid.laycbd
+        if self._laycbd is None:
+            self._laycbd = np.zeros((self.nlay,), dtype=int)
 
-        self.ibound = ibound
+        self._active = []
+        self._ncbd = 0
+        for i in range(self.nlay):
+            self._active.append(1)
+            if self._laycbd[i] != 0:
+                self._active.append(0)
+                self._ncbd += 1
 
-        # build the model vertices
-        self.verts, self.iverts, self.zverts = \
-            self.get_3d_vertex_connectivity()
+        # USG trap
+        if self.modelgrid.top.size == self.nnodes:
+            self.top = self.modelgrid.top.reshape(self.nnodes)
+        else:
+            self.top = self.modelgrid.top.reshape(self.ncpl)
+        self.botm = self.modelgrid.botm.reshape(-1, self.ncpl)
 
-        return
+        if self.modelgrid.idomain is not None:
+            self.idomain = self.modelgrid.idomain.reshape(self.nnodes)
+        else:
+            self.idomain = np.ones((self.nnodes,), dtype=int)
 
-    def add_array(self, name, a, array2d=False):
+        if self.modeltime is not None:
+            perlen = self.modeltime.perlen
+            self._totim = np.add.accumulate(perlen)
 
+        self.points = []
+        self.faces = []
+        self.vtk_grid = None
+        self.vtk_polygons = None
+        self.vtk_pathlines = None
+        self._pathline_points = []
+        self._point_scalar_graph = None
+        self._point_scalar_numpy_graph = None
+        self._idw_weight_graph = None
+        self._idw_total_weight_graph = None
+
+        self._vtk_geometry_set = False
+        self.__transient_output_data = False
+        self.__transient_data = {}
+        self.__transient_vector = {}
+        self.__pathline_transient_data = {}
+        self.__vtk = vtk
+
+        if self.point_scalars:
+            self._create_point_scalar_graph()
+
+    def _create_smoothed_elevation_graph(self, adjk, top_elev=True):
         """
-
-        Adds an array to the vtk object
+        Method to create a dictionary of shared point elevations
 
         Parameters
         ----------
+        adjk : int
+            confining bed adjusted layer
 
-        name : str
-            name of the array
-        a : flopy array
-            the array to be added to the vtk object
-        array2d : bool
-            True if the array is 2d
+        Returns
+        -------
+        dict
+            Key is vertex number, value is elevation
 
         """
+        elevations = {}
+        for i, iv in enumerate(self.iverts):
+            for v in iv:
+                if v is None:
+                    continue
+                if not top_elev:
+                    zv = self.botm[adjk][i] * self.vertical_exageration
+                elif adjk == 0:
+                    zv = self.top[i] * self.vertical_exageration
+                else:
+                    if self.top.size == self.nnodes:
+                        adji = (adjk * self.ncpl) + i
+                        zv = self.top[adji] * self.vertical_exageration
+                    else:
+                        zv = self.botm[adjk - 1][i] * self.vertical_exageration
 
-        if name == 'ibound':
+                if v in elevations:
+                    elevations[v].append(zv)
+                else:
+                    elevations[v] = [zv]
+
+        for key in elevations:
+            elevations[key] = np.mean(elevations[key])
+
+        return elevations
+
+    def _create_point_scalar_graph(self):
+        """
+        Method to create a point scalar graph to map cells to points
+
+        """
+        graph = {}
+        v0 = 0
+        v1 = 0
+        nvert = len(self.verts)
+        shared_points = self.shared_points
+        if len(self._active) != self.nlay:
+            shared_points = False
+
+        for k in range(self.nlay):
+            for i, iv in enumerate(self.iverts):
+                adji = (k * self.ncpl) + i
+                for v in iv:
+                    if v is None:
+                        continue
+                    xvert = self.verts[v, 0]
+                    yvert = self.verts[v, 1]
+                    adjv = v + v1
+                    if adjv not in graph:
+                        graph[adjv] = {
+                            "vtk_points": [v0],
+                            "idx": [adji],
+                            "xv": [xvert],
+                            "yv": [yvert],
+                        }
+                    else:
+                        graph[adjv]["vtk_points"].append(v0)
+                        graph[adjv]["idx"].append(adji)
+                        graph[adjv]["xv"].append(xvert)
+                        graph[adjv]["yv"].append(yvert)
+                    v0 += 1
+
+            v1 += nvert
+
+            if k == self.nlay - 1 or not shared_points:
+                for i, iv in enumerate(self.iverts):
+                    adji = (k * self.ncpl) + i
+                    for v in iv:
+                        if v is None:
+                            continue
+                        xvert = self.verts[v, 0]
+                        yvert = self.verts[v, 1]
+                        adjv = v + v1
+                        if adjv not in graph:
+                            graph[adjv] = {
+                                "vtk_points": [v0],
+                                "idx": [adji],
+                                "xv": [xvert],
+                                "yv": [yvert],
+                            }
+                        else:
+                            graph[adjv]["vtk_points"].append(v0)
+                            graph[adjv]["idx"].append(adji)
+                            graph[adjv]["xv"].append(xvert)
+                            graph[adjv]["yv"].append(yvert)
+                        v0 += 1
+                v1 += nvert
+
+        # convert this to a numpy representation
+        max_shared = 0
+        num_points = v0
+        for k, d in graph.items():
+            if len(d["vtk_points"]) > max_shared:
+                max_shared = len(d["vtk_points"])
+
+        numpy_graph = np.ones((max_shared, num_points), dtype=int) * -1
+        xvert = np.ones((max_shared, num_points)) * np.nan
+        yvert = np.ones((max_shared, num_points)) * np.nan
+        for k, d in graph.items():
+            for _, pt in enumerate(d["vtk_points"]):
+                for ixx, value in enumerate(d["idx"]):
+                    if self.idomain[value] > 0:
+                        numpy_graph[ixx, pt] = value
+                        xvert[ixx, pt] = d["xv"][ixx]
+                        yvert[ixx, pt] = d["yv"][ixx]
+
+        # now create the IDW weights for point scalars
+        xc = np.ravel(self.modelgrid.xcellcenters)
+        yc = np.ravel(self.modelgrid.ycellcenters)
+
+        if xc.size != self.nnodes:
+            xc = np.tile(xc, self.nlay)
+            yc = np.tile(yc, self.nlay)
+
+        xc = np.where(numpy_graph != -1, xc[numpy_graph], np.nan)
+        yc = np.where(numpy_graph != -1, yc[numpy_graph], np.nan)
+
+        asq = (xvert - xc) ** 2
+        bsq = (yvert - yc) ** 2
+
+        weights = np.sqrt(asq + bsq)
+        tot_weights = np.nansum(weights, axis=0)
+
+        self._point_scalar_graph = graph
+        self._point_scalar_numpy_graph = numpy_graph
+        self._idw_weight_graph = weights
+        self._idw_total_weight_graph = tot_weights
+
+    def _build_grid_geometry(self):
+        """
+        Method that creates lists of vertex points and cell faces
+
+        """
+        points = []
+        faces = []
+        v0 = 0
+        v1 = 0
+        ncb = 0
+        shared_points = self.shared_points
+        if len(self._active) != self.nlay:
+            shared_points = False
+
+        for k in range(self.nlay):
+            adjk = k + ncb
+            if k != self.nlay - 1:
+                if self._active[adjk + 1] == 0:
+                    ncb += 1
+
+            if self.smooth:
+                elevations = self._create_smoothed_elevation_graph(adjk)
+
+            for i, iv in enumerate(self.iverts):
+                for v in iv:
+                    if v is None:
+                        continue
+                    xv = self.verts[v, 0]
+                    yv = self.verts[v, 1]
+                    if self.smooth:
+                        zv = elevations[v]
+                    elif k == 0:
+                        zv = self.top[i] * self.vertical_exageration
+                    else:
+                        if self.top.size == self.nnodes:
+                            adji = (adjk * self.ncpl) + i
+                            zv = self.top[adji] * self.vertical_exageration
+                        else:
+                            zv = (
+                                self.botm[adjk - 1][i]
+                                * self.vertical_exageration
+                            )
+
+                    points.append([xv, yv, zv])
+                    v1 += 1
+
+                cell_faces = [
+                    [v for v in range(v0, v1)],
+                    [v + self.nvpl for v in range(v0, v1)],
+                ]
+
+                for v in range(v0, v1):
+                    if v != v1 - 1:
+                        cell_faces.append(
+                            [v + 1, v, v + self.nvpl, v + self.nvpl + 1]
+                        )
+                    else:
+                        cell_faces.append(
+                            [v0, v, v + self.nvpl, v0 + self.nvpl]
+                        )
+
+                v0 = v1
+                faces.append(cell_faces)
+
+            if k == self.nlay - 1 or not shared_points:
+                if self.smooth:
+                    elevations = self._create_smoothed_elevation_graph(
+                        adjk, top_elev=False
+                    )
+
+                for i, iv in enumerate(self.iverts):
+                    for v in iv:
+                        if v is None:
+                            continue
+                        xv = self.verts[v, 0]
+                        yv = self.verts[v, 1]
+                        if self.smooth:
+                            zv = elevations[v]
+                        else:
+                            zv = self.botm[adjk][i] * self.vertical_exageration
+
+                        points.append([xv, yv, zv])
+                        v1 += 1
+
+                v0 = v1
+
+        self.points = points
+        self.faces = faces
+
+    def _set_vtk_grid_geometry(self):
+        """
+        Method to set vtk's geometry and add it to the vtk grid object
+
+        """
+        if self._vtk_geometry_set:
             return
 
-        # if array is 2d reformat to 3d array
-        if array2d:
-            assert a.shape == self.shape2d
-            array = np.full(self.shape, self.nanval)
-            array[0, :, :] = a
-            a = array
+        if not self.faces:
+            self._build_grid_geometry()
+
+        self.vtk_grid = self.__vtk.vtkUnstructuredGrid()
+
+        points = self.__vtk.vtkPoints()
+        for point in self.points:
+            points.InsertNextPoint(point)
+
+        self.vtk_grid.SetPoints(points)
+
+        for node in range(self.nnodes):
+            cell_faces = self.faces[node]
+            nface = len(cell_faces)
+            fid_list = self.__vtk.vtkIdList()
+            fid_list.InsertNextId(nface)
+            for face in cell_faces:
+                fid_list.InsertNextId(len(face))
+                [fid_list.InsertNextId(i) for i in face]
+
+            self.vtk_grid.InsertNextCell(self.__vtk.VTK_POLYHEDRON, fid_list)
+
+        self._vtk_geometry_set = True
+
+    def _build_hfbs(self, pkg):
+        """
+        Method to add hfb planes to the vtk object
+
+        Parameters
+        ----------
+        pkg : object
+            flopy hfb object
+
+        """
+        from vtk.util import numpy_support
+
+        # check if modflow 6 or modflow 2005
+        if hasattr(pkg, "hfb_data"):
+            mf6 = False
+            hfb_data = pkg.hfb_data
+        else:
+            # asssume that there is no transient hfb data for now
+            hfb_data = pkg.stress_period_data.array[0]
+            mf6 = True
+
+        points = []
+        faces = []
+        array = []
+        cnt = 0
+        verts = self.modelgrid.cross_section_vertices
+        verts = np.dstack((verts[0], verts[1]))
+        botm = np.ravel(self.botm)
+        for hfb in hfb_data:
+            if self.modelgrid.grid_type == "structured":
+                if not mf6:
+                    k = hfb["k"]
+                    cell1 = list(hfb[["k", "irow1", "icol1"]])
+                    cell2 = list(hfb[["k", "irow2", "icol2"]])
+                else:
+                    cell1 = hfb["cellid1"]
+                    cell2 = hfb["cellid2"]
+                    k = cell1[0]
+                n0, n1 = self.modelgrid.get_node([cell1, cell2])
+
+            else:
+                cell1 = hfb["cellid1"]
+                cell2 = hfb["cellid2"]
+                if len(cell1) == 2:
+                    k, n0 = cell1
+                    _, n1 = cell2
+                else:
+                    n0 = cell1[0]
+                    n1 = cell1[1]
+                    k = 0
+
+            array.append(hfb["hydchr"])
+            adjn0 = n0 - (k * self.ncpl)
+            adjn1 = n1 - (k * self.ncpl)
+            v1 = verts[adjn0]
+            v2 = verts[adjn1]
+
+            # get top and botm elevations, use max and min:
+            if k == 0 or self.top.size == self.nnodes:
+                tv = np.max([self.top[n0], self.top[n1]])
+                bv = np.min([botm[n0], botm[n1]])
+            else:
+                tv = np.max([botm[n0 - self.ncpl], botm[n1 - self.ncpl]])
+                bv = np.min([botm[n0], botm[n1]])
+
+            tv *= self.vertical_exageration
+            bv *= self.vertical_exageration
+
+            pts = []
+            for v in v1:
+                # ix = np.where(v2 == v)
+                ix = np.where((v2.T[0] == v[0]) & (v2.T[1] == v[1]))
+                if len(ix[0]) > 0 and len(pts) < 2:
+                    pts.append(v2[ix[0][0]])
+
+            pts = np.sort(pts)[::-1]
+
+            # create plane, counter-clockwise order
+            pts = [
+                (pts[0, 0], pts[0, 1], tv),
+                (pts[1, 0], pts[1, 1], tv),
+                (pts[1, 0], pts[1, 1], bv),
+                (pts[0, 0], pts[0, 1], bv),
+            ]
+
+            # add to points and faces
+            plane_face = []
+            for pt in pts:
+                points.append(pt)
+                plane_face.append(cnt)
+                cnt += 1
+
+            faces.append(plane_face)
+
+        # now create the vtk geometry
+        vtk_points = self.__vtk.vtkPoints()
+        for point in points:
+            vtk_points.InsertNextPoint(point)
+
+        # now create an UnstructuredGrid object
+        polydata = self.__vtk.vtkUnstructuredGrid()
+        polydata.SetPoints(vtk_points)
+
+        # create the vtk polygons
+        for face in faces:
+            polygon = self.__vtk.vtkPolygon()
+            polygon.GetPointIds().SetNumberOfIds(4)
+            for ix, iv in enumerate(face):
+                polygon.GetPointIds().SetId(ix, iv)
+            polydata.InsertNextCell(
+                polygon.GetCellType(), polygon.GetPointIds()
+            )
+
+        # and then set the hydchr data
+        vtk_arr = numpy_support.numpy_to_vtk(
+            num_array=np.array(array), array_type=self.__vtk.VTK_FLOAT
+        )
+        vtk_arr.SetName("hydchr")
+        polydata.GetCellData().SetScalars(vtk_arr)
+        self.vtk_polygons = polydata
+
+    def _build_point_scalar_array(self, array):
+        """
+        Method to build a point scalar array using an inverse distance
+        weighting scheme
+
+        Parameters
+        ----------
+        array : np.ndarray
+            ndarray of shape nnodes
+
+        Returns
+        -------
+        np.ndarray
+            array with shape n vtk points
+        """
+        isint = False
+        if np.issubdtype(array[0], np.dtype(int)):
+            isint = True
+
+        if isint:
+            # maybe think of a way to do ints with the numpy graph,
+            #  looping through the dict is very inefficient
+            ps_array = np.zeros((len(self.points),), dtype=array.dtype)
+            for _, value in self._point_scalar_graph.items():
+                for ix, pt in enumerate(value["vtk_points"]):
+                    ps_array[pt] = array[value["idx"][ix]]
+        else:
+            ps_graph = self._point_scalar_numpy_graph.copy()
+            idxs = np.where(np.isnan(array))
+            not_graphed = np.isin(ps_graph, idxs[0])
+            ps_graph[not_graphed] = -1
+            ps_array = np.where(ps_graph >= 0, array[ps_graph], np.nan)
+
+            # do inverse distance weighting and apply mask to retain
+            # nan valued cells because numpy returns 0 when all vals are nan
+            weight_graph = self._idw_weight_graph.copy()
+            weight_graph[not_graphed] = np.nan
+            weighted_vals = weight_graph * ps_array
+            mask = np.isnan(weighted_vals).all(axis=0)
+            weighted_vals = np.nansum(weighted_vals, axis=0)
+            weighted_vals[mask] = np.nan
+            total_weight_graph = np.nansum(weight_graph, axis=0)
+            ps_array = weighted_vals / total_weight_graph
+
+        return ps_array
+
+    def _add_timevalue(self, index, fname):
+        """
+        Method to add a TimeValue to a vtk object, used with transient arrays
+
+        Parameters
+        ----------
+        index : int, tuple
+            integer representing kper or a tuple of (kstp, kper)
+        fname : os.PathLike or str
+            path to the vtu file
+
+        """
+        if not self.pvd:
+            return
 
         try:
-
-            assert a.shape == self.shape
-        except AssertionError:
+            timeval = self._totim[index]
+        except (IndexError, KeyError):
             return
 
-        a = np.where(a == self.nanval, np.nan, a)
-        a = a.astype(float)
-        # idxs = np.argwhere(a == self.nanval)
+        self.pvd.add_timevalue(fname, timeval)
 
-        # add array to self.arrays
-        self.arrays[name] = a
-        return
-
-    def write(self, output_file, timeval=None):
+    def _mask_values(self, array, masked_values):
         """
-
-        writes the stored arrays to vtk file
+        Method to mask values with nan
 
         Parameters
         ----------
+        array : np.ndarray
+            numpy array of values
+        masked_values : list
+            values to convert to nan
 
-        output_file : str
-            output file name to write the vtk data
+        Returns
+        -------
+        np.ndarray
+        """
+        if masked_values is not None:
+            try:
+                for mv in masked_values:
+                    array[array == mv] = np.nan
+            except ValueError:
+                pass
 
-        timeval : scalar
-            model time value to be stored in the time section of the vtk
-            file, default is None
+        return array
+
+    def add_array(self, array, name, masked_values=None, dtype=None):
+        """
+        Method to set an array to the vtk grid
+
+        Parameters
+        ----------
+        array : np.ndarray, list
+            list of array values to set to the vtk_array
+        name : str
+            array name for vtk
+        masked_values : list, None
+            list of values to set equal to nan
+        dtype : vtk datatype object
+            method to supply and force a vtk datatype
+
+        """
+        from vtk.util import numpy_support
+
+        if not self._vtk_geometry_set:
+            self._set_vtk_grid_geometry()
+
+        array = np.ravel(array)
+
+        if array.size != self.nnodes:
+            raise AssertionError("array must be the size as the modelgrid")
+
+        if self.idomain is not None:
+            try:
+                array[self.idomain == 0] = np.nan
+            except ValueError:
+                pass
+
+        array = self._mask_values(array, masked_values)
+
+        if not self.binary and not self.xml:
+            # ascii does not properly render nan values
+            array = np.nan_to_num(array, nan=1e30)
+
+        if self.point_scalars:
+            array = self._build_point_scalar_array(array)
+
+        if dtype is None:
+            dtype = self.__vtk.VTK_FLOAT
+            if np.issubdtype(array[0], np.dtype(int)):
+                dtype = self.__vtk.VTK_INT
+
+        vtk_arr = numpy_support.numpy_to_vtk(num_array=array, array_type=dtype)
+        vtk_arr.SetName(name)
+
+        if self.point_scalars:
+            self.vtk_grid.GetPointData().AddArray(vtk_arr)
+        else:
+            self.vtk_grid.GetCellData().AddArray(vtk_arr)
+
+    def add_transient_array(self, d, name=None, masked_values=None):
+        """
+        Method to add transient array data to the vtk object
+
+        Parameters
+        ----------
+        d: dict
+            dictionary of array2d, arry3d data or numpy array data
+        name : str, None
+            parameter name, required when user provides a dictionary
+            of numpy arrays
+        masked_values : list, None
+            list of values to set equal to nan
+
+        Returns
+        -------
+        None
+        """
+        if self.__transient_output_data:
+            raise AssertionError(
+                "Transient arrays cannot be mixed with transient output, "
+                "Please create a seperate vtk object for transient package "
+                "data"
+            )
+
+        if not self._vtk_geometry_set:
+            self._set_vtk_grid_geometry()
+
+        k = list(d.keys())[0]
+        transient = dict()
+        if isinstance(d[k], DataInterface):
+            if d[k].data_type in (DataType.array2d, DataType.array3d):
+                if name is None:
+                    name = d[k].name
+                    if isinstance(name, list):
+                        name = name[0]
+
+                for kper, value in d.items():
+                    if value.array.size != self.nnodes:
+                        array = np.zeros(self.nnodes) * np.nan
+                        array[: value.array.size] = np.ravel(value.array)
+                    else:
+                        array = value.array
+
+                    array = self._mask_values(array, masked_values)
+                    transient[kper] = array
+        else:
+            if name is None:
+                raise ValueError(
+                    "name must be specified when providing numpy arrays"
+                )
+            for kper, trarray in d.items():
+                if trarray.size != self.nnodes:
+                    array = np.zeros(self.nnodes) * np.nan
+                    array[: trarray.size] = np.ravel(trarray)
+                else:
+                    array = trarray
+
+                array = self._mask_values(array, masked_values)
+                transient[kper] = array
+
+        for k, v in transient.items():
+            if k not in self.__transient_data:
+                self.__transient_data[k] = {name: v}
+            else:
+                self.__transient_data[k][name] = v
+
+    def add_transient_list(self, mflist, masked_values=None):
+        """
+        Method to add transient list data to a vtk object
+
+        Parameters
+        ----------
+        mflist : flopy.utils.MfList object
+        masked_values : list, None
+            list of values to set equal to nan
+
+        """
+        if not self._vtk_geometry_set:
+            self._set_vtk_grid_geometry()
+
+        pkg_name = mflist.package.name[0]
+        mfl = mflist.array
+        if isinstance(mfl, dict):
+            for arr_name, arr4d in mflist.array.items():
+                d = {kper: array for kper, array in enumerate(arr4d)}
+                name = f"{pkg_name}_{arr_name}"
+                self.add_transient_array(d, name)
+        else:
+            export = {}
+            for kper in range(mflist.package.parent.nper):
+                try:
+                    arr_dict = mflist.to_array(kper, mask=True)
+                except ValueError:
+                    continue
+
+                if arr_dict is None:
+                    continue
+
+                for arr_name, array in arr_dict.items():
+                    if arr_name not in export:
+                        export[arr_name] = {kper: array}
+                    else:
+                        export[arr_name][kper] = array
+
+            for arr_name, d in export.items():
+                name = f"{pkg_name}_{arr_name}"
+                self.add_transient_array(d, name, masked_values=masked_values)
+
+    def add_vector(self, vector, name, masked_values=None):
+        """
+        Method to add vector data to vtk
+
+        Parameters
+        ----------
+        vector : array
+            array of dimension (3, nnodes)
+        name : str
+            name of the vector to be displayed in vtk
+        masked_values : list, None
+            list of values to set equal to nan
+
+        """
+        from vtk.util import numpy_support
+
+        if not self._vtk_geometry_set:
+            self._set_vtk_grid_geometry()
+
+        if isinstance(vector, (tuple, list)):
+            vector = np.array(vector)
+
+        if vector.size != 3 * self.nnodes:
+            if vector.size == 3 * self.ncpl:
+                vector = np.reshape(vector, (3, self.ncpl))
+                tv = np.full((3, self.nnodes), np.nan)
+                for ix, q in enumerate(vector):
+                    tv[ix, : self.ncpl] = q
+                vector = tv
+            else:
+                raise AssertionError(
+                    "Size of vector must be 3 * nnodes or 3 * ncpl"
+                )
+        else:
+            vector = np.reshape(vector, (3, self.nnodes))
+
+        if self.point_scalars:
+            tmp = []
+            for v in vector:
+                tmp.append(self._build_point_scalar_array(v))
+            vector = np.array(tmp)
+
+        vector = self._mask_values(vector, masked_values)
+
+        vtk_arr = numpy_support.numpy_to_vtk(
+            num_array=vector, array_type=self.__vtk.VTK_FLOAT
+        )
+        vtk_arr.SetName(name)
+        vtk_arr.SetNumberOfComponents(3)
+
+        if self.point_scalars:
+            self.vtk_grid.GetPointData().SetVectors(vtk_arr)
+        else:
+            self.vtk_grid.GetCellData().SetVectors(vtk_arr)
+
+    def add_transient_vector(self, d, name, masked_values=None):
+        """
+        Method to add transient vector data to vtk
+
+        Parameters
+        ----------
+        d : dict
+            dictionary of vectors
+        name : str
+            name of vector to be displayed in vtk
+        masked_values : list, None
+            list of values to set equal to nan
+
+        """
+        if not self._vtk_geometry_set:
+            self._set_vtk_grid_geometry()
+
+        if self.__transient_data:
+            k = list(self.__transient_data.keys())[0]
+            if len(d) != len(self.__transient_data[k]):
+                print(
+                    "Transient vector not same size as transient arrays time "
+                    "stamp may be unreliable for vector data in VTK file"
+                )
+
+        if isinstance(d, dict):
+            cnt = 0
+            for key, value in d.items():
+                if not isinstance(value, np.ndarray):
+                    value = np.array(value)
+
+                if (
+                    value.size != 3 * self.ncpl
+                    or value.size != 3 * self.nnodes
+                ):
+                    raise AssertionError(
+                        "Size of vector must be 3 * nnodes or 3 * ncpl"
+                    )
+
+                value = self._mask_values(value, masked_values)
+                self.__transient_vector[cnt] = {name: value}
+                cnt += 1
+
+    def add_package(self, pkg, masked_values=None):
+        """
+        Method to set all arrays within a package to VTK arrays
+
+        Parameters
+        ----------
+        pkg : flopy.pakbase.Package object
+            flopy package object, example ModflowWel
+        masked_values : list, None
+            list of values to set equal to nan
+
+        """
+        if not self._vtk_geometry_set:
+            self._set_vtk_grid_geometry()
+
+        if "hfb" in pkg.name[0].lower():
+            self._build_hfbs(pkg)
+            return
+
+        for item, value in pkg.__dict__.items():
+            if item in VTKIGNORE:
+                continue
+
+            if isinstance(value, list):
+                for v in value:
+                    if isinstance(v, Util3d):
+                        if value.array.size != self.nnodes:
+                            continue
+                        self.add_array(v.array, item, masked_values)
+
+            if isinstance(value, DataInterface):
+                if value.data_type in (DataType.array2d, DataType.array3d):
+                    if value.array is not None:
+                        if value.array.size < self.nnodes:
+                            if value.array.size < self.ncpl:
+                                continue
+
+                            array = np.zeros(self.nnodes) * np.nan
+                            array[: value.array.size] = np.ravel(value.array)
+
+                        elif value.array.size > self.nnodes and self._ncbd > 0:
+                            # deal with confining beds
+                            array = np.array(
+                                [
+                                    value.array[ix]
+                                    for ix, i in enumerate(self._active)
+                                    if i != 0
+                                ]
+                            )
+
+                        else:
+                            array = value.array
+
+                        self.add_array(array, item, masked_values)
+
+                elif value.data_type == DataType.transient2d:
+                    if value.array is not None:
+                        if hasattr(value, "transient_2ds"):
+                            self.add_transient_array(
+                                value.transient_2ds, item, masked_values
+                            )
+                        else:
+                            d = {ix: i for ix, i in enumerate(value.array)}
+                            self.add_transient_array(d, item, masked_values)
+
+                elif value.data_type == DataType.transient3d:
+                    if value.array is not None:
+                        self.add_transient_array(
+                            value.transient_3ds, item, masked_values
+                        )
+
+                elif value.data_type == DataType.transientlist:
+                    self.add_transient_list(value, masked_values)
+
+                else:
+                    pass
+
+    def add_model(self, model, selpaklist=None, masked_values=None):
+        """
+        Method to add all array and transient list data from a modflow model
+        to a timeseries of vtk files
+
+        Parameters
+        ----------
+        model : fp.modflow.ModelInterface
+            any flopy model object
+        selpaklist : list, None
+            optional parameter where the user can supply a list of packages
+            to export.
+        masked_values : list, None
+            list of values to set equal to nan
+
+        """
+        for package in model.packagelist:
+            if selpaklist is not None:
+                if package.name[0] not in selpaklist:
+                    continue
+
+            self.add_package(package, masked_values)
+
+    def add_pathline_points(self, pathlines, timeseries=False):
+        """
+        Method to add Modpath output from a pathline or timeseries file
+        to the grid. Colors will be representative of totim.
+
+        Parameters
+        ----------
+        pathlines : np.recarray or list
+            pathlines accepts a numpy recarray of a particle pathline or
+            a list of numpy reccarrays associated with pathlines
+        timeseries : bool
+            method to plot data as a series of vtk timeseries files for
+            animation or as a single static vtk file. Default is false
         """
 
-        # make sure file ends with vtu
-        assert output_file.lower().endswith(".vtu")
+        if isinstance(pathlines, (np.recarray, np.ndarray)):
+            pathlines = [pathlines]
 
-        # get the active data cells based on the data arrays and ibound
-        actwcells3d = self._configure_data_arrays()
-        actwcells = actwcells3d.ravel()
+        keys = ["particleid", "time"]
+        if not timeseries:
+            arrays = {key: [] for key in keys}
+            points = []
+            lines = []
+            for recarray in pathlines:
+                recarray["z"] *= self.vertical_exageration
+                line = []
+                for rec in recarray:
+                    t = tuple(rec[["x", "y", "z"]])
+                    line.append(t)
+                    points.append(t)
+                    for key in keys:
+                        arrays[key].append(rec[key])
+                lines.append(line)
 
-        # get the indexes of the active cells
-        idxs = np.argwhere(actwcells != 0).ravel()
+            self._set_particle_track_data(points, lines, arrays)
 
-        # get the verts and iverts to be output
-        verts = [self.verts[idx] for idx in idxs]
-        iverts = self._build_iverts(verts)
+        else:
+            self.vtk_pathlines = self.__vtk.vtkUnstructuredGrid()
+            timeseries_data = {}
+            points = {}
+            for recarray in pathlines:
+                recarray["z"] *= self.vertical_exageration
+                for rec in recarray:
+                    time = rec["time"]
+                    if time not in points:
+                        points[time] = [tuple(rec[["x", "y", "z"]])]
+                        t = {key: [] for key in keys}
+                        timeseries_data[time] = t
 
-        # get the total number of cells and vertices
-        ncells = len(iverts)
-        npoints = ncells * 8
+                    else:
+                        points[time].append(tuple(rec[["x", "y", "z"]]))
 
-        if self.verbose:
-            print('Writing vtk file: ' + output_file)
-            print('Number of point is {}, Number of cells is {}\n'.format(
-                npoints, ncells))
+                    for key in keys:
+                        timeseries_data[time][key].append(rec[key])
 
-        # open output file for writing
-        f = open(output_file, 'w')
+            self.__pathline_transient_data = timeseries_data
+            self._pathline_points = points
 
-        # write xml
-        indent_level = 0
-        s = '<?xml version="1.0"?>'
-        f.write(s + '\n')
-        indent_level = start_tag(f, '<VTKFile type="UnstructuredGrid">',
-                                 indent_level)
+    def add_heads(self, hds, kstpkper=None, masked_values=None):
+        """
+        Method to add head data to a vtk file
 
-        indent_level = start_tag(f, '<UnstructuredGrid>', indent_level)
+        Parameters
+        ----------
+        hds : flopy.utils.LayerFile object
+            Binary or Formatted HeadFile type object
+        kstpkper : tuple, list of tuples, None
+            tuple or list of tuples of kstpkper, if kstpkper=None all
+            records are selected
+        masked_values : list, None
+            list of values to set equal to nan
 
-        # if time value write time section
-        if timeval:
+        """
+        if not self.__transient_output_data and self.__transient_data:
+            raise AssertionError(
+                "Head data cannot be mixed with transient package data, "
+                "Please create a seperate vtk object for transient head data"
+            )
 
-            indent_level = start_tag(f, '<FieldData>', indent_level)
-
-            s = '<DataArray type="Float64" Name="TimeValue"' \
-                ' NumberOfTuples="1" ' \
-                'format="ascii" RangeMin="{0}" RangeMax="{0}">'
-            indent_level = start_tag(f, s, indent_level)
-
-            f.write(indent_level * '  ' + '{}\n'.format(timeval))
-
-            indent_level = end_tag(f, '</DataArray>', indent_level)
-
-            indent_level = end_tag(f, '</FieldData>', indent_level)
-
-        # piece
-        s = '<Piece NumberOfPoints="{}" ' \
-            'NumberOfCells="{}">'.format(npoints, ncells)
-        indent_level = start_tag(f, s, indent_level)
-
-        # points
-        s = '<Points>'
-        indent_level = start_tag(f, s, indent_level)
-
-        s = '<DataArray type="Float64" NumberOfComponents="3">'
-        indent_level = start_tag(f, s, indent_level)
-        assert (isinstance(self.modelgrid, StructuredGrid))
-        for cell in verts:
-            for row in cell:
-                s = indent_level * '  ' + '{} {} {} \n'.format(*row)
-                f.write(s)
-        s = '</DataArray>'
-        indent_level = end_tag(f, s, indent_level)
-
-        s = '</Points>'
-        indent_level = end_tag(f, s, indent_level)
-
-        # cells
-        s = '<Cells>'
-        indent_level = start_tag(f, s, indent_level)
-
-        s = '<DataArray type="Int32" Name="connectivity">'
-        indent_level = start_tag(f, s, indent_level)
-        for row in iverts:
-            s = indent_level * '  ' + ' '.join([str(i) for i in row]) + '\n'
-            f.write(s)
-        s = '</DataArray>'
-        indent_level = end_tag(f, s, indent_level)
-
-        s = '<DataArray type="Int32" Name="offsets">'
-        indent_level = start_tag(f, s, indent_level)
-        icount = 0
-        for row in iverts:
-            icount += len(row)
-            s = indent_level * '  ' + '{} \n'.format(icount)
-            f.write(s)
-        s = '</DataArray>'
-        indent_level = end_tag(f, s, indent_level)
-
-        s = '<DataArray type="UInt8" Name="types">'
-        indent_level = start_tag(f, s, indent_level)
-        for row in iverts:
-            s = indent_level * '  ' + '{} \n'.format(self.cell_type)
-            f.write(s)
-        s = '</DataArray>'
-        indent_level = end_tag(f, s, indent_level)
-
-        s = '</Cells>'
-        indent_level = end_tag(f, s, indent_level)
-
-        # add cell data
-        s = '<CellData Scalars="scalars">'
-        indent_level = start_tag(f, s, indent_level)
-
-        # write data arrays to file
-        for arrayName, arrayValues in self.arrays.items():
-            self.write_data_array(f, indent_level, arrayName,
-                                  arrayValues, actwcells3d)
-
-        s = '</CellData>'
-        indent_level = end_tag(f, s, indent_level)
-
-        # write arrays as point data if point scalars is set to True
-        if self.point_scalars:
-            s = '<PointData Scalars="scalars">'
-            indent_level = start_tag(f, s, indent_level)
-            for array_name, array_values in self.arrays.items():
-                self.write_point_value(f, indent_level, array_values,
-                                       array_name, actwcells3d)
-
-            s = '</PointData>'
-            indent_level = end_tag(f, s, indent_level)
-
+        if kstpkper is None:
+            kstpkper = hds.get_kstpkper()
+        elif isinstance(kstpkper, (list, tuple)):
+            if not isinstance(kstpkper[0], (list, tuple)):
+                kstpkper = [kstpkper]
         else:
             pass
 
-        # end piece
-        indent_level = end_tag(f, '</Piece>', indent_level)
+        # reset totim based on values read from head file
+        times = hds.get_times()
+        kstpkpers = hds.get_kstpkper()
+        self._totim = {ki: time for (ki, time) in zip(kstpkpers, times)}
 
-        # end unstructured grid
-        indent_level = end_tag(f, '</UnstructuredGrid>', indent_level)
+        text = hds.text.decode()
 
-        # end xml
-        indent_level = end_tag(f, '</VTKFile>', indent_level)
+        d = dict()
+        for ki in kstpkper:
+            d[ki] = hds.get_data(ki)
 
-        # end file
-        f.close()
-        self.arrays.clear()
-        return
+        self.__transient_output_data = False
+        self.add_transient_array(d, name=text, masked_values=masked_values)
+        self.__transient_output_data = True
 
-    def write_binary(self, output_file):
-
+    def add_cell_budget(
+        self, cbc, text=None, kstpkper=None, masked_values=None
+    ):
         """
-
-        outputs binary .vtu file
+        Method to add cell budget data to vtk
 
         Parameters
         ----------
-
-        output_file : str
-            vtk output file
-
-        """
-
-        # make sure file ends with vtu
-        assert output_file.lower().endswith(".vtu")
-
-        if self.verbose:
-            print('writing binary vtk file')
-
-        xml = BinaryXml(output_file)
-        offset = 0
-        grid_type = 'UnstructuredGrid'
-
-        # get the active data cells based on the data arrays and ibound
-        actwcells3d = self._configure_data_arrays()
-        actwcells = actwcells3d.ravel()
-
-        # get the indexes of the active cells
-        idxs = np.argwhere(actwcells != 0).ravel()
-
-        # get the verts and iverts to be output
-        verts = [self.verts[idx] for idx in idxs]
-        iverts = self._build_iverts(verts)
-
-        # check if there is data to be written out
-        if len(verts) == 0:
-            # if not cannot write binary .vtu file
-            return
-
-        # get the total number of cells and vertices
-        ncells = len(iverts)
-        npoints = ncells * 8
-
-        if self.verbose:
-            print('Writing vtk file: ' + output_file)
-            print('Number of point is {}, Number of cells is {}\n'.format(
-                npoints, ncells))
-
-        # format verts and iverts
-        verts = np.array(verts)
-        verts.reshape(npoints, 3)
-        iverts = np.ascontiguousarray(iverts, np.float64)
-
-        # write xml file info
-        xml.open_element("VTKFile"). \
-            add_attributes(type=grid_type, version="1.0",
-                           byte_order=self._get_byte_order(),
-                           header_type="UInt64")
-        # unstructured grid
-        xml.open_element(grid_type)
-
-        # piece
-        xml.open_element('Piece')
-        xml.add_attributes(NumberOfPoints=npoints, NumberOfCells=ncells)
-
-        # points
-        xml.open_element('Points')
-
-        xml.open_element('DataArray')
-        xml.add_attributes(Name='points', NumberOfComponents='3',
-                           type='Float64',
-                           format='appended', offset=offset)
-
-        # calculate the offset of the start of the next piece of data
-        # offset is calculated from beginning of data section
-        points_size = verts.size * verts[0].dtype.itemsize
-        offset += points_size + 8
-
-        xml.close_element('DataArray')
-
-        xml.close_element('Points')
-
-        # cells
-        xml.open_element('Cells')
-
-        # connectivity
-        xml.open_element('DataArray')
-        xml.add_attributes(Name='connectivity', NumberOfComponents='1',
-                           type='Float64',
-                           format='appended', offset=offset)
-        conn_size = iverts.size * iverts[0].dtype.itemsize
-        offset += conn_size + 8
-
-        xml.close_element('DataArray')
-
-        xml.open_element('DataArray')
-        xml.add_attributes(Name='offsets', NumberOfComponents='1',
-                           type='Float64',
-                           format='appended', offset=offset)
-        offsets_size = iverts.shape[0] * iverts[0].dtype.itemsize
-        offset += offsets_size + 8
-
-        xml.close_element('DataArray')
-
-        xml.open_element('DataArray')
-        xml.add_attributes(Name='types', NumberOfComponents='1',
-                           type='Float64',
-                           format='appended', offset=offset)
-        types_size = iverts.shape[0] * iverts[0].dtype.itemsize
-        offset += types_size + 8
-
-        xml.close_element('DataArray')
-
-        xml.close_element('Cells')
-
-        xml.open_element('CellData')
-        xml.add_attributes(Scalars='scalars')
-
-        # format data arrays and store for later output
-        processed_arrays = []
-        for name, a in self.arrays.items():
-            a = a.ravel()[idxs]
-            xml.open_element('DataArray')
-            xml.add_attributes(Name=name, NumberOfComponents='1',
-                               type='Float64',
-                               format='appended', offset=offset)
-            a = np.ascontiguousarray(a, np.float64)
-            processed_arrays.append([a, a.size * a[0].dtype.itemsize])
-            offset += processed_arrays[-1][-1] + 8
-            xml.close_element('DataArray')
-
-        xml.close_element('CellData')
-
-        # for data array point scalars
-        if self.point_scalars:
-
-            xml.open_element('PointData')
-            xml.add_attributes(Scalars='scalars')
-
-            # get output point arrays
-            # loop through stored arrays
-            for name, a in self.arrays.items():
-                # get the array values onto vertices
-                verts_info = self.get_3d_vertex_connectivity(
-                    actwcells=actwcells3d, zvalues=a)
-                # get values
-                point_values_dict = verts_info[2]
-                a = np.array([point_values_dict[cellid] for cellid in
-                              sorted(point_values_dict.keys())]).ravel()
-
-                xml.open_element('DataArray')
-                xml.add_attributes(Name=name, NumberOfComponents='1',
-                                   type='Float64',
-                                   format='appended', offset=offset)
-                a = np.ascontiguousarray(a, np.float64)
-                processed_arrays.append([a, a.size * a[0].dtype.itemsize])
-                offset += processed_arrays[-1][-1] + 8
-
-                xml.close_element('DataArray')
-            xml.close_element('PointData')
-
-        # end piece
-        xml.close_element('Piece')
-
-        # end unstructured grid
-        xml.close_element('UnstructuredGrid')
-
-        # build data section
-        xml.open_element("AppendedData").add_attributes(
-            encoding="raw").add_text("_")
-
-        xml.write_size(points_size)
-        # format verts for output
-        verts_x = np.ascontiguousarray(np.ravel(verts[:, :, 0]),
-                                       np.float64)
-        verts_y = np.ascontiguousarray(np.ravel(verts[:, :, 1]),
-                                       np.float64)
-        verts_z = np.ascontiguousarray(np.ravel(verts[:, :, 2]),
-                                       np.float64)
-        # write coordinates
-        xml.write_coord_arrays(verts_x, verts_y, verts_z)
-
-        # write iverts
-        xml.write_size(conn_size)
-        rav_iverts = np.ascontiguousarray(np.ravel(iverts), np.float64)
-        xml.write_array(rav_iverts)
-
-        xml.write_size(offsets_size)
-        data = np.empty((iverts.shape[0]), np.float64)
-        icount = 0
-        for index, row in enumerate(iverts):
-            icount += len(row)
-            data[index] = icount
-        xml.write_array(data)
-
-        # write cell types (11)
-        xml.write_size(types_size)
-        data = np.empty((iverts.shape[0]), np.float64)
-        data.fill(self.cell_type)
-        xml.write_array(data)
-
-        # write out the array scalars and array point scalars
-        for a, block_size in processed_arrays:
-            xml.write_size(block_size)
-            xml.write_array(a)
-
-        # end xml
-        xml.close_element("AppendedData")
-        xml.close_element('VTKFile')
-        xml.close()
-        # clear arrays
-        self.arrays.clear()
-
-    def _configure_data_arrays(self):
-        """
-        Compares arrays and active cells to find where active data
-        exists, and what cells to output.
-        """
-
-        # get 1d shape
-        shape1d = self.shape[0] * self.shape[1] * self.shape[2]
-
-        # build index array
-        ot_idx_array = np.zeros(shape1d, dtype=np.int_)
-        # loop through arrays
-        for name in self.arrays:
-            array = self.arrays[name]
-            # make array 1d
-            a = array.ravel()
-            # find where no data
-            where_nan = np.isnan(a)
-            # where no data set to the class nan val
-            a[where_nan] = self.nanval
-            # get the indexes where there is data
-            idxs = np.argwhere(a != self.nanval)
-            # set the active array to 1
-            ot_idx_array[idxs] = 1
-
-        # reset the shape of the active data array
-        ot_idx_array = ot_idx_array.reshape(self.shape)
-        # where the ibound is 0 set the active array to 0
-        ot_idx_array[self.ibound == 0] = 0
-
-        return ot_idx_array
-
-    def get_3d_vertex_connectivity(self, actwcells=None, zvalues=None):
+        cbc : flopy.utils.CellBudget object
+            flopy binary CellBudget object
+        text : str or None
+            The text identifier for the record.  Examples include
+            'RIVER LEAKAGE', 'STORAGE', 'FLOW RIGHT FACE', etc. If text=None
+            all compatible records are exported
+        kstpkper : tuple, list of tuples, None
+            tuple or list of tuples of kstpkper, if kstpkper=None all
+            records are selected
+        masked_values : list, None
+            list of values to set equal to nan
 
         """
+        if not self.__transient_output_data and self.__transient_data:
+            raise AssertionError(
+                "Binary data cannot be mixed with transient package data, "
+                "Please create a seperate vtk object for transient head data"
+            )
 
-        Builds x,y,z vertices
-
-        Parameters
-        ----------
-        actwcells : array
-            array of where data exists
-        zvalues: array
-            array of values to be used instead of the zvalues of
-            the vertices.  This allows point scalars to be interpolated.
-
-        Returns
-        -------
-        vertsdict : dict
-            dictionary of verts
-        ivertsdict : dict
-            dictionary of iverts
-        zvertsdict : dict
-            dictionary of zverts
-
-        """
-        # set up active cells
-        if actwcells is None:
-            actwcells = self.ibound
-
-        ipoint = 0
-
-        vertsdict = {}
-        ivertsdict = {}
-        zvertsdict = {}
-
-        # if smoothing interpolate the z values
-        if self.smooth:
-            if zvalues is not None:
-                # use the given data array values
-                zVertices = self.extendedDataArray(zvalues)
+        records = cbc.get_unique_record_names(decode=True)
+        imeth_dict = {
+            record: imeth for (record, imeth) in zip(records, cbc.imethlist)
+        }
+        if text is None:
+            keylist = records
+        else:
+            if not isinstance(text, list):
+                keylist = [text]
             else:
-                zVertices = self.extendedDataArray(self.modelgrid.top_botm)
-        else:
-            zVertices = None
+                keylist = text
 
-        # model cellid based on 1darray
-        # build the vertices
-        cellid = -1
-        for k in range(self.nlay):
-            for i in range(self.nrow):
-                for j in range(self.ncol):
-                    cellid += 1
-                    if actwcells[k, i, j] == 0:
+        if kstpkper is None:
+            kstpkper = cbc.get_kstpkper()
+        elif isinstance(kstpkper, tuple):
+            if not isinstance(kstpkper[0], (list, tuple)):
+                kstpkper = [kstpkper]
+        else:
+            pass
+
+        # reset totim based on values read from budget file
+        times = cbc.get_times()
+        kstpkpers = cbc.get_kstpkper()
+        self._totim = {ki: time for (ki, time) in zip(kstpkpers, times)}
+
+        for name in keylist:
+            d = {}
+            for i, ki in enumerate(kstpkper):
+                try:
+                    array = cbc.get_data(kstpkper=ki, text=name, full3D=True)
+                    if len(array) == 0:
                         continue
-                    verts = []
-                    ivert = []
-                    zverts = []
-                    pts = self.modelgrid._cell_vert_list(i, j)
-                    pt0, pt1, pt2, pt3, pt0 = pts
 
-                    if not self.smooth:
-                        cellBot = self.modelgrid.top_botm[k + 1, i, j]
-                        cellTop = self.modelgrid.top_botm[k, i, j]
-                        celElev = [cellBot, cellTop]
-                        for elev in celElev:
-                            # verts[ipoint, :] = np.append(pt1,elev)
-                            verts.append([pt1[0], pt1[1], elev])
-                            # verts[ipoint+1, :] = np.append(pt2,elev)
-                            verts.append([pt2[0], pt2[1], elev])
-                            # verts[ipoint+2, :] = np.append(pt0,elev)
-                            verts.append([pt0[0], pt0[1], elev])
-                            # verts[ipoint+3, :] = np.append(pt3,elev)
-                            verts.append([pt3[0], pt3[1], elev])
-                            ivert.extend([ipoint, ipoint+1, ipoint+2,
-                                          ipoint+3])
-                            zverts.extend([elev, elev, elev, elev])
-                            ipoint += 4
-                        vertsdict[cellid] = verts
-                        ivertsdict[cellid] = ivert
-                        zvertsdict[cellid] = zverts
+                    array = np.ma.filled(array, np.nan)
+                    if array.size < self.nnodes:
+                        if array.size < self.ncpl:
+                            raise AssertionError(
+                                "Array size must be equal to "
+                                "either ncpl or nnodes"
+                            )
+
+                        array = np.zeros(self.nnodes) * np.nan
+                        array[: array.size] = np.ravel(array)
+
+                except ValueError:
+                    if imeth_dict[name] == 6:
+                        array = np.full((self.nnodes,), np.nan)
+                        rec = cbc.get_data(kstpkper=ki, text=name)[0]
+                        for [node, q] in zip(rec["node"], rec["q"]):
+                            array[node] = q
                     else:
-                        layers = [k+1, k]
-                        for lay in layers:
-                            verts.append([pt1[0], pt1[1], zVertices[lay, i+1,
-                                                                    j]])
-                            verts.append([pt2[0], pt2[1], zVertices[lay, i+1,
-                                                                    j+1]])
+                        continue
 
-                            verts.append([pt0[0], pt0[1], zVertices[lay, i,
-                                                                    j]])
+                d[ki] = array
 
-                            verts.append([pt3[0], pt3[1], zVertices[lay, i,
-                                                                    j+1]])
-                            ivert.extend([ipoint, ipoint+1, ipoint+2,
-                                          ipoint+3])
-                            zverts.extend([zVertices[lay, i+1, j], zVertices[
-                                lay, i+1, j+1],
-                                        zVertices[lay, i, j], zVertices[lay, i,
-                                                                        j+1]])
-                            ipoint += 4
-                        vertsdict[cellid] = verts
-                        ivertsdict[cellid] = ivert
-                        zvertsdict[cellid] = zverts
-        return vertsdict, ivertsdict, zvertsdict
+            self.__transient_output_data = False
+            self.add_transient_array(d, name, masked_values)
+            self.__transient_output_data = True
 
-    def extendedDataArray(self, dataArray):
-
-        if dataArray.shape[0] == self.nlay+1:
-            dataArray = dataArray
-        else:
-            listArray = [dataArray[0]]
-            for lay in range(dataArray.shape[0]):
-                listArray.append(dataArray[lay])
-            dataArray = np.stack(listArray)
-
-        matrix = np.zeros([self.nlay+1, self.nrow+1, self.ncol+1])
-        for lay in range(self.nlay+1):
-            for row in range(self.nrow+1):
-                for col in range(self.ncol+1):
-
-                    indexList = [[row-1, col-1], [row-1, col], [row, col-1],
-                                 [row, col]]
-                    neighList = []
-                    for index in indexList:
-                        if index[0] in range(self.nrow) and index[1] in \
-                                range(self.ncol):
-                            neighList.append(dataArray[lay, index[0],
-                                                       index[1]])
-                    neighList = np.array(neighList)
-                    if neighList[neighList != self.nanval].shape[0] > 0:
-                        headMean = neighList[neighList != self.nanval].mean()
-                    else:
-                        headMean = self.nanval
-                    matrix[lay, row, col] = headMean
-        return matrix
-
-    @staticmethod
-    def _get_byte_order():
-        if sys.byteorder == "little":
-            return "LittleEndian"
-        else:
-            return "BigEndian"
-
-    @staticmethod
-    def write_data_array(f, indent_level, arrayName, arrayValues,
-                         actWCells):
+    def _set_particle_track_data(self, points, lines=None, arrays=None):
         """
-
-        Writes the data array to the output vtk file
+        Build VTK data structures for particle positions, pathlines, and metadata
 
         Parameters
         ----------
-        f : file object
-            output vtk file
-        indent_level : int
-            current indent of the xml
-        arrayName : str
-            name of the output array
-        arrayValues : array
-            the data array being output
-        actWCells : array
-            array of the active cells
-
+        points : list or array_like
+            list of (x, y, z) points
+        lines : list or array_like, optional
+            list of lists or 2D array of particle tracks, each with
+            n >= 1 (x, y, z) coordinates making n - 1 line segments
+        arrays : dict, optional
+            dictionary of array data to associate with points (e.g., particle ID, time)
         """
+        from vtk.util import numpy_support
 
-        s = '<DataArray type="Float64" Name="{}" format="ascii">'.format(
-            arrayName)
-        indent_level = start_tag(f, s, indent_level)
+        if self.vtk_pathlines is None:
+            self.vtk_pathlines = self.__vtk.vtkUnstructuredGrid()
 
-        # data
-        nlay = arrayValues.shape[0]
+        # create vtkPoints container
+        vtk_points = self.__vtk.vtkPoints()
+        lines = [] if lines is None else lines
+        if any(lines):
+            for line in lines:
+                for point in line:
+                    vtk_points.InsertNextPoint(point)
+        else:
+            for point in points:
+                vtk_points.InsertNextPoint(point)
+        self.vtk_pathlines.SetPoints(vtk_points)
 
-        for lay in range(nlay):
-            s = indent_level * '  '
-            f.write(s)
-            idx = (actWCells[lay] != 0)
-            arrayValuesLay = arrayValues[lay][idx].flatten()
-            for layValues in arrayValuesLay:
-                s = ' {}'.format(layValues)
-                f.write(s)
-            f.write('\n')
+        # create a vtkPolyLine for each particle track
+        i = 0
+        for line in lines:
+            npts = len(line)
+            poly = self.__vtk.vtkPolyLine()
+            poly.GetPointIds().SetNumberOfIds(npts)
+            for ii in range(0, npts):
+                poly.GetPointIds().SetId(ii, i)
+                i += 1
+            self.vtk_pathlines.InsertNextCell(
+                poly.GetCellType(), poly.GetPointIds()
+            )
 
-        s = '</DataArray>'
-        indent_level = end_tag(f, s, indent_level)
-        return
+        # create a vtkVertex for each point
+        # necessary if arrays (time & particle ID) live on points?
+        if any(lines):
+            i = 0
+            for line in lines:
+                for _ in line:
+                    vertex = self.__vtk.vtkPolyVertex()
+                    vertex.GetPointIds().SetNumberOfIds(1)
+                    vertex.GetPointIds().SetId(0, i)
+                    self.vtk_pathlines.InsertNextCell(
+                        vertex.GetCellType(), vertex.GetPointIds()
+                    )
+                    i += 1
+        else:
+            for i in range(len(points)):
+                vertex = self.__vtk.vtkPolyVertex()
+                vertex.GetPointIds().SetNumberOfIds(1)
+                vertex.GetPointIds().SetId(0, i)
+                self.vtk_pathlines.InsertNextCell(
+                    vertex.GetCellType(), vertex.GetPointIds()
+                )
 
-    def write_point_value(self, f, indent_level, data_array, array_name,
-                          actwcells):
+        # add arrays (time & particle ID) to points
+        arrays = {} if arrays is None else arrays
+        for name, array in arrays.items():
+            array = np.array(array)
+            vtk_array = numpy_support.numpy_to_vtk(
+                num_array=array, array_type=self.__vtk.VTK_FLOAT
+            )
+            vtk_array.SetName(name)
+            self.vtk_pathlines.GetPointData().AddArray(vtk_array)
+
+    def write(self, f: Union[str, os.PathLike], kper=None):
         """
-        Writes the data array to the output vtk file as point scalars
-        """
-        # header tag
-        s = '<DataArray type="Float64" Name="{}" format="ascii">'.format(
-            array_name)
-        indent_level = start_tag(f, s, indent_level)
-
-        # data
-        verts_info = self.get_3d_vertex_connectivity(
-            actwcells=actwcells, zvalues=data_array)
-
-        zverts = verts_info[2]
-
-        for cellid in sorted(zverts):
-            for z in zverts[cellid]:
-                s = indent_level * '  '
-                f.write(s)
-                s = ' {}'.format(z)
-                f.write(s)
-                f.write('\n')
-
-        # ending tag
-        s = '</DataArray>'
-        indent_level = end_tag(f, s, indent_level)
-        return
-
-    @staticmethod
-    def _build_iverts(verts):
-        """
-
-        Builds the iverts based on the vertices being output
+        Method to write a vtk file from the VTK object
 
         Parameters
         ----------
-        verts : array
-            vertices being output
+        f : str or PathLike
+            vtk file name
+        kpers : int, list, tuple
+            stress period or list of stress periods to write to vtk. This
+            parameter only applies to transient package data.
+
+        """
+        grids = [
+            self.vtk_grid,
+            self.vtk_polygons,
+            self.vtk_pathlines,
+        ]
+        suffix = [
+            "",
+            "_hfb",
+            "_pathline",
+        ]
+
+        extension = ".vtk"
+        if self.pvd:
+            self.pvd = Pvd()
+            extension = ".vtu"
+
+        f = Path(f)
+        f.parent.mkdir(exist_ok=True, parents=True)
+
+        if kper is not None:
+            if isinstance(kper, (int, float)):
+                kper = [int(kper)]
+
+        for ix, grid in enumerate(grids):
+            if grid is None:
+                continue
+
+            if f.suffix not in (".vtk", ".vtu"):
+                foo = f.parent / f"{f.name}{suffix[ix]}{extension}"
+            else:
+                foo = f.parent / f"{f.stem}{suffix[ix]}{f.suffix}"
+
+            if not self.xml:
+                w = self.__vtk.vtkUnstructuredGridWriter()
+                if self.binary:
+                    w.SetFileTypeToBinary()
+            else:
+                w = self.__vtk.vtkXMLUnstructuredGridWriter()
+                if not self.binary:
+                    w.SetDataModeToAscii()
+
+            if self.__pathline_transient_data and ix == 2:
+                stp = 0
+                for time, d in self.__pathline_transient_data.items():
+                    tf = self.__create_transient_vtk_path(foo, stp)
+                    points = self._pathline_points[time]
+                    self._set_particle_track_data(points, arrays=d)
+
+                    w.SetInputData(self.vtk_pathlines)
+                    w.SetFileName(str(tf))
+                    w.Update()
+                    stp += 1
+
+            else:
+                w.SetInputData(grid)
+
+                if (
+                    self.__transient_data or self.__transient_vector
+                ) and ix == 0:
+                    if self.__transient_data:
+                        cnt = 0
+                        for per, d in self.__transient_data.items():
+                            if kper is not None:
+                                if per not in kper:
+                                    continue
+
+                            if self.__transient_output_data:
+                                tf = self.__create_transient_vtk_path(foo, cnt)
+                            else:
+                                tf = self.__create_transient_vtk_path(foo, per)
+                            self._add_timevalue(per, tf)
+                            for name, array in d.items():
+                                self.add_array(array, name)
+
+                            if per in self.__transient_vector:
+                                d = self.__transient_vector[d]
+                                for name, vector in d.items():
+                                    self.add_vector(vector, name)
+
+                            w.SetFileName(str(tf))
+                            w.Update()
+                            cnt += 1
+                    else:
+                        cnt = 0
+                        for per, d in self.__transient_vector.items():
+                            if kper is not None:
+                                if per not in kper:
+                                    continue
+
+                            if self.__transient_output_data:
+                                tf = self.__create_transient_vtk_path(foo, cnt)
+                            else:
+                                tf = self.__create_transient_vtk_path(foo, per)
+                            self._add_timevalue(per)
+                            for name, vector in d.items():
+                                self.add_vector(vector, name)
+
+                            w.SetFileName(str(tf))
+                            w.update()
+                            cnt += 1
+                else:
+                    w.SetFileName(str(foo))
+                    w.Update()
+
+        if not type(self.pvd) == bool:
+            if f.suffix not in (".vtk", ".vtu"):
+                pvdfile = f.parent / f"{f.name}.pvd"
+            else:
+                pvdfile = f.with_suffix(".pvd")
+
+            self.pvd.write(pvdfile)
+
+    def to_pyvista(self):
+        """
+        Convert VTK object to PyVista meshes. If the VTK object contains 0
+        or multiple meshes a list of meshes is returned. Otherwise the one
+        mesh is returned alone. PyVista must be installed for this method.
 
         Returns
         -------
-
-        iverts : array
-            array of ivert values
-
+        pyvista.DataSet or list of pyvista.DataSet
+            PyVista mesh or list of meshes
         """
-        ncells = len(verts)
-        npoints = ncells * 8
-        iverts = []
-        ivert = []
-        count = 1
-        for i in range(npoints):
-            ivert.append(i)
-            if count == 8:
-                iverts.append(ivert)
-                ivert = []
-                count = 0
-            count += 1
-        iverts = np.array(iverts)
+        pv = import_optional_dependency("pyvista")
+        grids = [self.vtk_grid, self.vtk_polygons, self.vtk_pathlines]
+        meshes = [pv.wrap(grid) for grid in grids if grid is not None]
+        return meshes[0] if len(meshes) == 1 else meshes
 
-        return iverts
+    def __create_transient_vtk_path(self, path, kper):
+        """
+        Method to set naming convention for transient vtk file series
 
+        Parameters
+        ----------
+        path : Path
+            vtk file path
+        kper : int
+            zero based stress period number
 
-def _get_names(in_list):
-    ot_list = []
-    for x in in_list:
-        if isinstance(x, bytes):
-            ot_list.append(str(x.decode('UTF-8')))
-        else:
-            ot_list.append(x)
-    return ot_list
+        Returns
+        -------
+        Path
+            updated vtk file path of format <filebase>_{:06d}.vtk where
+            {:06d} represents the six zero padded stress period time
+        """
+        return path.parent / f"{path.stem.rstrip('_')}_{kper:06d}{path.suffix}"
 
 
-def export_cbc(model, cbcfile, otfolder, precision='single', nanval=-1e+20,
-               kstpkper=None, text=None, smooth=False,
-               point_scalars=False, binary=False):
+def export_model(
+    model,
+    otfolder: Union[str, os.PathLike],
+    package_names=None,
+    nanval=-1e20,
+    smooth=False,
+    point_scalars=False,
+    vtk_grid_type="auto",
+    true2d=False,
+    binary=True,
+    kpers=None,
+):
     """
+    Export model to vtk
 
-    Exports cell by cell file to vtk
+    .. deprecated:: 3.3.5
+        Use :meth:`Vtk.add_model`
 
     Parameters
     ----------
+    model : flopy model instance
+        flopy model
+    otfolder : str or PathLike
+        output folder
+    package_names : list
+        list of package names to be exported
+    nanval : scalar
+        no data value, default value is -1e20
+    array2d : bool
+        True if array is 2d, default is False
+    smooth : bool
+        if True, will create smooth layer elevations, default is False
+    point_scalars : bool
+        if True, will also output array values at cell vertices, default is
+        False; note this automatically sets smooth to True
+    vtk_grid_type : str
+        Specific vtk_grid_type or 'auto' (default). Possible specific values
+        are 'ImageData', 'RectilinearGrid', and 'UnstructuredGrid'.
+        If 'auto', the grid type is automatically determined. Namely:
+            * A regular grid (in all three directions) will be saved as an
+              'ImageData'.
+            * A rectilinear (in all three directions), non-regular grid
+              will be saved as a 'RectilinearGrid'.
+            * Other grids will be saved as 'UnstructuredGrid'.
+    true2d : bool
+        If True, the model is expected to be 2d (1 layer, 1 row or 1 column)
+        and the data will be exported as true 2d data, default is False.
+    binary : bool
+        if True the output file will be binary, default is False
+    kpers : iterable of int
+        Stress periods to export. If None (default), all stress periods will be
+        exported.
+    """
+    warnings.warn("export_model is deprecated, please use Vtk.add_model()")
 
+    if nanval != -1e20:
+        warnings.warn("nanval is deprecated, setting to np.nan")
+    if true2d:
+        warnings.warn("true2d is no longer supported, setting to False")
+    if vtk_grid_type != "auto":
+        warnings.warn("vtk_grid_type is deprecated, setting to binary")
+
+    vtk = Vtk(
+        model,
+        vertical_exageration=1,
+        binary=binary,
+        smooth=smooth,
+        point_scalars=point_scalars,
+    )
+
+    vtk.add_model(model, package_names)
+
+    if not os.path.exists(otfolder):
+        os.mkdir(otfolder)
+
+    name = model.name
+    vtk.write(os.path.join(otfolder, name), kper=kpers)
+
+
+def export_package(
+    pak_model,
+    pak_name,
+    otfolder: Union[str, os.PathLike],
+    vtkobj=None,
+    nanval=-1e20,
+    smooth=False,
+    point_scalars=False,
+    vtk_grid_type="auto",
+    true2d=False,
+    binary=True,
+    kpers=None,
+):
+    """
+    Export package to vtk
+
+    .. deprecated:: 3.3.5
+        Use :meth:`Vtk.add_package`
+
+    Parameters
+    ----------
+    pak_model : flopy model instance
+        the model of the package
+    pak_name : str
+        the name of the package
+    otfolder : str or PathLike
+        output folder to write the data
+    vtkobj : VTK instance
+        a vtk object (allows export_package to be called from
+        export_model)
+    nanval : scalar
+        no data value, default value is -1e20
+    smooth : bool
+        if True, will create smooth layer elevations, default is False
+    point_scalars : bool
+        if True, will also output array values at cell vertices, default is
+        False; note this automatically sets smooth to True
+    vtk_grid_type : str
+        Specific vtk_grid_type or 'auto' (default). Possible specific values
+        are 'ImageData', 'RectilinearGrid', and 'UnstructuredGrid'.
+        If 'auto', the grid type is automatically determined. Namely:
+            * A regular grid (in all three directions) will be saved as an
+              'ImageData'.
+            * A rectilinear (in all three directions), non-regular grid
+              will be saved as a 'RectilinearGrid'.
+            * Other grids will be saved as 'UnstructuredGrid'.
+    true2d : bool
+        If True, the model is expected to be 2d (1 layer, 1 row or 1 column)
+        and the data will be exported as true 2d data, default is False.
+    binary : bool
+        if True the output file will be binary, default is False
+    kpers : iterable of int
+        Stress periods to export. If None (default), all stress periods will be
+        exported.
+    """
+    warnings.warn("export_package is deprecated, use Vtk.add_package()")
+
+    if nanval != -1e20:
+        warnings.warn("nanval is deprecated, setting to np.nan")
+    if true2d:
+        warnings.warn("true2d is no longer supported, setting to False")
+    if vtk_grid_type != "auto":
+        warnings.warn("vtk_grid_type is deprecated, setting to binary")
+
+    if not vtkobj:
+        vtk = Vtk(
+            pak_model,
+            binary=binary,
+            smooth=smooth,
+            point_scalars=point_scalars,
+        )
+    else:
+        vtk = vtkobj
+
+    if not os.path.exists(otfolder):
+        os.mkdir(otfolder)
+
+    if isinstance(pak_name, list):
+        pak_name = pak_name[0]
+
+    p = pak_model.get_package(pak_name)
+    vtk.add_package(p)
+
+    vtk.write(os.path.join(otfolder, pak_name), kper=kpers)
+
+
+def export_transient(
+    model,
+    array,
+    output_folder: Union[str, os.PathLike],
+    name,
+    nanval=-1e20,
+    array2d=False,
+    smooth=False,
+    point_scalars=False,
+    vtk_grid_type="auto",
+    true2d=False,
+    binary=True,
+    kpers=None,
+):
+    """
+    Export transient arrays and lists to vtk
+
+    .. deprecated:: 3.3.5
+        Use :meth:`Vtk.add_transient_array` or :meth:`Vtk.add_transient_list`
+
+    Parameters
+    ----------
+    model : MFModel
+        the flopy model instance
+    array : Transient instance
+        flopy transient array
+    output_folder : str or PathLike
+        output folder to write the data
+    name : str
+        name of array
+    nanval : scalar
+        no data value, default value is -1e20
+    array2d : bool
+        True if array is 2d, default is False
+    smooth : bool
+        if True, will create smooth layer elevations, default is False
+    point_scalars : bool
+        if True, will also output array values at cell vertices, default is
+        False; note this automatically sets smooth to True
+    vtk_grid_type : str
+        Specific vtk_grid_type or 'auto' (default). Possible specific values
+        are 'ImageData', 'RectilinearGrid', and 'UnstructuredGrid'.
+        If 'auto', the grid type is automatically determined. Namely:
+            * A regular grid (in all three directions) will be saved as an
+              'ImageData'.
+            * A rectilinear (in all three directions), non-regular grid
+              will be saved as a 'RectilinearGrid'.
+            * Other grids will be saved as 'UnstructuredGrid'.
+    true2d : bool
+        If True, the model is expected to be 2d (1 layer, 1 row or 1 column)
+        and the data will be exported as true 2d data, default is False.
+    binary : bool
+        if True the output file will be binary, default is False
+    kpers : iterable of int
+        Stress periods to export. If None (default), all stress periods will be
+        exported.
+    """
+    warnings.warn(
+        "export_transient is deprecated, use Vtk.add_transient_array() or "
+        "Vtk.add_transient_list()"
+    )
+
+    if nanval != -1e20:
+        warnings.warn("nanval is deprecated, setting to np.nan")
+    if true2d:
+        warnings.warn("true2d is no longer supported, setting to False")
+    if vtk_grid_type != "auto":
+        warnings.warn("vtk_grid_type is deprecated, setting to binary")
+    if array2d:
+        warnings.warn(
+            "array2d parameter is deprecated, 2d arrays are "
+            "handled automatically"
+        )
+
+    if not os.path.exists(output_folder):
+        os.mkdir(output_folder)
+
+    vtk = Vtk(model, binary=binary, smooth=smooth, point_scalars=point_scalars)
+
+    if array.data_type == DataType.transient2d:
+        if array.array is not None:
+            if hasattr(array, "transient_2ds"):
+                vtk.add_transient_array(array.transient_2ds, name)
+            else:
+                d = {ix: i for ix, i in enumerate(array.array)}
+                vtk.add_transient_array(d, name)
+
+    elif array.data_type == DataType.transient3d:
+        if array.array is None:
+            vtk.add_transient_array(array.transient_3ds, name)
+
+    elif array.data_type == DataType.transientlist:
+        vtk.add_transient_list(array)
+
+    else:
+        raise TypeError(f"type {type(array)} not valid for export_transient")
+
+    vtk.write(os.path.join(output_folder, name), kper=kpers)
+
+
+def export_array(
+    model,
+    array,
+    output_folder: Union[str, os.PathLike],
+    name,
+    nanval=-1e20,
+    array2d=False,
+    smooth=False,
+    point_scalars=False,
+    vtk_grid_type="auto",
+    true2d=False,
+    binary=True,
+):
+    """
+    Export array to vtk
+
+    .. deprecated:: 3.3.5
+        Use :meth:`Vtk.add_array`
+
+    Parameters
+    ----------
+    model : flopy model instance
+        the flopy model instance
+    array : flopy array
+        flopy 2d or 3d array
+    output_folder : str or PathLike
+        output folder to write the data
+    name : str
+        name of array
+    nanval : scalar
+        no data value, default value is -1e20
+    array2d : bool
+        true if the array is 2d and represents the first layer, default is
+        False
+    smooth : bool
+        if True, will create smooth layer elevations, default is False
+    point_scalars : bool
+        if True, will also output array values at cell vertices, default is
+        False; note this automatically sets smooth to True
+    vtk_grid_type : str
+        Specific vtk_grid_type or 'auto' (default). Possible specific values
+        are 'ImageData', 'RectilinearGrid', and 'UnstructuredGrid'.
+        If 'auto', the grid type is automatically determined. Namely:
+            * A regular grid (in all three directions) will be saved as an
+              'ImageData'.
+            * A rectilinear (in all three directions), non-regular grid
+              will be saved as a 'RectilinearGrid'.
+            * Other grids will be saved as 'UnstructuredGrid'.
+    true2d : bool
+        If True, the model is expected to be 2d (1 layer, 1 row or 1 column)
+        and the data will be exported as true 2d data, default is False.
+    binary : bool
+        if True the output file will be binary, default is False
+    """
+    warnings.warn("export_array is deprecated, please use Vtk.add_array()")
+
+    if nanval != -1e20:
+        warnings.warn("nanval is deprecated, setting to np.nan")
+    if true2d:
+        warnings.warn("true2d is no longer supported, setting to False")
+    if vtk_grid_type != "auto":
+        warnings.warn("vtk_grid_type is deprecated, setting to binary")
+    if array2d:
+        warnings.warn(
+            "array2d parameter is deprecated, 2d arrays are "
+            "handled automatically"
+        )
+
+    if not os.path.exists(output_folder):
+        os.mkdir(output_folder)
+
+    if array.size < model.modelgrid.nnodes:
+        if array.size < model.modelgrid.ncpl:
+            raise AssertionError(
+                "Array size must be equal to either ncpl or nnodes"
+            )
+
+        array = np.zeros(model.modelgrid.nnodes) * np.nan
+        array[: array.size] = np.ravel(array)
+
+    vtk = Vtk(model, binary=binary, smooth=smooth, point_scalars=point_scalars)
+
+    vtk.add_array(array, name)
+    vtk.write(os.path.join(output_folder, name))
+
+
+def export_heads(
+    model,
+    hdsfile,
+    otfolder,
+    text="head",
+    precision="auto",
+    verbose=False,
+    nanval=-1e20,
+    kstpkper=None,
+    smooth=False,
+    point_scalars=False,
+    vtk_grid_type="auto",
+    true2d=False,
+    binary=True,
+):
+    """
+    Exports binary head file to vtk
+
+    .. deprecated:: 3.3.5
+        Use :meth:`Vtk.add_heads`
+
+    Parameters
+    ----------
+    model : MFModel
+        the flopy model instance
+    hdsfile : str, HeadFile object
+        binary head file path or object
+    otfolder : str
+        output folder to write the data
+    text : string
+        Name of the text string in the head file.  Default is 'head'.
+    precision : str
+        Precision of data in the head file: 'auto', 'single' or 'double'.
+        Default is 'auto'.
+    verbose : bool
+        If True, write information to the screen. Default is False.
+    nanval : scalar
+        no data value, default value is -1e20
+    kstpkper : tuple of ints or list of tuple of ints
+        A tuple containing the time step and stress period (kstp, kper).
+        The kstp and kper values are zero based.
+    smooth : bool
+        if True, will create smooth layer elevations, default is False
+    point_scalars : bool
+        if True, will also output array values at cell vertices, default is
+        False; note this automatically sets smooth to True
+    vtk_grid_type : str
+        Specific vtk_grid_type or 'auto' (default). Possible specific values
+        are 'ImageData', 'RectilinearGrid', and 'UnstructuredGrid'.
+        If 'auto', the grid type is automatically determined. Namely:
+            * A regular grid (in all three directions) will be saved as an
+              'ImageData'.
+            * A rectilinear (in all three directions), non-regular grid
+              will be saved as a 'RectilinearGrid'.
+            * Other grids will be saved as 'UnstructuredGrid'.
+    true2d : bool
+        If True, the model is expected to be 2d (1 layer, 1 row or 1 column)
+        and the data will be exported as true 2d data, default is False.
+    binary : bool
+        if True the output file will be binary, default is False
+    """
+    warnings.warn("export_heads is deprecated, use Vtk.add_heads()")
+
+    if nanval != -1e20:
+        warnings.warn("nanval is deprecated, setting to np.nan")
+    if true2d:
+        warnings.warn("true2d is no longer supported, setting to False")
+    if vtk_grid_type != "auto":
+        warnings.warn("vtk_grid_type is deprecated, setting to binary")
+
+    from ..utils import HeadFile
+
+    if not os.path.exists(otfolder):
+        os.mkdir(otfolder)
+
+    if not isinstance(hdsfile, HeadFile):
+        hds = HeadFile(
+            hdsfile, text=text, precision=precision, verbose=verbose
+        )
+    else:
+        hds = hdsfile
+
+    vtk = Vtk(model, binary=binary, smooth=smooth, point_scalars=point_scalars)
+
+    vtk.add_heads(hds, kstpkper)
+    name = f"{model.name}_{text}"
+    vtk.write(os.path.join(otfolder, name))
+
+
+def export_cbc(
+    model,
+    cbcfile,
+    otfolder,
+    precision="single",
+    verbose=False,
+    nanval=-1e20,
+    kstpkper=None,
+    text=None,
+    smooth=False,
+    point_scalars=False,
+    vtk_grid_type="auto",
+    true2d=False,
+    binary=True,
+):
+    """
+    Exports cell by cell file to vtk
+
+    .. deprecated:: 3.3.5
+        Use :meth:`Vtk.add_cell_budget`
+
+    Parameters
+    ----------
     model : flopy model instance
         the flopy model instance
     cbcfile : str
         the cell by cell file
     otfolder : str
         output folder to write the data
-    precision : str:
-        binary file precision, default is 'single'
+    precision : str
+        Precision of data in the cell by cell file: 'single' or 'double'.
+        Default is 'single'.
+    verbose : bool
+        If True, write information to the screen. Default is False.
     nanval : scalar
         no data value
     kstpkper : tuple of ints or list of tuple of ints
@@ -984,571 +1985,46 @@ def export_cbc(model, cbcfile, otfolder, precision='single', nanval=-1e+20,
         The text identifier for the record.  Examples include
         'RIVER LEAKAGE', 'STORAGE', 'FLOW RIGHT FACE', etc.
     smooth : bool
-        If true a smooth surface will be output, default is False
+        if True, will create smooth layer elevations, default is False
     point_scalars : bool
-        If True point scalar values will be written, default is False
+        if True, will also output array values at cell vertices, default is
+        False; note this automatically sets smooth to True
+    vtk_grid_type : str
+        Specific vtk_grid_type or 'auto' (default). Possible specific values
+        are 'ImageData', 'RectilinearGrid', and 'UnstructuredGrid'.
+        If 'auto', the grid type is automatically determined. Namely:
+            * A regular grid (in all three directions) will be saved as an
+              'ImageData'.
+            * A rectilinear (in all three directions), non-regular grid
+              will be saved as a 'RectilinearGrid'.
+            * Other grids will be saved as 'UnstructuredGrid'.
+    true2d : bool
+        If True, the model is expected to be 2d (1 layer, 1 row or 1 column)
+        and the data will be exported as true 2d data, default is False.
     binary : bool
-        if True the output .vtu file will be binary, default is
-        False.
-
+        if True the output file will be binary, default is False
     """
+    warnings.warn("export_cbc is deprecated, use Vtk.add_cell_budget()")
 
-    mg = model.modelgrid
-    shape = (mg.nlay, mg.nrow, mg.ncol)
+    if nanval != -1e20:
+        warnings.warn("nanval is deprecated, setting to np.nan")
+    if true2d:
+        warnings.warn("true2d is no longer supported, setting to False")
+    if vtk_grid_type != "auto":
+        warnings.warn("vtk_grid_type is deprecated, setting to binary")
+
+    from ..utils import CellBudgetFile
 
     if not os.path.exists(otfolder):
         os.mkdir(otfolder)
 
-    # set up the pvd file to make the output files time enabled
-    pvdfile = open(
-        os.path.join(otfolder, '{}_Heads.pvd'.format(model.name)),
-        'w')
-
-    pvdfile.write("""<?xml version="1.0"?>
-<VTKFile type="Collection" version="0.1"
-         byte_order="LittleEndian"
-         compressor="vtkZLibDataCompressor">
-  <Collection>\n""")
-
-    # load cbc
-
-    cbb = bf.CellBudgetFile(cbcfile, precision=precision)
-
-    # totim_dict = dict(zip(cbb.get_kstpkper(), model.dis.get_totim()))
-
-    # get records
-    records = _get_names(cbb.get_unique_record_names())
-
-    # build imeth lookup
-    imeth_dict = {record: imeth for (record, imeth) in zip(records,
-                                                           cbb.imethlist)}
-    # get list of packages to export
-    if text is not None:
-        # build keylist
-        if isinstance(text, str):
-            keylist = [text]
-        elif isinstance(text, list):
-            keylist = text
-        else:
-            raise Exception('text must be type str or list of str')
+    if not isinstance(cbcfile, CellBudgetFile):
+        cbc = CellBudgetFile(cbcfile, precision=precision, verbose=verbose)
     else:
-        keylist = records
+        cbc = cbcfile
 
-    if kstpkper is not None:
-        if isinstance(kstpkper, tuple):
-            kstplist = [kstpkper[0]]
-            kperlist = [kstpkper[1]]
-        elif isinstance(kstpkper, list):
-            kstpkper_list = list(map(list, zip(*kstpkper)))
-            kstplist = kstpkper_list[0]
-            kperlist = kstpkper_list[1]
+    vtk = Vtk(model, binary=binary, smooth=smooth, point_scalars=point_scalars)
 
-        else:
-            raise Exception('kstpkper must be tuple of (kstp, kper) or list '
-                            'of tuples')
-
-    else:
-        kperlist = list(set([x[1] for x in cbb.get_kstpkper() if x[1] > -1]))
-        kstplist = list(set([x[0] for x in cbb.get_kstpkper() if x[0] > -1]))
-
-    # get model name
-    model_name = model.name
-
-    vtk = Vtk(model, nanval=nanval, smooth=smooth, point_scalars=point_scalars)
-
-    # export data
-    addarray = False
-    count = 1
-    for kper in kperlist:
-        for kstp in kstplist:
-
-            ot_base = '{}_CBC_KPER{}_KSTP{}.vtu'.format(
-                model_name, kper + 1, kstp + 1)
-            otfile = os.path.join(otfolder, ot_base)
-            pvdfile.write("""<DataSet timestep="{}" group="" part="0"
-                         file="{}"/>\n""".format(count, ot_base))
-            for name in keylist:
-
-                try:
-                    rec = cbb.get_data(kstpkper=(kstp, kper), text=name,
-                                       full3D=True)
-
-                    if len(rec) > 0:
-                        array = rec[0]  # need to fix for multiple pak
-                        addarray = True
-
-                except ValueError:
-
-                    rec = cbb.get_data(kstpkper=(kstp, kper), text=name)[0]
-
-                    if imeth_dict[name] == 6:
-                        array = np.full(shape, nanval)
-                        # rec array
-                        for [node, q] in zip(rec['node'], rec['q']):
-                            lyr, row, col = np.unravel_index(node - 1, shape)
-
-                            array[lyr, row, col] = q
-
-                        addarray = True
-                    else:
-                        raise Exception('Data type not currently supported '
-                                        'for cbc output')
-                        # print('Data type not currently supported '
-                        #       'for cbc output')
-
-                if addarray:
-
-                    # set the data to no data value
-                    if ma.is_masked(array):
-                        array = np.where(array.mask, nanval, array)
-
-                    # add array to vtk
-                    vtk.add_array(name.strip(), array)  # need to adjust for
-
-            # write the vtk data to the output file
-            if binary:
-                vtk.write_binary(otfile)
-            else:
-                vtk.write(otfile)
-            count += 1
-    # finish writing the pvd file
-    pvdfile.write("""  </Collection>
-</VTKFile>""")
-
-    pvdfile.close()
-    return
-
-
-def export_heads(model, hdsfile, otfolder, nanval=-1e+20, kstpkper=None,
-                 smooth=False, point_scalars=False,
-                 binary=False):
-    """
-
-    Exports binary head file to vtk
-
-    Parameters
-    ----------
-
-    model : MFModel
-        the flopy model instance
-    hdsfile : str
-        binary heads file
-    otfolder : str
-        output folder to write the data
-    nanval : scalar
-        no data value, default value is -1e20
-    kstpkper : tuple of ints or list of tuple of ints
-        A tuple containing the time step and stress period (kstp, kper).
-        The kstp and kper values are zero based.
-    smooth : bool
-        If true a smooth surface will be output, default is False
-    point_scalars : bool
-        If True point scalar values will be written, default is False
-    binary : bool
-        if True the output .vtu file will be binary, default is
-        False.
-
-    """
-
-    # setup output folder
-    if not os.path.exists(otfolder):
-        os.mkdir(otfolder)
-
-    # start writing the pvd file to make the data time aware
-    pvdfile = open(os.path.join(otfolder, '{}_Heads.pvd'.format(model.name)),
-                   'w')
-
-    pvdfile.write("""<?xml version="1.0"?>
-<VTKFile type="Collection" version="0.1"
-         byte_order="LittleEndian"
-         compressor="vtkZLibDataCompressor">
-  <Collection>\n""")
-    # get the heads
-    hds = HeadFile(hdsfile)
-
-    if kstpkper is not None:
-        if isinstance(kstpkper, tuple):
-            kstplist = [kstpkper[0]]
-            kperlist = [kstpkper[1]]
-
-        elif isinstance(kstpkper, list):
-            kstpkper_list = list(map(list, zip(*kstpkper)))
-            kstplist = kstpkper_list[0]
-            kperlist = kstpkper_list[1]
-
-        else:
-            raise Exception('kstpkper must be tuple of (kstp, kper) or list '
-                            'of tuples')
-
-    else:
-        kperlist = list(set([x[1] for x in hds.get_kstpkper() if x[1] > -1]))
-        kstplist = list(set([x[0] for x in hds.get_kstpkper() if x[0] > -1]))
-
-    # set upt the vtk
-    vtk = Vtk(model, smooth=smooth, point_scalars=point_scalars, nanval=nanval)
-
-    # output data
-    count = 0
-    for kper in kperlist:
-        for kstp in kstplist:
-            hdarr = hds.get_data((kstp, kper))
-            vtk.add_array('head', hdarr)
-            ot_base = '{}_Heads_KPER{}_KSTP{}.vtu'.format(
-                model.name, kper + 1, kstp + 1)
-            otfile = os.path.join(otfolder, ot_base)
-            # vtk.write(otfile, timeval=totim_dict[(kstp, kper)])
-            if binary:
-                vtk.write_binary(otfile)
-            else:
-                vtk.write(otfile)
-            pvdfile.write("""<DataSet timestep="{}" group="" part="0"
-             file="{}"/>\n""".format(count, ot_base))
-            count += 1
-
-    pvdfile.write("""  </Collection>
-</VTKFile>""")
-
-    pvdfile.close()
-
-
-def export_array(model, array, output_folder, name, nanval=-1e+20,
-                 array2d=False, smooth=False, point_scalars=False,
-                 binary=False):
-
-    """
-
-    Export array to vtk
-
-    Parameters
-    ----------
-
-    model : flopy model instance
-        the flopy model instance
-    array : flopy array
-        flopy 2d or 3d array
-    output_folder : str
-        output folder to write the data
-    name : str
-        name of array
-    nanval : scalar
-        no data value, default value is -1e20
-    array2d : bool
-        True if array is 2d, default is False
-    smooth : bool
-        If true a smooth surface will be output, default is False
-    point_scalars : bool
-        If True point scalar values will be written, default is False
-    binary : bool
-        if True the output .vtu file will be binary, default is
-        False.
-
-    """
-
-    if not os.path.exists(output_folder):
-        os.mkdir(output_folder)
-
-    vtk = Vtk(model, nanval=nanval, smooth=smooth, point_scalars=point_scalars)
-    vtk.add_array(name, array, array2d=array2d)
-    otfile = os.path.join(output_folder, '{}.vtu'.format(name))
-    if binary:
-        vtk.write_binary(otfile)
-    else:
-        vtk.write(otfile)
-
-    return
-
-
-def export_transient(model, array, output_folder, name, nanval=-1e+20,
-                     array2d=False, smooth=False, point_scalars=False,
-                     binary=False):
-    """
-
-    Export transient 2d array to vtk
-
-    Parameters
-    ----------
-
-    model : MFModel
-        the flopy model instance
-    array : Transient instance
-        flopy transient array
-    output_folder : str
-        output folder to write the data
-    name : str
-        name of array
-    nanval : scalar
-        no data value, default value is -1e20
-    array2d : bool
-        True if array is 2d, default is False
-    smooth : bool
-        If true a smooth surface will be output, default is False
-    point_scalars : bool
-        If True point scalar values will be written, default is False
-    binary : bool
-        if True the output .vtu file will be binary, default is
-        False.
-
-    """
-
-    if not os.path.exists(output_folder):
-        os.mkdir(output_folder)
-
-    to_tim = model.dis.get_totim()
-
-    vtk = Vtk(model, nanval=nanval, smooth=smooth, point_scalars=point_scalars)
-
-    if array2d:
-
-        for kper in range(array.shape[0]):
-
-            t2d_array_kper = array[kper]
-            t2d_array_kper_shape = t2d_array_kper.shape
-            t2d_array_input = t2d_array_kper.reshape(t2d_array_kper_shape[1],
-                                                     t2d_array_kper_shape[2])
-
-            vtk.add_array(name, t2d_array_input, array2d=True)
-
-            ot_name = '{}_0{}'.format(name, kper + 1)
-            ot_file = os.path.join(output_folder, '{}.vtu'.format(ot_name))
-            vtk.write(ot_file, timeval=to_tim[kper])
-
-    else:
-
-        for kper in range(array.shape[0]):
-            vtk.add_array(name, array[kper])
-
-            ot_name = '{}_0{}'.format(name, kper + 1)
-            ot_file = os.path.join(output_folder, '{}.vtu'.format(ot_name))
-            if binary:
-                vtk.write_binary(ot_file)
-            else:
-                vtk.write(ot_file, timeval=to_tim[kper])
-    return
-
-
-def trans_dict(in_dict, name, trans_array, array2d=False):
-    """
-    Builds or adds to dictionary trans_array
-    """
-    if not in_dict:
-        in_dict = {}
-    for kper in range(trans_array.shape[0]):
-        if kper not in in_dict:
-            in_dict[kper] = {}
-        in_dict[kper][name] = _Array(trans_array[kper], array2d=array2d)
-
-    return in_dict
-
-
-def export_package(pak_model, pak_name, ot_folder, vtkobj=None,
-                   nanval=-1e+20, smooth=False, point_scalars=False,
-                   binary=False):
-
-    """
-    Exports package to vtk
-
-    Parameters
-    ----------
-
-    pak_model : flopy model instance
-        the model of the package
-    pak_name : str
-        the name of the package
-    ot_folder : str
-        output folder to write the data
-    vtkobj : VTK instance
-        a vtk object (allows export_package to be called from
-        export_model)
-    nanval : scalar
-        no data value, default value is -1e20
-    smooth : bool
-        If true a smooth surface will be output, default is False
-    point_scalars : bool
-        If True point scalar values will be written, default is False
-    binary : bool
-        if True the output .vtu file will be binary, default is
-        False.
-
-    """
-
-    # see if there is vtk object being supplied by export_model
-    if not vtkobj:
-        # if not build one
-        vtk = Vtk(pak_model, nanval=nanval, smooth=smooth,
-                  point_scalars=point_scalars)
-    else:
-        # otherwise use the vtk object that was supplied
-        vtk = vtkobj
-
-    if not os.path.exists(ot_folder):
-        os.mkdir(ot_folder)
-
-    # is there output data
-    has_output = False
-    # is there output transient data
-    vtk_trans_dict = None
-
-    # get package
-    if isinstance(pak_name, list):
-        pak_name = pak_name[0]
-
-    pak = pak_model.get_package(pak_name)
-
-    shape_check_3d = (pak_model.modelgrid.nlay, pak_model.modelgrid.nrow,
-                      pak_model.modelgrid.ncol)
-    shape_check_2d = (shape_check_3d[1], shape_check_3d[2])
-
-    # loop through the items in the package
-    for item, value in pak.__dict__.items():
-
-        if value is None or not hasattr(value, 'data_type'):
-            continue
-
-        if isinstance(value, list):
-            raise NotImplementedError("LIST")
-
-        elif isinstance(value, DataInterface):
-            # if transiet list data add to the vtk_trans_dict for later output
-            if value.data_type == DataType.transientlist:
-
-                try:
-                    list(value.masked_4D_arrays_itr())
-                except AttributeError:
-
-                    continue
-                except ValueError:
-                    continue
-                has_output = True
-                for name, array in value.masked_4D_arrays_itr():
-
-                    vtk_trans_dict = trans_dict(vtk_trans_dict, name, array)
-
-            elif value.data_type == DataType.array3d:
-                # if 3d array add array to the vtk and set has_output to True
-                if value.array is not None:
-                    has_output = True
-
-                    vtk.add_array(item, value.array)
-
-            elif value.data_type == DataType.array2d and value.array.shape ==\
-                    shape_check_2d:
-                # if 2d array add array to vtk object and turn on has output
-                if value.array is not None:
-                    has_output = True
-                    vtk.add_array(item, value.array, array2d=True)
-
-            elif value.data_type == DataType.transient2d:
-                # if transient data add data to vtk_trans_dict for later output
-                if value.array is not None:
-                    has_output = True
-                    vtk_trans_dict = trans_dict(vtk_trans_dict, item,
-                                                value.array, array2d=True)
-
-            elif value.data_type == DataType.list:
-                # this data type is not being output
-                if value.array is not None:
-                    has_output = True
-                    if isinstance(value.array, np.recarray):
-                        pass
-
-                    else:
-                        raise Exception('Data type not understond in data '
-                                        'list')
-
-            elif value.data_type == DataType.transient3d:
-                # add to transient dictionary for output
-                if value.array is not None:
-                    has_output = True
-                    # vtk_trans_dict = _export_transient_3d(vtk, value.array,
-                    #                 vtkdict=vtk_trans_dict)
-                    vtk_trans_dict = trans_dict(vtk_trans_dict, item,
-                                                value.array)
-
-            else:
-                pass
-        else:
-            pass
-
-    if not has_output:
-        # there is no data to output
-        pass
-
-    else:
-
-        # write out data
-        # write array data
-        if len(vtk.arrays) > 0:
-            ot_file = os.path.join(ot_folder, '{}.vtu'.format(pak_name))
-            if binary:
-                vtk.write_binary(ot_file)
-            else:
-                vtk.write(ot_file)
-
-        # write transient data
-        if vtk_trans_dict:
-
-            # get model time
-            # to_tim = _get_basic_modeltime(pak_model.modeltime.perlen)
-            # loop through the transient array data that was stored in the
-            # trans_array_dict and output
-            for kper, array_dict in vtk_trans_dict.items():
-                # if to_tim:
-                #     time = to_tim[kper]
-                # else:
-                #     time = None
-                # set up output file
-                ot_file = os.path.join(ot_folder, '{} _0{}.vtu'.format(
-                    pak_name, kper + 1))
-                for name, array in sorted(array_dict.items()):
-                    if array.array2d:
-                        array_shape = array.array.shape
-                        a = array.array.reshape(array_shape[1], array_shape[2])
-                    else:
-                        a = array.array
-                    vtk.add_array(name, a, array.array2d)
-                # vtk.write(ot_file, timeval=time)
-                if binary:
-                    vtk.write_binary(ot_file)
-                else:
-                    vtk.write(ot_file)
-    return
-
-
-def export_model(model, ot_folder, package_names=None, nanval=-1e+20,
-                 smooth=False, point_scalars=False, binary=False):
-    """
-
-    model : flopy model instance
-        flopy model
-    ot_folder : str
-        output folder
-    package_names : list
-        list of package names to be exported
-    nanval : scalar
-        no data value, default value is -1e20
-    array2d : bool
-        True if array is 2d, default is False
-    smooth : bool
-        If true a smooth surface will be output, default is False
-    point_scalars : bool
-        If True point scalar values will be written, default is False
-    binary : bool
-        if True the output .vtu file will be binary, default is
-        False.
-
-    """
-    vtk = Vtk(model, nanval=nanval, smooth=smooth, point_scalars=point_scalars)
-
-    if package_names is not None:
-        if not isinstance(package_names, list):
-            package_names = [package_names]
-    else:
-        package_names = [pak.name[0] for pak in ml.packagelist]
-
-    if not os.path.exists(ot_folder):
-        os.mkdir(ot_folder)
-
-    for pak_name in package_names:
-        export_package(model, pak_name, ot_folder, vtkobj=vtk, nanval=nanval,
-                       smooth=smooth, point_scalars=point_scalars,
-                       binary=binary)
+    vtk.add_cell_budget(cbc, text, kstpkper)
+    fname = f"{model.name}_CBC"
+    vtk.write(os.path.join(otfolder, fname))

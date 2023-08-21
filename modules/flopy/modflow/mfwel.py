@@ -4,18 +4,15 @@ the ModflowWel class as `flopy.modflow.ModflowWel`.
 
 Additional information for this MODFLOW package can be found at the `Online
 MODFLOW Guide
-<http://water.usgs.gov/ogw/modflow/MODFLOW-2005-Guide/index.html?wel.htm>`_.
+<https://water.usgs.gov/ogw/modflow/MODFLOW-2005-Guide/wel.html>`_.
 
 """
-
-import sys
 import numpy as np
-from ..utils import MfList
+
 from ..pakbase import Package
-from ..utils.recarray_utils import create_empty_recarray
+from ..utils import MfList
 from ..utils.optionblock import OptionBlock
-from collections import OrderedDict
-import warnings
+from ..utils.recarray_utils import create_empty_recarray
 
 
 class ModflowWel(Package):
@@ -83,6 +80,9 @@ class ModflowWel(Package):
         number greater than zero. To define the names for all package files
         (input and output) the length of the list of strings should be 2.
         Default is None.
+    add_package : bool
+        Flag to add the initialised package object to the parent model object.
+        Default is True.
 
     Attributes
     ----------
@@ -110,65 +110,75 @@ class ModflowWel(Package):
     >>> wel = flopy.modflow.ModflowWel(m, stress_period_data=lrcq)
 
     """
-    _options = OrderedDict([('specify', {OptionBlock.dtype: np.bool_,
-                                         OptionBlock.nested: True,
-                                         OptionBlock.n_nested: 2,
-                                         OptionBlock.vars: OrderedDict(
-                                             [('phiramp',
-                                               OptionBlock.simple_float),
-                                              ('iunitramp',
-                                               OrderedDict(
-                                                   [(OptionBlock.dtype, int),
-                                                   (OptionBlock.nested, False),
-                                                   (OptionBlock.optional, True)
-                                                    ]))])}),
-                            ('tabfiles', OptionBlock.simple_tabfile)])
 
-    def __init__(self, model, ipakcb=None, stress_period_data=None, dtype=None,
-                 extension='wel', options=None, binary=False,
-                 unitnumber=None, filenames=None):
-        """
-        Package constructor.
+    _options = dict(
+        [
+            (
+                "specify",
+                {
+                    OptionBlock.dtype: np.bool_,
+                    OptionBlock.nested: True,
+                    OptionBlock.n_nested: 2,
+                    OptionBlock.vars: dict(
+                        [
+                            ("phiramp", OptionBlock.simple_float),
+                            (
+                                "iunitramp",
+                                dict(
+                                    [
+                                        (OptionBlock.dtype, int),
+                                        (OptionBlock.nested, False),
+                                        (OptionBlock.optional, True),
+                                    ]
+                                ),
+                            ),
+                        ]
+                    ),
+                },
+            ),
+            ("tabfiles", OptionBlock.simple_tabfile),
+        ]
+    )
 
-        """
+    def __init__(
+        self,
+        model,
+        ipakcb=None,
+        stress_period_data=None,
+        dtype=None,
+        extension="wel",
+        options=None,
+        binary=False,
+        unitnumber=None,
+        filenames=None,
+        add_package=True,
+    ):
         # set default unit number of one is not specified
         if unitnumber is None:
-            unitnumber = ModflowWel.defaultunit()
+            unitnumber = ModflowWel._defaultunit()
 
         # set filenames
-        if filenames is None:
-            filenames = [None, None]
-        elif isinstance(filenames, str):
-            filenames = [filenames, None]
-        elif isinstance(filenames, list):
-            if len(filenames) < 2:
-                filenames.append(None)
+        filenames = self._prepare_filenames(filenames, 2)
 
         # update external file information with cbc output, if necessary
         if ipakcb is not None:
-            fname = filenames[1]
-            model.add_output_file(ipakcb, fname=fname,
-                                  package=ModflowWel.ftype())
+            model.add_output_file(
+                ipakcb, fname=filenames[1], package=self._ftype()
+            )
         else:
             ipakcb = 0
 
-        # Fill namefile items
-        name = [ModflowWel.ftype()]
-        units = [unitnumber]
-        extra = ['']
+        # call base package constructor
+        super().__init__(
+            model,
+            extension=extension,
+            name=self._ftype(),
+            unit_number=unitnumber,
+            filenames=filenames[0],
+        )
 
-        # set package name
-        fname = [filenames[0]]
-
-        # Call ancestor's init to set self.parent, extension, name and
-        # unit number
-        Package.__init__(self, model, extension=extension, name=name,
-                         unit_number=units, extra=extra, filenames=fname)
-
-        self.heading = '# {} package for '.format(self.name[0]) + \
-                       ' {}, '.format(model.version_types[model.version]) + \
-                       'generated by Flopy.'
-        self.url = 'wel.htm'
+        self._generate_heading()
+        self.url = "wel.html"
 
         self.ipakcb = ipakcb
         self.np = 0
@@ -192,11 +202,11 @@ class ModflowWel(Package):
 
         else:
             for idx, opt in enumerate(options):
-                if 'specify' in opt:
+                if "specify" in opt:
                     t = opt.strip().split()
                     self.specify = True
-                    self.phiramp = np.float64(t[1])
-                    self.iunitramp = np.int_(t[2])
+                    self.phiramp = float(t[1])
+                    self.iunitramp = int(t[2])
                     self.options.pop(idx)
                     break
 
@@ -204,19 +214,20 @@ class ModflowWel(Package):
             self.dtype = dtype
         else:
             self.dtype = self.get_default_dtype(
-                structured=self.parent.structured)
+                structured=self.parent.structured
+            )
 
         # determine if any aux variables in dtype
         dt = self.get_default_dtype(structured=self.parent.structured)
         if len(self.dtype.names) > len(dt.names):
-            for name in self.dtype.names[len(dt.names):]:
+            for name in self.dtype.names[len(dt.names) :]:
                 ladd = True
                 for option in options:
                     if name.lower() in option.lower():
                         ladd = False
                         break
                 if ladd:
-                    options.append('aux {} '.format(name))
+                    options.append(f"aux {name} ")
 
         if isinstance(self.options, OptionBlock):
             if not self.options.auxillary:
@@ -225,25 +236,23 @@ class ModflowWel(Package):
             self.options = options
 
         # initialize MfList
-        self.stress_period_data = MfList(self, stress_period_data,
-                                         binary=binary)
+        self.stress_period_data = MfList(
+            self, stress_period_data, binary=binary
+        )
 
-        self.parent.add_package(self)
+        if add_package:
+            self.parent.add_package(self)
 
-    @property
-    def phiramp_unit(self):
-        err = "phiramp_unit will be replaced " \
-              "with iunitramp for consistency"
-        warnings.warn(err, DeprecationWarning)
-        return self.iunitramp
+    def _ncells(self):
+        """Maximum number of cells that have wells (developed for
+        MT3DMS SSM package).
 
-    @phiramp_unit.setter
-    def phiramp_unit(self, phiramp_unit):
-        self.iunitramp = phiramp_unit
+        Returns
+        -------
+        ncells: int
+            maximum number of wel cells
 
-    def ncells(self):
-        # Returns the  maximum number of cells that have a well
-        # (developed for MT3DMS SSM package)
+        """
         return self.stress_period_data.mxact
 
     def write_file(self, f=None):
@@ -264,46 +273,49 @@ class ModflowWel(Package):
             else:
                 f_wel = f
         else:
-            f_wel = open(self.fn_path, 'w')
+            f_wel = open(self.fn_path, "w")
 
-        f_wel.write('%s\n' % self.heading)
+        f_wel.write(f"{self.heading}\n")
 
-        if isinstance(self.options, OptionBlock) and \
-                self.parent.version == "mfnwt":
-
+        if (
+            isinstance(self.options, OptionBlock)
+            and self.parent.version == "mfnwt"
+        ):
             self.options.update_from_package(self)
             if self.options.block:
                 self.options.write_options(f_wel)
 
-        line = (
-            ' {0:9d} {1:9d} '.format(self.stress_period_data.mxact,
-                                     self.ipakcb))
+        line = f" {self.stress_period_data.mxact:9d} {self.ipakcb:9d} "
 
         if isinstance(self.options, OptionBlock):
             if self.options.noprint:
                 line += "NOPRINT "
             if self.options.auxillary:
-                line += " ".join([str(aux).upper() for aux in
-                                  self.options.auxillary])
+                line += " ".join(
+                    [str(aux).upper() for aux in self.options.auxillary]
+                )
 
         else:
             for opt in self.options:
-                line += ' ' + str(opt)
+                line += " " + str(opt)
 
-        line += '\n'
+        line += "\n"
         f_wel.write(line)
 
-        if isinstance(self.options, OptionBlock) and \
-                self.parent.version == 'mfnwt':
+        if (
+            isinstance(self.options, OptionBlock)
+            and self.parent.version == "mfnwt"
+        ):
             if not self.options.block:
                 if isinstance(self.options.specify, np.ndarray):
                     self.options.tabfiles = False
                     self.options.write_options(f_wel)
 
         else:
-            if self.specify and self.parent.version == 'mfnwt':
-                f_wel.write('SPECIFY {0:10.5g} {1:10d}\n'.format(self.phiramp,
-                                                                 self.iunitramp))
+            if self.specify and self.parent.version == "mfnwt":
+                f_wel.write(
+                    f"SPECIFY {self.phiramp:10.5g} {self.iunitramp:10d}\n"
+                )
 
         self.stress_period_data.write_transient(f_wel)
         f_wel.close()
@@ -312,15 +324,21 @@ class ModflowWel(Package):
         try:
             self.stress_period_data.add_record(kper, index, values)
         except Exception as e:
-            raise Exception("mfwel error adding record to list: " + str(e))
+            raise Exception(f"mfwel error adding record to list: {e!s}")
 
     @staticmethod
     def get_default_dtype(structured=True):
         if structured:
-            dtype = np.dtype([("k", np.int_), ("i", np.int_),
-                              ("j", np.int_), ("flux", np.float64)])
+            dtype = np.dtype(
+                [
+                    ("k", int),
+                    ("i", int),
+                    ("j", int),
+                    ("flux", np.float32),
+                ]
+            )
         else:
-            dtype = np.dtype([("node", np.int_), ("flux", np.float64)])
+            dtype = np.dtype([("node", int), ("flux", np.float32)])
         return dtype
 
     @staticmethod
@@ -328,15 +346,15 @@ class ModflowWel(Package):
         # get an empty recarray that corresponds to dtype
         dtype = ModflowWel.get_default_dtype(structured=structured)
         if aux_names is not None:
-            dtype = Package.add_to_dtype(dtype, aux_names, np.float64)
-        return create_empty_recarray(ncells, dtype, default_value=-1.0E+10)
+            dtype = Package.add_to_dtype(dtype, aux_names, np.float32)
+        return create_empty_recarray(ncells, dtype, default_value=-1.0e10)
 
     @staticmethod
-    def get_sfac_columns():
-        return ['flux']
+    def _get_sfac_columns():
+        return ["flux"]
 
-    @staticmethod
-    def load(f, model, nper=None, ext_unit_dict=None, check=True):
+    @classmethod
+    def load(cls, f, model, nper=None, ext_unit_dict=None, check=True):
         """
         Load an existing package.
 
@@ -372,15 +390,21 @@ class ModflowWel(Package):
         """
 
         if model.verbose:
-            sys.stdout.write('loading wel package file...\n')
+            print("loading wel package file...")
 
-        return Package.load(f, model, ModflowWel, nper=nper, check=check,
-                            ext_unit_dict=ext_unit_dict)
+        return Package.load(
+            f,
+            model,
+            cls,
+            nper=nper,
+            check=check,
+            ext_unit_dict=ext_unit_dict,
+        )
 
     @staticmethod
-    def ftype():
-        return 'WEL'
+    def _ftype():
+        return "WEL"
 
     @staticmethod
-    def defaultunit():
+    def _defaultunit():
         return 20

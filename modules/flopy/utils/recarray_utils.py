@@ -23,12 +23,12 @@ def create_empty_recarray(length, dtype, default_value=0):
     --------
     >>> import numpy as np
     >>> import flopy
-    >>> dtype = np.dtype([('x', np.float64), ('y', np.float64)])
+    >>> dtype = np.dtype([('x', np.float32), ('y', np.float32)])
     >>> ra = flopy.utils.create_empty_recarray(10, dtype)
 
     """
     r = np.zeros(length, dtype=dtype)
-    msg = 'dtype argument must be an instance of np.dtype, not list.'
+    msg = "dtype argument must be an instance of np.dtype, not list."
     assert isinstance(dtype, np.dtype), msg
     for name in dtype.names:
         dt = dtype.fields[name][0]
@@ -62,8 +62,7 @@ def ra_slice(ra, cols):
     """
     raslice = np.column_stack([ra[c] for c in cols])
     dtype = [(str(d[0]), str(d[1])) for d in ra.dtype.descr if d[0] in cols]
-    return np.array([tuple(r) for r in raslice],
-                    dtype=dtype).view(np.recarray)
+    return np.array([tuple(r) for r in raslice], dtype=dtype).view(np.recarray)
 
 
 def recarray(array, dtype):
@@ -87,7 +86,7 @@ def recarray(array, dtype):
     --------
     >>> import numpy as np
     >>> import flopy
-    >>> dtype = np.dtype([('x', np.float64), ('y', np.float64)])
+    >>> dtype = np.dtype([('x', np.float32), ('y', np.float32)])
     >>> arr = [(1., 2.), (10., 20.), (100., 200.)]
     >>> ra = flopy.utils.recarray(arr, dtype)
 

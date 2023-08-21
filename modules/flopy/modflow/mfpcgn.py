@@ -4,11 +4,9 @@ the ModflowStr class as `flopy.modflow.ModflowPcgn`.
 
 Additional information for this MODFLOW package can be found at the `Online
 MODFLOW Guide
-<http://water.usgs.gov/ogw/modflow/MODFLOW-2005-Guide/pcgn.htm>`_.
+<https://water.usgs.gov/ogw/modflow/MODFLOW-2005-Guide/pcgn.html>`_.
 
 """
-
-import sys
 from ..pakbase import Package
 
 
@@ -175,79 +173,93 @@ class ModflowPcgn(Package):
 
     """
 
-    def __init__(self, model, iter_mo=50, iter_mi=30, close_r=1e-5,
-                 close_h=1e-5, relax=1.0, ifill=0, unit_pc=None, unit_ts=None,
-                 adamp=0, damp=1.0, damp_lb=0.001, rate_d=0.1, chglimit=0.,
-                 acnvg=0, cnvg_lb=0.001, mcnvg=2, rate_c=-1.0, ipunit=None,
-                 extension='pcgn', unitnumber=None, filenames=None):
-        """
-        Package constructor.
-
-        """
+    def __init__(
+        self,
+        model,
+        iter_mo=50,
+        iter_mi=30,
+        close_r=1e-5,
+        close_h=1e-5,
+        relax=1.0,
+        ifill=0,
+        unit_pc=None,
+        unit_ts=None,
+        adamp=0,
+        damp=1.0,
+        damp_lb=0.001,
+        rate_d=0.1,
+        chglimit=0.0,
+        acnvg=0,
+        cnvg_lb=0.001,
+        mcnvg=2,
+        rate_c=-1.0,
+        ipunit=None,
+        extension="pcgn",
+        unitnumber=None,
+        filenames=None,
+    ):
         # set default unit number of one is not specified
         if unitnumber is None:
-            unitnumber = ModflowPcgn.defaultunit()
+            unitnumber = ModflowPcgn._defaultunit()
 
         # set filenames
-        if filenames is None:
-            filenames = [None, None, None, None]
-        elif isinstance(filenames, str):
-            filenames = [filenames, None, None, None]
-        elif isinstance(filenames, list):
-            if len(filenames) < 4:
-                for idx in range(len(filenames), 4):
-                    filenames.append(None)
+        filenames = self._prepare_filenames(filenames, 4)
 
         # update external file information with unit_pc output, if necessary
         if unit_pc is not None:
-            fname = filenames[1]
-            model.add_output_file(unit_pc, fname=fname, extension='pcgni',
-                                  binflag=False,
-                                  package=ModflowPcgn.ftype())
+            model.add_output_file(
+                unit_pc,
+                fname=filenames[1],
+                extension="pcgni",
+                binflag=False,
+                package=self._ftype(),
+            )
         else:
             unit_pc = 0
 
         # update external file information with unit_ts output, if necessary
         if unit_ts is not None:
-            fname = filenames[2]
-            model.add_output_file(unit_ts, fname=fname, extension='pcgnt',
-                                  binflag=False,
-                                  package=ModflowPcgn.ftype())
+            model.add_output_file(
+                unit_ts,
+                fname=filenames[2],
+                extension="pcgnt",
+                binflag=False,
+                package=self._ftype(),
+            )
         else:
             unit_ts = 0
 
         # update external file information with ipunit output, if necessary
         if ipunit is not None:
             if ipunit > 0:
-                fname = filenames[3]
-                model.add_output_file(ipunit, fname=fname, extension='pcgno',
-                                      binflag=False,
-                                      package=ModflowPcgn.ftype())
+                model.add_output_file(
+                    ipunit,
+                    fname=filenames[3],
+                    extension="pcgno",
+                    binflag=False,
+                    package=self._ftype(),
+                )
         else:
             ipunit = -1
 
-        name = [ModflowPcgn.ftype()]
-        units = [unitnumber]
-        extra = ['']
-
-        # set package name
-        fname = [filenames[0]]
-
-        # Call ancestor's init to set self.parent, extension, name and
-        # unit number
-        Package.__init__(self, model, extension=extension, name=name,
-                         unit_number=units, extra=extra, filenames=fname)
+        # call base package constructor
+        super().__init__(
+            model,
+            extension=extension,
+            name=self._ftype(),
+            unit_number=unitnumber,
+            filenames=filenames[0],
+        )
 
         # check if a valid model version has been specified
-        if model.version == 'mfusg':
-            err = 'Error: cannot use {} package '.format(self.name) + \
-                  'with model version {}'.format(model.version)
-            raise Exception(err)
+        if model.version == "mfusg":
+            raise Exception(
+                f"Error: cannot use {self.name} package "
+                f"with model version {model.version}"
+            )
 
-        self.heading = '# {} package for '.format(self.name[0]) + \
-                       ' {}, '.format(model.version_types[model.version]) + \
-                       'generated by Flopy.'
-        self.url = 'pcgn.htm'
+        self._generate_heading()
+        self.url = "pcgn.html"
         self.iter_mo = iter_mo
         self.iter_mi = iter_mi
         self.close_h = close_h
@@ -268,9 +280,10 @@ class ModflowPcgn(Package):
         self.ipunit = ipunit
         # error trapping
         if self.ifill < 0 or self.ifill > 1:
-            e = 'PCGN: ifill must be 0 or 1 - an ifill value of ' + \
-                '{} was specified'.format(self.ifill)
-            raise TypeError(e)
+            raise TypeError(
+                "PCGN: ifill must be 0 or 1 - an ifill value of "
+                "{} was specified".format(self.ifill)
+            )
         # add package
         self.parent.add_package(self)
 
@@ -284,69 +297,73 @@ class ModflowPcgn(Package):
 
         """
         # Open file for writing
-        f = open(self.fn_path, 'w')
-        f.write('{0:s}\n'.format(self.heading))
+        f = open(self.fn_path, "w")
+        f.write(f"{self.heading}\n")
 
         ifrfm = self.parent.get_ifrefm()
         if ifrfm:
             # dataset 1
-            line = '{} '.format(self.iter_mo)
-            line += '{} '.format(self.iter_mi)
-            line += '{} '.format(self.close_r)
-            line += '{}\n'.format(self.close_h)
+            line = f"{self.iter_mo} "
+            line += f"{self.iter_mi} "
+            line += f"{self.close_r} "
+            line += f"{self.close_h}\n"
             f.write(line)
 
             # dataset 2
-            line = '{} '.format(self.relax)
-            line += '{} '.format(self.ifill)
-            line += '{} '.format(self.unit_pc)
-            line += '{}\n'.format(self.unit_ts)
+            line = f"{self.relax} "
+            line += f"{self.ifill} "
+            line += f"{self.unit_pc} "
+            line += f"{self.unit_ts}\n"
             f.write(line)
 
             # dataset 3
-            line = '{} '.format(self.adamp)
-            line += '{} '.format(self.damp)
-            line += '{} '.format(self.damp_lb)
-            line += '{} '.format(self.rate_d)
-            line += '{}\n'.format(self.chglimit)
+            line = f"{self.adamp} "
+            line += f"{self.damp} "
+            line += f"{self.damp_lb} "
+            line += f"{self.rate_d} "
+            line += f"{self.chglimit}\n"
             f.write(line)
 
             # dataset 4
-            line = '{} '.format(self.acnvg)
-            line += '{} '.format(self.cnvg_lb)
-            line += '{} '.format(self.mcnvg)
-            line += '{} '.format(self.rate_c)
-            line += '{}\n'.format(self.ipunit)
+            line = f"{self.acnvg} "
+            line += f"{self.cnvg_lb} "
+            line += f"{self.mcnvg} "
+            line += f"{self.rate_c} "
+            line += f"{self.ipunit}\n"
             f.write(line)
 
         else:
             # dataset 1
-            sfmt = ' {0:9d} {1:9d} {2:9.3g} {3:9.3g}\n'
-            line = sfmt.format(self.iter_mo, self.iter_mi, self.close_r,
-                               self.close_h)
+            sfmt = " {0:9d} {1:9d} {2:9.3g} {3:9.3g}\n"
+            line = sfmt.format(
+                self.iter_mo, self.iter_mi, self.close_r, self.close_h
+            )
             f.write(line)
 
             # dataset 2
-            sfmt = ' {0:9.3g} {1:9d} {2:9d} {3:9d}\n'
-            line = sfmt.format(self.relax, self.ifill, self.unit_pc,
-                               self.unit_ts)
+            sfmt = " {0:9.3g} {1:9d} {2:9d} {3:9d}\n"
+            line = sfmt.format(
+                self.relax, self.ifill, self.unit_pc, self.unit_ts
+            )
             f.write(line)
 
             # dataset 3
-            sfmt = ' {0:9d} {1:9.3g} {2:9.3g} {3:9.3g} {4:9.3g}\n'
-            line = sfmt.format(self.adamp, self.damp, self.damp_lb,
-                               self.rate_d, self.chglimit)
+            sfmt = " {0:9d} {1:9.3g} {2:9.3g} {3:9.3g} {4:9.3g}\n"
+            line = sfmt.format(
+                self.adamp, self.damp, self.damp_lb, self.rate_d, self.chglimit
+            )
             f.write(line)
 
             # dataset 4
-            sfmt = ' {0:9d} {1:9.3g} {2:9d} {3:9.3g} {4:9d}\n'
-            line = sfmt.format(self.acnvg, self.cnvg_lb, self.mcnvg,
-                               self.rate_c, self.ipunit)
+            sfmt = " {0:9d} {1:9.3g} {2:9d} {3:9.3g} {4:9d}\n"
+            line = sfmt.format(
+                self.acnvg, self.cnvg_lb, self.mcnvg, self.rate_c, self.ipunit
+            )
             f.write(line)
         f.close()
 
-    @staticmethod
-    def load(f, model, ext_unit_dict=None):
+    @classmethod
+    def load(cls, f, model, ext_unit_dict=None):
         """
         Load an existing package.
 
@@ -378,18 +395,18 @@ class ModflowPcgn(Package):
         """
 
         if model.verbose:
-            sys.stdout.write('loading pcgn package file...\n')
+            print("loading pcgn package file...")
 
-        openfile = not hasattr(f, 'read')
+        openfile = not hasattr(f, "read")
         if openfile:
             filename = f
-            f = open(filename, 'r')
+            f = open(filename, "r")
 
         ifrefm = model.get_ifrefm()
         # dataset 0 -- header
         while True:
             line = f.readline()
-            if line[0] != '#':
+            if line[0] != "#":
                 break
         if ifrefm:
             # dataset 1
@@ -402,7 +419,7 @@ class ModflowPcgn(Package):
             # dataset 2
             while True:
                 line = f.readline()
-                if line[0] != '#':
+                if line[0] != "#":
                     break
             t = line.strip().split()
             relax = float(t[0])
@@ -415,7 +432,7 @@ class ModflowPcgn(Package):
                 # dataset 3
                 while True:
                     line = f.readline()
-                    if line[0] != '#':
+                    if line[0] != "#":
                         break
                 t = line.strip().split()
                 adamp = int(t[0])
@@ -427,7 +444,7 @@ class ModflowPcgn(Package):
                 # dataset 4
                 while True:
                     line = f.readline()
-                    if line[0] != '#':
+                    if line[0] != "#":
                         break
                 t = line.strip().split()
                 acnvg = int(t[0])
@@ -444,7 +461,7 @@ class ModflowPcgn(Package):
             # dataset 2
             while True:
                 line = f.readline()
-                if line[0] != '#':
+                if line[0] != "#":
                     break
             relax = float(line[0:10].strip())
             ifill = int(line[10:20].strip())
@@ -456,7 +473,7 @@ class ModflowPcgn(Package):
                 # dataset 3
                 while True:
                     line = f.readline()
-                    if line[0] != '#':
+                    if line[0] != "#":
                         break
                 adamp = int(line[0:10].strip())
                 damp = float(line[10:20].strip())
@@ -467,7 +484,7 @@ class ModflowPcgn(Package):
                 # dataset 4
                 while True:
                     line = f.readline()
-                    if line[0] != '#':
+                    if line[0] != "#":
                         break
                 acnvg = int(line[0:10].strip())
                 cnvg_lb = float(line[10:20].strip())
@@ -494,33 +511,50 @@ class ModflowPcgn(Package):
         unitnumber = None
         filenames = [None, None, None, None]
         if ext_unit_dict is not None:
-            unitnumber, filenames[0] = \
-                model.get_ext_dict_attr(ext_unit_dict,
-                                        filetype=ModflowPcgn.ftype())
+            unitnumber, filenames[0] = model.get_ext_dict_attr(
+                ext_unit_dict, filetype=ModflowPcgn._ftype()
+            )
             if unit_pc > 0:
-                iu, filenames[1] = \
-                    model.get_ext_dict_attr(ext_unit_dict, unit=unit_pc)
+                iu, filenames[1] = model.get_ext_dict_attr(
+                    ext_unit_dict, unit=unit_pc
+                )
             if unit_ts > 0:
-                iu, filenames[2] = \
-                    model.get_ext_dict_attr(ext_unit_dict, unit=unit_ts)
+                iu, filenames[2] = model.get_ext_dict_attr(
+                    ext_unit_dict, unit=unit_ts
+                )
             if ipunit > 0:
-                iu, filenames[3] = \
-                    model.get_ext_dict_attr(ext_unit_dict, unit=ipunit)
+                iu, filenames[3] = model.get_ext_dict_attr(
+                    ext_unit_dict, unit=ipunit
+                )
 
-        pcgn = ModflowPcgn(model, iter_mo=iter_mo, iter_mi=iter_mi,
-                           close_r=close_r, close_h=close_h, relax=relax,
-                           ifill=ifill, unit_pc=unit_pc, unit_ts=unit_ts,
-                           adamp=adamp, damp=damp, damp_lb=damp_lb,
-                           rate_d=rate_d, chglimit=chglimit, acnvg=acnvg,
-                           cnvg_lb=cnvg_lb, mcnvg=mcnvg, rate_c=rate_c,
-                           ipunit=ipunit, unitnumber=unitnumber,
-                           filenames=filenames)
-        return pcgn
+        return cls(
+            model,
+            iter_mo=iter_mo,
+            iter_mi=iter_mi,
+            close_r=close_r,
+            close_h=close_h,
+            relax=relax,
+            ifill=ifill,
+            unit_pc=unit_pc,
+            unit_ts=unit_ts,
+            adamp=adamp,
+            damp=damp,
+            damp_lb=damp_lb,
+            rate_d=rate_d,
+            chglimit=chglimit,
+            acnvg=acnvg,
+            cnvg_lb=cnvg_lb,
+            mcnvg=mcnvg,
+            rate_c=rate_c,
+            ipunit=ipunit,
+            unitnumber=unitnumber,
+            filenames=filenames,
+        )
 
     @staticmethod
-    def ftype():
-        return 'PCGN'
+    def _ftype():
+        return "PCGN"
 
     @staticmethod
-    def defaultunit():
+    def _defaultunit():
         return 27
