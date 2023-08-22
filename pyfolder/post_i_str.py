@@ -115,7 +115,7 @@ def sd_plot_daily(self):
                 df.index = pd.date_range(startDate, periods=len(df.streamflow_sim), freq="M")
             else:
                 df.index = pd.date_range(startDate, periods=len(df.streamflow_sim), freq="A")
-            ax.plot(df.index, df.streamflow_sim, c='limegreen', lw=1, label="Simulated")
+            ax.plot(df.index.values, df.streamflow_sim.values, c='limegreen', lw=1, label="Simulated")
             df2 = pd.concat([df, strObd[sub_ob]], axis=1)
             df3 = df2.dropna()
             if self.dlg.radioButton_str_obd_pt.isChecked():
@@ -193,26 +193,28 @@ def sd_plot_daily(self):
                                 usecols=[1, 3, colNum],
                                 names=["date", "filter", "streamflow_sim"],
                                 index_col=0)
-        try:
-            df = output_rch.loc[outletSubNum]
-            if self.dlg.radioButton_day.isChecked():
-                df.index = pd.date_range(startDate, periods=len(df.streamflow_sim))
-            elif self.dlg.radioButton_month.isChecked():
-                df = df[df['filter'] < 13]
-                df.index = pd.date_range(startDate, periods=len(df.streamflow_sim), freq="M")
-            else:
-                df.index = pd.date_range(startDate, periods=len(df.streamflow_sim), freq = "A")     
-            ax.plot(df.index, df.streamflow_sim, c = 'g', lw = 1, label = "Simulated")
-            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d\n%Y'))
+        # try: NOTE: let them break  
+        df = output_rch.loc[outletSubNum]
+        if self.dlg.radioButton_day.isChecked():
+            df.index = pd.date_range(startDate, periods=len(df.streamflow_sim))
+        elif self.dlg.radioButton_month.isChecked():
+            df = df[df['filter'] < 13]
+            df.index = pd.date_range(startDate, periods=len(df.streamflow_sim), freq="M")
+        else:
+            df.index = pd.date_range(startDate, periods=len(df.streamflow_sim), freq = "A")     
+        # ValueError: Multi-dimensional indexing (e.g. `obj[:, None]`) is no longer supported. 
+        # Convert to a numpy array before indexing instead
+        # https://stackoverflow.com/questions/75939123/valueerror-multi-dimensional-indexing-e-g-obj-none-is-no-longer-suppor
+        ax.plot(df.index.values, df.streamflow_sim.values, c = 'g', lw = 1, label = "Simulated")
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d\n%Y'))
 
-        except:
-            ax.text(.5,.5, u"Running the simulation for a warm-up period!",
-                    fontsize = 12,
-                    horizontalalignment='center',
-                    weight = 'extra bold',
-                    color = 'y',
-                    transform=ax.transAxes,)
-
+        # except:
+        #     ax.text(.5,.5, u"Running the simulation for a warm-up period!",
+        #             fontsize = 12,
+        #             horizontalalignment='center',
+        #             weight = 'extra bold',
+        #             color = 'y',
+        #             transform=ax.transAxes,)
     # Set title
     if self.dlg.radioButton_day.isChecked() and (self.dlg.comboBox_SD_timeStep.currentText() == "Daily"):   
         ax.set_title('Daily Stream Discharge @ ' + str(outletSubNum)  , fontsize = 10)
