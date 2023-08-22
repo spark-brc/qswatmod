@@ -1,7 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-.git
 # Sphinx documentation
 docs/_build/
 docs/_static/
