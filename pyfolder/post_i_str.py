@@ -33,41 +33,73 @@ def read_sub_no(self):
             self.dlg.comboBox_sub_number.addItems(sorted_subno) # in addItem list should contain string numbers
 
 
-def read_strObd(self):
+def read_stf_obd(self):
     QSWATMOD_path_dict = self.dirs_and_paths()
     if self.dlg.checkBox_stream_obd.isChecked():
         self.dlg.frame_sd_obd.setEnabled(True)
         self.dlg.radioButton_str_obd_line.setEnabled(True)
         self.dlg.radioButton_str_obd_pt.setEnabled(True)
         self.dlg.spinBox_str_obd_size.setEnabled(True)
-        try:
-            wd = QSWATMOD_path_dict['SMfolder']
-            strObd = pd.read_csv(
-                            wd + "\\streamflow.obd",
-                            delim_whitespace=True,
-                            index_col=0,
-                            parse_dates=True)
+        get_stf_obds(self)
 
-            strObd_list = list(strObd)
-            self.dlg.comboBox_SD_obs_data.clear()
-            self.dlg.comboBox_SD_obs_data.addItems(strObd_list)
-        except:
-            msgBox = QMessageBox()
-            msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-            msgBox.setWindowTitle("No 'streamflow.obd' file found!")
-            msgBox.setText("Please, provide 'streamflow.obd' file!")
-            msgBox.exec_()
-            self.dlg.checkBox_stream_obd.setChecked(0)  
-            self.dlg.frame_sd_obd.setEnabled(False)
-            self.dlg.radioButton_str_obd_line.setEnabled(False)
-            self.dlg.radioButton_str_obd_pt.setEnabled(False)
-            self.dlg.spinBox_str_obd_size.setEnabled(False)
+
+# def get_cols(self):
+
+
+
+        # try:
+        #     wd = QSWATMOD_path_dict['SMfolder']
+        #     strObd = pd.read_csv(
+        #                     wd + "\\streamflow.obd",
+        #                     delim_whitespace=True,
+        #                     index_col=0,
+        #                     parse_dates=True)
+
+        #     strObd_list = list(strObd)
+        #     self.dlg.comboBox_SD_obs_data.clear()
+        #     self.dlg.comboBox_SD_obs_data.addItems(strObd_list)
+        # except:
+        #     msgBox = QMessageBox()
+        #     msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
+        #     msgBox.setWindowTitle("No 'streamflow.obd' file found!")
+        #     msgBox.setText("Please, provide 'streamflow.obd' file!")
+        #     msgBox.exec_()
+        #     self.dlg.checkBox_stream_obd.setChecked(0)  
+        #     self.dlg.frame_sd_obd.setEnabled(False)
+        #     self.dlg.radioButton_str_obd_line.setEnabled(False)
+        #     self.dlg.radioButton_str_obd_pt.setEnabled(False)
+        #     self.dlg.spinBox_str_obd_size.setEnabled(False)
     else:
         self.dlg.comboBox_SD_obs_data.clear()
         self.dlg.frame_sd_obd.setEnabled(False)
         self.dlg.radioButton_str_obd_line.setEnabled(False)
         self.dlg.radioButton_str_obd_pt.setEnabled(False)
         self.dlg.spinBox_str_obd_size.setEnabled(False)
+
+
+
+def get_stf_obds(self):
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    stf_obd_files = [
+        os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/stf*.obd.csv')
+        ]
+    self.dlg.comboBox_stf_obd.clear()
+    self.dlg.comboBox_stf_obd.addItems(stf_obd_files)
+
+def get_stf_cols(self):
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    wd = QSWATMOD_path_dict['SMfolder']
+    stf_obd_nam = self.dlg.comboBox_stf_obd.currentText()
+
+    stf_obd = pd.read_csv(
+                    os.path.join(wd, stf_obd_nam),
+                    index_col=0,
+                    parse_dates=True)
+
+    stf_obd_list = stf_obd.columns.tolist()
+    self.dlg.comboBox_SD_obs_data.clear()
+    self.dlg.comboBox_SD_obs_data.addItems(stf_obd_list)
+
 
 def sd_plot_daily(self):
     if self.dlg.checkBox_darktheme.isChecked():
@@ -82,6 +114,7 @@ def sd_plot_daily(self):
     colNum = 6 # get flow_out
     outletSubNum = int(self.dlg.comboBox_sub_number.currentText())
 
+    stf_obd_nam = self.dlg.comboBox_stf_obd.currentText()
 
     fig, ax = plt.subplots(figsize = (9, 4))
     ax.set_ylabel(r'Stream Discharge $[m^3/s]$', fontsize = 8)
@@ -89,13 +122,12 @@ def sd_plot_daily(self):
 
     if self.dlg.checkBox_stream_obd.isChecked():
         strObd = pd.read_csv(
-                                os.path.join(wd, "streamflow.obd"),
-                                # delim_whitespace=True,
-                                sep=r'\s+',
+                                os.path.join(wd, stf_obd_nam),
                                 index_col=0,
                                 header=0,
                                 parse_dates=True,
-                                delimiter="\t")
+                                na_values=[-999, ""]
+                                )
         output_rch = pd.read_csv(
                             os.path.join(wd, "output.rch"),
                             delim_whitespace=True,
@@ -104,7 +136,6 @@ def sd_plot_daily(self):
                             names=["date", "filter", "streamflow_sim"],
                             index_col=0)
         sub_ob = self.dlg.comboBox_SD_obs_data.currentText()
-        # sub_ob = 'sub_58'
         try:
             df = output_rch.loc[outletSubNum]
             # Based on SWAT Time Step condition
@@ -145,7 +176,7 @@ def sd_plot_daily(self):
                 ## PBIAS
                 PBIAS =  100*(sum(df3[sub_ob] - df3.streamflow_sim) / sum(df3[sub_ob]))
                 ax.text(
-                    .01, 0.95, u'Nash–Sutcliffe: '+ "%.4f" % dNS,
+                    .01, 0.95, u'Nash-Sutcliffe: '+ "%.4f" % dNS,
                     fontsize = 8,
                     horizontalalignment='left',
                     color='limegreen',
@@ -163,7 +194,7 @@ def sd_plot_daily(self):
                     color='limegreen',
                     transform=ax.transAxes)
             else:
-                ax.text(.01,.95, u'Nash–Sutcliffe: '+ u"---",
+                ax.text(.01,.95, u'Nash-Sutcliffe: '+ u"---",
                     fontsize = 8,
                     horizontalalignment='left',
                     transform=ax.transAxes)
@@ -240,7 +271,7 @@ def sd_plot_monthly(self):
     endDate = eddate_warmup.strftime("%m/%d/%Y")
     colNum = 6 # get flow_out
     outletSubNum = int(self.dlg.comboBox_sub_number.currentText())
-
+    stf_obd_nam = self.dlg.comboBox_stf_obd.currentText()
 
     fig, ax = plt.subplots(figsize = (9,4))
     ax.set_ylabel(r'Stream Discharge $[m^3/s]$', fontsize = 8)
@@ -248,12 +279,11 @@ def sd_plot_monthly(self):
 
     if self.dlg.checkBox_stream_obd.isChecked():
         strObd = pd.read_csv(
-                                os.path.join(wd, "streamflow.obd"),
-                                sep = '\s+',
+                                os.path.join(wd, stf_obd_nam),
                                 index_col = 0,
                                 header = 0,
                                 parse_dates=True,
-                                delimiter = "\t")
+                                na_values=[-999, ""])
 
         output_rch = pd.read_csv(
                             os.path.join(wd, "output.rch"),

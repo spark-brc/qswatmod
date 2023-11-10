@@ -45,7 +45,7 @@
       <bool>true</bool>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>3</number>
      </property>
      <widget class="QWidget" name="General">
       <attribute name="title">
@@ -3969,9 +3969,9 @@ SWAT-MODFLOW Simulation</string>
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-248</y>
+            <y>0</y>
             <width>617</width>
-            <height>898</height>
+            <height>892</height>
            </rect>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_43">
@@ -4076,7 +4076,7 @@ SWAT-MODFLOW Simulation</string>
                    </font>
                   </property>
                   <property name="text">
-                   <string>   Check if &quot;streamflow.obd&quot; file is prepared.</string>
+                   <string>   Check if &quot;measurement&quot; file is prepared.</string>
                   </property>
                   <property name="tristate">
                    <bool>false</bool>
@@ -4084,48 +4084,19 @@ SWAT-MODFLOW Simulation</string>
                  </widget>
                 </item>
                 <item>
-                 <widget class="QPushButton" name="pushButton_str_obd">
-                  <property name="font">
-                   <font>
-                    <weight>50</weight>
-                    <bold>false</bold>
-                   </font>
-                  </property>
-                  <property name="text">
-                   <string>...</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <spacer name="horizontalSpacer_7">
-                  <property name="orientation">
-                   <enum>Qt::Horizontal</enum>
-                  </property>
-                  <property name="sizeHint" stdset="0">
+                 <widget class="QComboBox" name="comboBox_stf_obd">
+                  <property name="minimumSize">
                    <size>
-                    <width>40</width>
-                    <height>20</height>
+                    <width>150</width>
+                    <height>0</height>
                    </size>
                   </property>
-                 </spacer>
+                 </widget>
                 </item>
                 <item>
                  <widget class="Line" name="line_17">
                   <property name="orientation">
                    <enum>Qt::Vertical</enum>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLabel" name="label_2">
-                  <property name="font">
-                   <font>
-                    <weight>50</weight>
-                    <bold>false</bold>
-                   </font>
-                  </property>
-                  <property name="text">
-                   <string>Plot Type:</string>
                   </property>
                  </widget>
                 </item>
@@ -4423,7 +4394,7 @@ SWAT-MODFLOW Simulation</string>
                    </font>
                   </property>
                   <property name="text">
-                   <string>   Check if &quot;modflow.obd&quot; file is prepared.</string>
+                   <string>   Check if &quot;measurement&quot; file is prepared.</string>
                   </property>
                   <property name="tristate">
                    <bool>false</bool>
@@ -4431,48 +4402,19 @@ SWAT-MODFLOW Simulation</string>
                  </widget>
                 </item>
                 <item>
-                 <widget class="QPushButton" name="pushButton_mf_obd">
-                  <property name="font">
-                   <font>
-                    <weight>50</weight>
-                    <bold>false</bold>
-                   </font>
-                  </property>
-                  <property name="text">
-                   <string>...</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <spacer name="horizontalSpacer_6">
-                  <property name="orientation">
-                   <enum>Qt::Horizontal</enum>
-                  </property>
-                  <property name="sizeHint" stdset="0">
+                 <widget class="QComboBox" name="comboBox_dtw_obd">
+                  <property name="minimumSize">
                    <size>
-                    <width>40</width>
-                    <height>20</height>
+                    <width>150</width>
+                    <height>0</height>
                    </size>
                   </property>
-                 </spacer>
+                 </widget>
                 </item>
                 <item>
                  <widget class="Line" name="line_18">
                   <property name="orientation">
                    <enum>Qt::Vertical</enum>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLabel" name="label_3">
-                  <property name="font">
-                   <font>
-                    <weight>50</weight>
-                    <bold>false</bold>
-                   </font>
-                  </property>
-                  <property name="text">
-                   <string>Plot Type: </string>
                   </property>
                  </widget>
                 </item>
@@ -7876,17 +7818,17 @@ SWAT-MODFLOW Simulation</string>
   </connection>
  </connections>
  <buttongroups>
-  <buttongroup name="buttonGroup_gw_delay"/>
-  <buttongroup name="buttonGroup_irrig_active"/>
-  <buttongroup name="buttonGroup_rt_perc_conc"/>
-  <buttongroup name="buttonGroup_drain_active"/>
-  <buttongroup name="buttonGroup_irrig_swat_active"/>
-  <buttongroup name="buttonGroup_RT3D_active"/>
-  <buttongroup name="buttonGroup_wt_obd"/>
-  <buttongroup name="buttonGroup_str_obd"/>
-  <buttongroup name="buttonGroup_mf_active"/>
-  <buttongroup name="buttonGroup_head_recharge"/>
-  <buttongroup name="buttonGroup_mf_swat"/>
   <buttongroup name="buttonGroup_rt3d_map"/>
+  <buttongroup name="buttonGroup_irrig_active"/>
+  <buttongroup name="buttonGroup_RT3D_active"/>
+  <buttongroup name="buttonGroup_gw_delay"/>
+  <buttongroup name="buttonGroup_drain_active"/>
+  <buttongroup name="buttonGroup_str_obd"/>
+  <buttongroup name="buttonGroup_rt_perc_conc"/>
+  <buttongroup name="buttonGroup_irrig_swat_active"/>
+  <buttongroup name="buttonGroup_head_recharge"/>
+  <buttongroup name="buttonGroup_wt_obd"/>
+  <buttongroup name="buttonGroup_mf_active"/>
+  <buttongroup name="buttonGroup_mf_swat"/>
  </buttongroups>
 </ui>
