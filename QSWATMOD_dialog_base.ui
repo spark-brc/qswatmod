@@ -6060,7 +6060,7 @@ SWAT-MODFLOW Simulation</string>
                       </font>
                      </property>
                      <property name="title">
-                      <string>Not activatable in this version 2.6</string>
+                      <string>Not activatable in this version 2.7</string>
                      </property>
                      <property name="checkable">
                       <bool>false</bool>

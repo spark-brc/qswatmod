@@ -719,7 +719,7 @@ def export_sd_daily(self):
 
     # Add info
     from datetime import datetime
-    version = "version 2.6."
+    version = "version 2.7."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     if self.dlg.checkBox_stream_obd.isChecked():
@@ -885,7 +885,7 @@ def export_sd_monthly(self):
     stf_obd_nam = self.dlg.comboBox_stf_obd.currentText()
     # Add info
     from datetime import datetime
-    version = "version 2.6."
+    version = "version 2.7."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     if self.dlg.checkBox_stream_obd.isChecked():
@@ -1010,7 +1010,7 @@ def export_sd_mTa(self):
     stf_obd_nam = self.dlg.comboBox_stf_obd.currentText()
     # Add info
     from datetime import datetime
-    version = "version 2.6."
+    version = "version 2.7."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     if self.dlg.checkBox_stream_obd.isChecked():
@@ -1133,7 +1133,7 @@ def export_sd_annual(self):
     stf_obd_nam = self.dlg.comboBox_stf_obd.currentText()
     # Add info
     from datetime import datetime
-    version = "version 2.6."
+    version = "version 2.7."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     if self.dlg.checkBox_stream_obd.isChecked():
