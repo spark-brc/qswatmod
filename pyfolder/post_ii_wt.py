@@ -11,6 +11,7 @@ import os
 from matplotlib import style
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMessageBox
+import glob
 
 # try:
 #     import deps.pandas as pd
@@ -50,22 +51,12 @@ def read_wtObd(self):
         self.dlg.radioButton_wt_obd_line.setEnabled(True)
         self.dlg.radioButton_wt_obd_pt.setEnabled(True)
         self.dlg.spinBox_wt_obd_size.setEnabled(True)
-        try:
-            wd = QSWATMOD_path_dict['SMfolder']
-            wtObd = pd.read_csv(
-                                os.path.join(wd, "modflow.obd"),
-                                delim_whitespace=True,
-                                index_col=0,
-                                parse_dates=True)
-
-            wtObd_list = list(wtObd)
-            self.dlg.comboBox_wt_obs_data.clear()
-            self.dlg.comboBox_wt_obs_data.addItems(wtObd_list)
-        except:
+        get_gwls_obds(self)
+        if self.dlg.comboBox_dtw_obd.count()==0:
             msgBox = QMessageBox()
             msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
             msgBox.setWindowTitle("No 'modflow.obd' file found!")
-            msgBox.setText("Please, provide 'modflow.obd' file!")
+            msgBox.setText("Please, groundwater measurement files!")
             msgBox.exec_()
             self.dlg.checkBox_wt_obd.setChecked(0)  
             self.dlg.frame_wt_obd.setEnabled(False)
@@ -79,6 +70,32 @@ def read_wtObd(self):
         self.dlg.radioButton_wt_obd_pt.setEnabled(False)
         self.dlg.spinBox_wt_obd_size.setEnabled(False)
 
+
+def get_gwls_obds(self):
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    dtw_obd_files = [
+        os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/dtw*.obd.csv')
+        ]
+    gwl_obd_files = [
+        os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/gwl*.obd.csv')
+        ]
+    tot_gd_files= dtw_obd_files + gwl_obd_files
+    self.dlg.comboBox_dtw_obd.clear()
+    self.dlg.comboBox_dtw_obd.addItems(tot_gd_files)
+
+
+def get_gwl_cols(self):
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    wd = QSWATMOD_path_dict['SMfolder']
+    gd_obd_nam = self.dlg.comboBox_dtw_obd.currentText()
+    gd_obd = pd.read_csv(
+                    os.path.join(wd, gd_obd_nam),
+                    index_col=0,
+                    parse_dates=True,
+                    na_values=[-999, ""])
+    gd_obd_list = gd_obd.columns.tolist()
+    self.dlg.comboBox_wt_obs_data.clear()
+    self.dlg.comboBox_wt_obs_data.addItems(gd_obd_list)
 
 def wt_plot_daily(self):
     if self.dlg.checkBox_darktheme.isChecked():
@@ -102,17 +119,16 @@ def wt_plot_daily(self):
     # Convert dataframe into a list with string items inside list
     grid_id_lst = mf_obs.index.astype(str).values.tolist()
     grid_id = self.dlg.comboBox_grid_id.currentText()
+    gd_obd_nam = self.dlg.comboBox_dtw_obd.currentText()
 
     fig, ax = plt.subplots(figsize = (9,4))
     ax.tick_params(axis='both', labelsize=8)
     if self.dlg.checkBox_wt_obd.isChecked():
-        wtObd = pd.read_csv(
-                            os.path.join(wd, "modflow.obd"),
-                            sep='\s+',
-                            index_col = 0,
-                            header = 0,
-                            parse_dates=True,
-                            delimiter = "\t")
+        gd_obd = pd.read_csv(
+                    os.path.join(wd, gd_obd_nam),
+                    index_col=0,
+                    parse_dates=True,
+                    na_values=[-999, ""])
         output_wt = pd.read_csv(
                             os.path.join(wd, "swatmf_out_MF_obs"),
                             delim_whitespace=True,
@@ -140,7 +156,7 @@ def wt_plot_daily(self):
 
         df.index = pd.date_range(startDate, periods=len(df))
         ax.plot(df.index, df, c='dodgerblue', lw=1, label="Simulated")
-        df2 = pd.concat([df, wtObd[wt_ob]], axis=1)
+        df2 = pd.concat([df, gd_obd[wt_ob]], axis=1)
         df3 = df2.dropna()
         if self.dlg.radioButton_wt_obd_pt.isChecked():
             size = float(self.dlg.spinBox_wt_obd_size.value())
@@ -223,7 +239,6 @@ def wt_plot_daily(self):
                             delim_whitespace=True,
                             skiprows = 1,
                             names = grid_id_lst,)
-
         try:
             if self.dlg.checkBox_depthTowater.isChecked():
                 # Calculate depth to water (Simulated watertable - landsurface)
@@ -277,17 +292,16 @@ def wt_plot_monthly(self):
     # Convert dataframe into a list with string items inside list
     grid_id_lst = mf_obs.index.astype(str).values.tolist()
     grid_id = self.dlg.comboBox_grid_id.currentText()
-
+    gd_obd_nam = self.dlg.comboBox_dtw_obd.currentText()
     fig, ax = plt.subplots(figsize = (9,4))
     ax.tick_params(axis='both', labelsize=8)
 
     if self.dlg.checkBox_wt_obd.isChecked():
-        wtObd = pd.read_csv(os.path.join(wd, "modflow.obd"),
-                                sep = '\s+',
-                                index_col = 0,
-                                header = 0,
-                                parse_dates=True,
-                                delimiter = "\t")
+        gd_obd = pd.read_csv(
+                    os.path.join(wd, gd_obd_nam),
+                    index_col=0,
+                    parse_dates=True,
+                    na_values=[-999, ""])
 
         output_wt = pd.read_csv(os.path.join(wd, "swatmf_out_MF_obs"),
                            delim_whitespace=True,
@@ -304,7 +318,7 @@ def wt_plot_monthly(self):
                 df = output_wt[str(grid_id)] - float(mf_obs.loc[int(grid_id)])
                 df.index = pd.date_range(startDate, periods=len(df))
                 dfm = df.resample('M').mean()
-                wtObdm = wtObd.resample('M').mean()
+                wtObdm = gd_obd.resample('M').mean()
                 ax.set_ylabel(r'Depth to Water $[m]$', fontsize = 8)
                 ax.set_title(u'Monthly Depth to watertable' + u" @ Grid id: " + grid_id, fontsize = 10,
                             loc='left')
@@ -312,7 +326,7 @@ def wt_plot_monthly(self):
                 df = output_wt[str(grid_id)]
                 df.index = pd.date_range(startDate, periods=len(df))
                 dfm = df.resample('M').mean()
-                wtObdm = wtObd.resample('M').mean()
+                wtObdm = gd_obd.resample('M').mean()
                 ax.set_ylabel(r'Hydraulic Head $[m]$', fontsize = 8)
                 ax.set_title(u'Monthly Watertable Elevation' + u" @ Grid id: " + grid_id, fontsize = 10,
                             loc='left')
@@ -456,17 +470,16 @@ def wt_plot_annual(self):
     # Convert dataframe into a list with string items inside list
     grid_id_lst = mf_obs.index.astype(str).values.tolist()
     grid_id = self.dlg.comboBox_grid_id.currentText()
-
+    gd_obd_nam = self.dlg.comboBox_dtw_obd.currentText()
     fig, ax = plt.subplots(figsize = (9,4))
     ax.tick_params(axis='both', labelsize=8)
 
     if self.dlg.checkBox_wt_obd.isChecked():
-        wtObd = pd.read_csv(os.path.join(wd, "modflow.obd"),
-                                sep = '\s+',
-                                index_col = 0,
-                                header = 0,
-                                parse_dates=True,
-                                delimiter = "\t")
+        gd_obd = pd.read_csv(
+                    os.path.join(wd, gd_obd_nam),
+                    index_col=0,
+                    parse_dates=True,
+                    na_values=[-999, ""])
 
         output_wt = pd.read_csv(os.path.join(wd, "swatmf_out_MF_obs"),
                            delim_whitespace=True,
@@ -483,7 +496,7 @@ def wt_plot_annual(self):
                 df = output_wt[str(grid_id)] - float(mf_obs.loc[int(grid_id)])
                 df.index = pd.date_range(startDate, periods=len(df))
                 dfm = df.resample('A').mean()
-                wtObdm = wtObd.resample('A').mean()
+                wtObdm = gd_obd.resample('A').mean()
                 ax.set_ylabel(r'Depth to Water $[m]$', fontsize = 8)
                 ax.set_title(u'Annual Depth to watertable' + u" @ Grid id: " + grid_id, fontsize = 10,
                             loc='left')
@@ -491,7 +504,7 @@ def wt_plot_annual(self):
                 df = output_wt[str(grid_id)]
                 df.index = pd.date_range(startDate, periods=len(df))
                 dfm = df.resample('A').mean()
-                wtObdm = wtObd.resample('A').mean()
+                wtObdm = gd_obd.resample('A').mean()
                 ax.set_ylabel(r'Hydraulic Head $[m]$', fontsize = 8)
                 ax.set_title(u'Annual Watertable Elevation' + u" @ Grid id: " + grid_id, fontsize = 10,
                             loc='left')
@@ -629,7 +642,7 @@ def export_wt_daily(self):
 
     # Add info
     from datetime import datetime
-    version = "version 2.6."
+    version = "version 2.7."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     mf_obs = pd.read_csv(
@@ -642,16 +655,16 @@ def export_wt_daily(self):
 
     # Convert dataframe into a list with string items inside list
     grid_id_lst = mf_obs.index.astype(str).values.tolist()
+    gd_obd_nam = self.dlg.comboBox_dtw_obd.currentText()
     grid_id = self.dlg.comboBox_grid_id.currentText()
 
+
     if self.dlg.checkBox_wt_obd.isChecked():
-        wtObd = pd.read_csv(
-                                os.path.join(wd, "modflow.obd"),
-                                sep='\s+',
-                                index_col = 0,
-                                header = 0,
-                                parse_dates=True,
-                                delimiter = "\t")
+        gd_obd = pd.read_csv(
+                    os.path.join(wd, gd_obd_nam),
+                    index_col=0,
+                    parse_dates=True,
+                    na_values=[-999, ""])
 
         output_wt = pd.read_csv(
                                 os.path.join(wd, "swatmf_out_MF_obs"),
@@ -668,7 +681,7 @@ def export_wt_daily(self):
                 # Calculate depth to water (Simulated watertable - landsurface)
                 df = output_wt[str(grid_id)] - float(mf_obs.loc[int(grid_id)])
                 df.index = pd.date_range(startDate, periods=len(df))
-                df2 = pd.concat([df, wtObd[wt_ob]], axis = 1)
+                df2 = pd.concat([df, gd_obd[wt_ob]], axis = 1)
                 df3 = df2.dropna()
 
                 if (len(df3[wt_ob]) > 1):
@@ -716,7 +729,7 @@ def export_wt_daily(self):
             else:
                 df = output_wt[str(grid_id)]
                 df.index = pd.date_range(startDate, periods=len(df))
-                df2 = pd.concat([df, wtObd[wt_ob]], axis = 1)
+                df2 = pd.concat([df, gd_obd[wt_ob]], axis = 1)
                 df3 = df2.dropna()
 
                 if (len(df3[wt_ob]) > 1):
@@ -836,7 +849,7 @@ def export_wt_monthly(self):
 
     # Add info
     from datetime import datetime
-    version = "version 2.6."
+    version = "version 2.7."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     mf_obs = pd.read_csv(os.path.join(wd, "modflow.obs"),
@@ -849,15 +862,13 @@ def export_wt_monthly(self):
     # Convert dataframe into a list with string items inside list
     grid_id_lst = mf_obs.index.astype(str).values.tolist()
     grid_id = self.dlg.comboBox_grid_id.currentText()
-
+    gd_obd_nam = self.dlg.comboBox_dtw_obd.currentText()
     if self.dlg.checkBox_wt_obd.isChecked():
-        wtObd = pd.read_csv(os.path.join(wd, "modflow.obd"),
-                                sep = '\s+',
-                                index_col = 0,
-                                header = 0,
-                                parse_dates=True,
-                                delimiter = "\t")
-
+        gd_obd = pd.read_csv(
+                    os.path.join(wd, gd_obd_nam),
+                    index_col=0,
+                    parse_dates=True,
+                    na_values=[-999, ""])
         output_wt = pd.read_csv(os.path.join(wd, "swatmf_out_MF_obs"),
                            delim_whitespace=True,
                            skiprows = 1,
@@ -873,7 +884,7 @@ def export_wt_monthly(self):
                 df = output_wt[str(grid_id)] - float(mf_obs.loc[int(grid_id)])
                 df.index = pd.date_range(startDate, periods=len(df))
                 dfm = df.resample('M').mean()
-                wtObdm = wtObd.resample('M').mean()             
+                wtObdm = gd_obd.resample('M').mean()             
                 df2 = pd.concat([dfm, wtObdm[wt_ob]], axis = 1)
                 df3 = df2.dropna()
 
@@ -919,7 +930,7 @@ def export_wt_monthly(self):
                 df = output_wt[str(grid_id)]
                 df.index = pd.date_range(startDate, periods=len(df))
                 dfm = df.resample('M').mean()
-                wtObdm = wtObd.resample('M').mean()             
+                wtObdm = gd_obd.resample('M').mean()             
                 df2 = pd.concat([dfm, wtObdm[wt_ob]], axis = 1)
                 df3 = df2.dropna()
 
@@ -1042,7 +1053,7 @@ def export_wt_annual(self):
 
     # Add info
     from datetime import datetime
-    version = "version 2.6."
+    version = "version 2.7."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     mf_obs = pd.read_csv(os.path.join(wd, "modflow.obs"),
@@ -1055,14 +1066,13 @@ def export_wt_annual(self):
     # Convert dataframe into a list with string items inside list
     grid_id_lst = mf_obs.index.astype(str).values.tolist()
     grid_id = self.dlg.comboBox_grid_id.currentText()
-
+    gd_obd_nam = self.dlg.comboBox_dtw_obd.currentText()
     if self.dlg.checkBox_wt_obd.isChecked():
-        wtObd = pd.read_csv(os.path.join(wd, "modflow.obd"),
-                                sep = '\s+',
-                                index_col = 0,
-                                header = 0,
-                                parse_dates=True,
-                                delimiter = "\t")
+        gd_obd = pd.read_csv(
+                    os.path.join(wd, gd_obd_nam),
+                    index_col=0,
+                    parse_dates=True,
+                    na_values=[-999, ""])
 
         output_wt = pd.read_csv(os.path.join(wd, "swatmf_out_MF_obs"),
                            delim_whitespace=True,
@@ -1079,7 +1089,7 @@ def export_wt_annual(self):
                 df = output_wt[str(grid_id)] - float(mf_obs.loc[int(grid_id)])
                 df.index = pd.date_range(startDate, periods=len(df))
                 dfa = df.resample('A').mean()
-                wtObda = wtObd.resample('A').mean()             
+                wtObda = gd_obd.resample('A').mean()             
                 df2 = pd.concat([dfa, wtObda[wt_ob]], axis = 1)
                 df3 = df2.dropna()
 
@@ -1127,7 +1137,7 @@ def export_wt_annual(self):
                 df = output_wt[str(grid_id)]
                 df.index = pd.date_range(startDate, periods=len(df))
                 dfa = df.resample('A').mean()
-                wtObda = wtObd.resample('A').mean()             
+                wtObda = gd_obd.resample('A').mean()             
                 df2 = pd.concat([dfa, wtObda[wt_ob]], axis = 1)
                 df3 = df2.dropna()
 

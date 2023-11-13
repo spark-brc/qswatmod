@@ -307,12 +307,17 @@ class QSWATMOD2(object):
 
         # === plot
         self.dlg.pushButton_plot_sd.clicked.connect(self.plot_sd)
+        self.dlg.comboBox_stf_obd.currentIndexChanged.connect(self.get_stf_cols)
         self.dlg.pushButton_plot_wt.clicked.connect(self.plot_wt)
+        self.dlg.comboBox_dtw_obd.currentIndexChanged.connect(self.get_gwl_cols)
+
+
+
         self.dlg.pushButton_plot_gwsw.clicked.connect(self.plot_gwsw)
 
         # == load_str and modflow_obd
-        self.dlg.pushButton_str_obd.clicked.connect(self.load_str_obd)
-        self.dlg.pushButton_mf_obd.clicked.connect(self.load_mf_obd)       
+        # self.dlg.pushButton_str_obd.clicked.connect(self.load_str_obd)
+        # self.dlg.pushButton_mf_obd.clicked.connect(self.load_mf_obd)   
 
         # === Export data to file
         self.dlg.pushButton_export_sd.clicked.connect(self.export_sd)
@@ -355,7 +360,7 @@ class QSWATMOD2(object):
         # Export output.std
         self.dlg.pushButton_std_export_wb.clicked.connect(self.export_wb)
         ##
-        self.dlg.checkBox_stream_obd.toggled.connect(self.read_strObd)
+        self.dlg.checkBox_stream_obd.toggled.connect(self.read_stf_obd)
         self.dlg.checkBox_wt_obd.toggled.connect(self.read_wtObd)
         # self.dlg.pushButton_refresh.clicked.connect(self.swat_analyze_subbasin)
         self.dlg.pushButton_createMF.clicked.connect(self.createMF)
@@ -524,8 +529,8 @@ class QSWATMOD2(object):
 
 
     ### Fourth tab
-    def read_strObd(self):
-        post_i_str.read_strObd(self)
+    def read_stf_obd(self):
+        post_i_str.read_stf_obd(self)
 
     def read_wtObd(self):
         post_ii_wt.read_wtObd(self)
@@ -2016,3 +2021,10 @@ class QSWATMOD2(object):
         self.rt3d = create_rt3d_dlg.CreateRT3D(self.iface)
         self.rt3d.show()
         self.rt3d.exec_()
+
+
+    def get_stf_cols(self):
+        post_i_str.get_stf_cols(self)
+
+    def get_gwl_cols(self):
+        post_ii_wt.get_gwl_cols(self)
