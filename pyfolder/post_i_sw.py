@@ -18,6 +18,76 @@ from PyQt5.QtWidgets import QMessageBox, QFileDialog
 from qgis.PyQt.QtCore import QSettings, QFileInfo, QVariant
 from datetime import datetime
 
+# -----------------------------------
+# NOTE: init settings
+# -----------------------------------
+
+def read_sub_no(self):
+    for self.layer in list(QgsProject.instance().mapLayers().values()):
+        if self.layer.name() == ("sub (SWAT)"):
+            self.layer = QgsProject.instance().mapLayersByName("sub (SWAT)")[0]
+            feats = self.layer.getFeatures()
+            # get sub number as a list
+            unsorted_subno = [str(f.attribute("Subbasin")) for f in feats]
+            # Sort this list
+            sorted_subno = sorted(unsorted_subno, key=int)
+            ## a = sorted(a, key=lambda x: float(x)
+            self.dlg.comboBox_sub_number.clear()
+            # self.dlg.comboBox_sub_number.addItem('')
+            self.dlg.comboBox_sub_number.addItems(sorted_subno) # in addItem list should contain string numbers
+
+def check_stf_obd(self):
+    if self.dlg.checkBox_stream_obd.isChecked():
+        self.dlg.frame_sd_obd.setEnabled(True)
+        self.dlg.radioButton_str_obd_line.setEnabled(True)
+        self.dlg.radioButton_str_obd_pt.setEnabled(True)
+        self.dlg.spinBox_str_obd_size.setEnabled(True)
+        get_stf_obds(self)
+        if self.dlg.comboBox_stf_obd.count()==0:
+            msgBox = QMessageBox()
+            msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
+            msgBox.setWindowTitle("No 'streamflow.obd' file found!")
+            msgBox.setText("Please, provide streamflow measurement files!")
+            msgBox.exec_()
+            self.dlg.checkBox_stream_obd.setChecked(0)  
+            self.dlg.frame_sd_obd.setEnabled(False)
+            self.dlg.radioButton_str_obd_line.setEnabled(False)
+            self.dlg.radioButton_str_obd_pt.setEnabled(False)
+            self.dlg.spinBox_str_obd_size.setEnabled(False)
+    else:
+        self.dlg.comboBox_stf_obd.clear()
+        self.dlg.comboBox_SD_obs_data.clear()
+        self.dlg.frame_sd_obd.setEnabled(False)
+        self.dlg.radioButton_str_obd_line.setEnabled(False)
+        self.dlg.radioButton_str_obd_pt.setEnabled(False)
+        self.dlg.spinBox_str_obd_size.setEnabled(False)
+
+
+def get_stf_obds(self):
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    stf_obd_files = [
+        os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/stf*.obd.csv')
+        ]
+    self.dlg.comboBox_stf_obd.clear()
+    self.dlg.comboBox_stf_obd.addItems(stf_obd_files)
+
+def get_stf_cols(self):
+    if self.dlg.checkBox_stream_obd.isChecked():
+        QSWATMOD_path_dict = self.dirs_and_paths()
+        wd = QSWATMOD_path_dict['SMfolder']
+        stf_obd_nam = self.dlg.comboBox_stf_obd.currentText()
+        stf_obd = pd.read_csv(
+                        os.path.join(wd, stf_obd_nam),
+                        index_col=0,
+                        parse_dates=True)
+        stf_obd_list = stf_obd.columns.tolist()
+        self.dlg.comboBox_SD_obs_data.clear()
+        self.dlg.comboBox_SD_obs_data.addItems(stf_obd_list)
+
+# --------------------------------------------
+# NOTE: plot
+# --------------------------------------------
+
 def plot_stf(self, ts):
     dark_theme = self.dlg.checkBox_darktheme.isChecked()
     plt.style.use('dark_background') if dark_theme else plt.style.use('default')
@@ -281,64 +351,67 @@ def show_error_message(self, title, message):
     msgBox.setText(message)
     msgBox.exec_()
 
-def check_stf_obd(self):
-    if self.dlg.checkBox_stream_obd.isChecked():
-        self.dlg.frame_sd_obd.setEnabled(True)
-        self.dlg.radioButton_str_obd_line.setEnabled(True)
-        self.dlg.radioButton_str_obd_pt.setEnabled(True)
-        self.dlg.spinBox_str_obd_size.setEnabled(True)
-        get_stf_obds(self)
-        if self.dlg.comboBox_stf_obd.count()==0:
-            msgBox = QMessageBox()
-            msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-            msgBox.setWindowTitle("No 'streamflow.obd' file found!")
-            msgBox.setText("Please, provide streamflow measurement files!")
-            msgBox.exec_()
-            self.dlg.checkBox_stream_obd.setChecked(0)  
-            self.dlg.frame_sd_obd.setEnabled(False)
-            self.dlg.radioButton_str_obd_line.setEnabled(False)
-            self.dlg.radioButton_str_obd_pt.setEnabled(False)
-            self.dlg.spinBox_str_obd_size.setEnabled(False)
-    else:
-        self.dlg.comboBox_stf_obd.clear()
-        self.dlg.comboBox_SD_obs_data.clear()
-        self.dlg.frame_sd_obd.setEnabled(False)
-        self.dlg.radioButton_str_obd_line.setEnabled(False)
-        self.dlg.radioButton_str_obd_pt.setEnabled(False)
-        self.dlg.spinBox_str_obd_size.setEnabled(False)
 
 
-def get_stf_obds(self):
+
+# NOTE: loading data
+def load_str_obd(self):
     QSWATMOD_path_dict = self.dirs_and_paths()
-    stf_obd_files = [
-        os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/stf*.obd.csv')
-        ]
-    self.dlg.comboBox_stf_obd.clear()
-    self.dlg.comboBox_stf_obd.addItems(stf_obd_files)
+    settings = QSettings()
+    if settings.contains('/QSWATMOD2/LastInputPath'):
+        path = str(settings.value('/QSWATMOD2/LastInputPath'))
+    else:
+        path = ''
+    title = "Provide 'streamflow.obd' file!"
+    inFileName, __ = QFileDialog.getOpenFileNames(
+        None, title, path,
+        "Observation data (*.obd *.OBD);; All files (*.*)"
+        )
+    if inFileName:
+        settings.setValue('/QSWATMOD2/LastInputPath', os.path.dirname(str(inFileName)))
+        output_dir = QSWATMOD_path_dict['SMfolder']
+        inInfo = QFileInfo(inFileName[0])
+        inFile = inInfo.fileName()
+        pattern = os.path.splitext(inFileName[0])[0] + '.*'
 
-def get_stf_cols(self):
-    if self.dlg.checkBox_stream_obd.isChecked():
-        QSWATMOD_path_dict = self.dirs_and_paths()
-        wd = QSWATMOD_path_dict['SMfolder']
-        stf_obd_nam = self.dlg.comboBox_stf_obd.currentText()
-        stf_obd = pd.read_csv(
-                        os.path.join(wd, stf_obd_nam),
-                        index_col=0,
-                        parse_dates=True)
-        stf_obd_list = stf_obd.columns.tolist()
-        self.dlg.comboBox_SD_obs_data.clear()
-        self.dlg.comboBox_SD_obs_data.addItems(stf_obd_list)
+        # inName = os.path.splitext(inFile)[0]
+        inName = 'streamflow'
+        for f in glob.iglob(pattern):
+            suffix = os.path.splitext(f)[1]
+            if os.name == 'nt':
+                outfile = ntpath.join(output_dir, inName + '.obd')
+            else:
+                outfile = posixpath.join(output_dir, inName + '.obd')             
+            shutil.copy(f, outfile)
 
-def read_sub_no(self):
-    for self.layer in list(QgsProject.instance().mapLayers().values()):
-        if self.layer.name() == ("sub (SWAT)"):
-            self.layer = QgsProject.instance().mapLayersByName("sub (SWAT)")[0]
-            feats = self.layer.getFeatures()
-            # get sub number as a list
-            unsorted_subno = [str(f.attribute("Subbasin")) for f in feats]
-            # Sort this list
-            sorted_subno = sorted(unsorted_subno, key=int)
-            ## a = sorted(a, key=lambda x: float(x)
-            self.dlg.comboBox_sub_number.clear()
-            # self.dlg.comboBox_sub_number.addItem('')
-            self.dlg.comboBox_sub_number.addItems(sorted_subno) # in addItem list should contain string numbers
+
+def load_mf_obd(self):
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    settings = QSettings()
+    if settings.contains('/QSWATMOD2/LastInputPath'):
+        path = str(settings.value('/QSWATMOD2/LastInputPath'))
+    else:
+        path = ''
+    title = "Provide 'modflow.obd' file!"
+    inFileName, __ = QFileDialog.getOpenFileNames(
+        None, title, path,
+        "Observation data (*.obd *.OBD);; All files (*.*)"
+        )
+    if inFileName:
+        settings.setValue('/QSWATMOD2/LastInputPath', os.path.dirname(str(inFileName)))           
+        output_dir = QSWATMOD_path_dict['SMfolder']
+        inInfo = QFileInfo(inFileName[0])
+        inFile = inInfo.fileName()
+        pattern = os.path.splitext(inFileName[0])[0] + '.*'
+
+        # inName = os.path.splitext(inFile)[0]
+        inName = 'modflow'
+        for f in glob.iglob(pattern):
+            suffix = os.path.splitext(f)[1]
+            if os.name == 'nt':
+                outfile = ntpath.join(output_dir, inName + '.obd')
+            else:
+                outfile = posixpath.join(output_dir, inName + '.obd')             
+            shutil.copy(f, outfile)
+
+

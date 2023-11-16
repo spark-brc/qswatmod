@@ -311,9 +311,6 @@ class QSWATMOD2(object):
         self.dlg.comboBox_stf_obd.currentIndexChanged.connect(self.get_stf_cols)
         self.dlg.pushButton_plot_wt.clicked.connect(self.plot_wt)
         self.dlg.comboBox_dtw_obd.currentIndexChanged.connect(self.get_gwl_cols)
-
-
-
         self.dlg.pushButton_plot_gwsw.clicked.connect(self.plot_gwsw)
 
         # == load_str and modflow_obd
