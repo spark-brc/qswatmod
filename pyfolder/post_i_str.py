@@ -17,78 +17,78 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
 from qgis.PyQt.QtCore import QSettings, QFileInfo, QVariant
 
-
-def read_sub_no(self):
-    for self.layer in list(QgsProject.instance().mapLayers().values()):
-        if self.layer.name() == ("sub (SWAT)"):
-            self.layer = QgsProject.instance().mapLayersByName("sub (SWAT)")[0]
-            feats = self.layer.getFeatures()
-            # get sub number as a list
-            unsorted_subno = [str(f.attribute("Subbasin")) for f in feats]
-            # Sort this list
-            sorted_subno = sorted(unsorted_subno, key=int)
-            ## a = sorted(a, key=lambda x: float(x)
-            self.dlg.comboBox_sub_number.clear()
-            # self.dlg.comboBox_sub_number.addItem('')
-            self.dlg.comboBox_sub_number.addItems(sorted_subno) # in addItem list should contain string numbers
-
-
-def read_stf_obd(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    if self.dlg.checkBox_stream_obd.isChecked():
-        self.dlg.frame_sd_obd.setEnabled(True)
-        self.dlg.radioButton_str_obd_line.setEnabled(True)
-        self.dlg.radioButton_str_obd_pt.setEnabled(True)
-        self.dlg.spinBox_str_obd_size.setEnabled(True)
-        get_stf_obds(self)
-        if self.dlg.comboBox_stf_obd.count()==0:
-            msgBox = QMessageBox()
-            msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-            msgBox.setWindowTitle("No 'streamflow.obd' file found!")
-            msgBox.setText("Please, provide streamflow measurement files!")
-            msgBox.exec_()
-            self.dlg.checkBox_stream_obd.setChecked(0)  
-            self.dlg.frame_sd_obd.setEnabled(False)
-            self.dlg.radioButton_str_obd_line.setEnabled(False)
-            self.dlg.radioButton_str_obd_pt.setEnabled(False)
-            self.dlg.spinBox_str_obd_size.setEnabled(False)
-    else:
-        self.dlg.comboBox_SD_obs_data.clear()
-        self.dlg.frame_sd_obd.setEnabled(False)
-        self.dlg.radioButton_str_obd_line.setEnabled(False)
-        self.dlg.radioButton_str_obd_pt.setEnabled(False)
-        self.dlg.spinBox_str_obd_size.setEnabled(False)
+# def read_sub_no(self):
+#     for self.layer in list(QgsProject.instance().mapLayers().values()):
+#         if self.layer.name() == ("sub (SWAT)"):
+#             self.layer = QgsProject.instance().mapLayersByName("sub (SWAT)")[0]
+#             feats = self.layer.getFeatures()
+#             # get sub number as a list
+#             unsorted_subno = [str(f.attribute("Subbasin")) for f in feats]
+#             # Sort this list
+#             sorted_subno = sorted(unsorted_subno, key=int)
+#             ## a = sorted(a, key=lambda x: float(x)
+#             self.dlg.comboBox_sub_number.clear()
+#             # self.dlg.comboBox_sub_number.addItem('')
+#             self.dlg.comboBox_sub_number.addItems(sorted_subno) # in addItem list should contain string numbers
 
 
+# def read_stf_obd(self):
+#     QSWATMOD_path_dict = self.dirs_and_paths()
+#     if self.dlg.checkBox_stream_obd.isChecked():
+#         self.dlg.frame_sd_obd.setEnabled(True)
+#         self.dlg.radioButton_str_obd_line.setEnabled(True)
+#         self.dlg.radioButton_str_obd_pt.setEnabled(True)
+#         self.dlg.spinBox_str_obd_size.setEnabled(True)
+#         get_stf_obds(self)
+#         if self.dlg.comboBox_stf_obd.count()==0:
+#             msgBox = QMessageBox()
+#             msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
+#             msgBox.setWindowTitle("No 'streamflow.obd' file found!")
+#             msgBox.setText("Please, provide streamflow measurement files!")
+#             msgBox.exec_()
+#             self.dlg.checkBox_stream_obd.setChecked(0)  
+#             self.dlg.frame_sd_obd.setEnabled(False)
+#             self.dlg.radioButton_str_obd_line.setEnabled(False)
+#             self.dlg.radioButton_str_obd_pt.setEnabled(False)
+#             self.dlg.spinBox_str_obd_size.setEnabled(False)
+#     else:
+#         self.dlg.comboBox_stf_obd.clear()
+#         self.dlg.comboBox_SD_obs_data.clear()
+#         self.dlg.frame_sd_obd.setEnabled(False)
+#         self.dlg.radioButton_str_obd_line.setEnabled(False)
+#         self.dlg.radioButton_str_obd_pt.setEnabled(False)
+#         self.dlg.spinBox_str_obd_size.setEnabled(False)
 
-def get_stf_obds(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    stf_obd_files = [
-        os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/stf*.obd.csv')
-        ]
-    self.dlg.comboBox_stf_obd.clear()
-    self.dlg.comboBox_stf_obd.addItems(stf_obd_files)
 
-def get_stf_cols(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    wd = QSWATMOD_path_dict['SMfolder']
-    stf_obd_nam = self.dlg.comboBox_stf_obd.currentText()
+# def get_stf_obds(self):
+#     QSWATMOD_path_dict = self.dirs_and_paths()
+#     stf_obd_files = [
+#         os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/stf*.obd.csv')
+#         ]
+#     self.dlg.comboBox_stf_obd.clear()
+#     self.dlg.comboBox_stf_obd.addItems(stf_obd_files)
 
-    stf_obd = pd.read_csv(
-                    os.path.join(wd, stf_obd_nam),
-                    index_col=0,
-                    parse_dates=True)
+# def get_stf_cols(self):
+#     if self.dlg.checkBox_stream_obd.isChecked():
+#         QSWATMOD_path_dict = self.dirs_and_paths()
+#         wd = QSWATMOD_path_dict['SMfolder']
+#         stf_obd_nam = self.dlg.comboBox_stf_obd.currentText()
 
-    stf_obd_list = stf_obd.columns.tolist()
-    self.dlg.comboBox_SD_obs_data.clear()
-    self.dlg.comboBox_SD_obs_data.addItems(stf_obd_list)
+#         stf_obd = pd.read_csv(
+#                         os.path.join(wd, stf_obd_nam),
+#                         index_col=0,
+#                         parse_dates=True)
+
+#         stf_obd_list = stf_obd.columns.tolist()
+#         self.dlg.comboBox_SD_obs_data.clear()
+#         self.dlg.comboBox_SD_obs_data.addItems(stf_obd_list)
 
 
 """
 Export data only selected
 """
 def export_sd_daily(self):
-    from qgis.PyQt import QtCore, QtGui, QtSql
+
     QSWATMOD_path_dict = self.dirs_and_paths()
     stdate, eddate, stdate_warmup, eddate_warmup = self.define_sim_period() 
     wd = QSWATMOD_path_dict['SMfolder']
