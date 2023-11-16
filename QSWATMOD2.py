@@ -66,6 +66,7 @@ from .pyfolder import runSim_link
 from .pyfolder import modflow_functions
 from .pyfolder import linking_process
 from .pyfolder import post_i_str
+from .pyfolder import post_i_sw
 from .pyfolder import post_ii_wt
 from .pyfolder import post_iii_rch
 from .pyfolder import post_iv_gwsw
@@ -306,7 +307,7 @@ class QSWATMOD2(object):
                 'winter', 'cool', 'gray'])
 
         # === plot
-        self.dlg.pushButton_plot_sd.clicked.connect(self.plot_sd)
+        self.dlg.pushButton_plot_sd.clicked.connect(self.plot_stf)
         self.dlg.comboBox_stf_obd.currentIndexChanged.connect(self.get_stf_cols)
         self.dlg.pushButton_plot_wt.clicked.connect(self.plot_wt)
         self.dlg.comboBox_dtw_obd.currentIndexChanged.connect(self.get_gwl_cols)
@@ -1040,28 +1041,10 @@ class QSWATMOD2(object):
 
     #     modflow_functions.MF_grid(x_origin, y_origin)
 
-    def plot_sd(self):
-        # Daily output format given
-        if self.dlg.radioButton_day.isChecked() and (self.dlg.comboBox_SD_timeStep.currentText() == "Daily"):
-            post_i_str.sd_plot_daily(self)
-        elif self.dlg.radioButton_day.isChecked() and (self.dlg.comboBox_SD_timeStep.currentText() == "Monthly"):
-            post_i_str.sd_plot_monthly(self)            
-        elif self.dlg.radioButton_day.isChecked() and (self.dlg.comboBox_SD_timeStep.currentText() == "Annual"):
-            post_i_str.sd_plot_annual(self) 
-        # Monthly output format given
-        elif self.dlg.radioButton_month.isChecked() and (self.dlg.comboBox_SD_timeStep.currentText() == "Monthly"):
-            post_i_str.sd_plot_daily(self)
-        elif self.dlg.radioButton_month.isChecked() and (self.dlg.comboBox_SD_timeStep.currentText() == "Annual"):
-            post_i_str.sd_plot_month_to_year(self)
+    def plot_stf(self):
+        selected_ts = self.dlg.comboBox_SD_timeStep.currentText()
+        post_i_sw.plot_stf(self, selected_ts)
 
-        # Annual output format given
-        elif self.dlg.radioButton_year.isChecked() and (self.dlg.comboBox_SD_timeStep.currentText() == "Annual"):
-            post_i_str.sd_plot_daily(self)
-
-        else:
-            msgBox = QMessageBox()
-            msgBox.setText("There was a problem plotting the result!")
-            msgBox.exec_()          
 
     def export_sd(self):
     # Daily output format given
