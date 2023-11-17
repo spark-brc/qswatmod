@@ -351,9 +351,6 @@ def show_error_message(self, title, message):
     msgBox.setText(message)
     msgBox.exec_()
 
-
-
-
 # NOTE: loading data
 def load_str_obd(self):
     QSWATMOD_path_dict = self.dirs_and_paths()

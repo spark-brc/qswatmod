@@ -157,3 +157,51 @@ class DefineTime:
             #     self.dlg.radioButton_day.setEnabled(False)
             #     self.dlg.radioButton_month.setEnabled(False)
             return duration_
+        
+class PlotUtils:
+    def __init__(self) -> None:
+        pass
+
+
+    # NOTE: metrics =======================================================================================
+    def calculate_metrics(self, ax, df3, grid_id, obd_col):
+        r_squared = ((sum((df3[obd_col] - df3[obd_col].mean()) * (df3[str(grid_id)] - df3[str(grid_id)].mean())))**2) / (
+                (sum((df3[obd_col] - df3[obd_col].mean())**2) * (sum((df3[str(grid_id)] - df3[str(grid_id)].mean())**2)))
+        )
+        dNS = 1 - (sum((df3[str(grid_id)] - df3[obd_col])**2) / sum((df3[obd_col] - (df3[obd_col]).mean())**2))
+        PBIAS = 100 * (sum(df3[obd_col] - df3[str(grid_id)]) / sum(df3[obd_col]))
+        self.display_metrics(ax, dNS, r_squared, PBIAS)
+
+    def display_metrics(self, ax, dNS, r_squared, PBIAS):
+        ax.text(
+            .01, 0.95, f'Nash-Sutcliffe: {dNS:.4f}',
+            fontsize=8, horizontalalignment='left', color='limegreen', transform=ax.transAxes
+        )
+        ax.text(
+            .01, 0.90, f'$R^2$: {r_squared:.4f}',
+            fontsize=8, horizontalalignment='left', color='limegreen', transform=ax.transAxes
+        )
+        ax.text(
+            .99, 0.95, f'PBIAS: {PBIAS:.4f}',
+            fontsize=8, horizontalalignment='right', color='limegreen', transform=ax.transAxes
+        )
+
+    def display_no_data_message(self, ax):
+        ax.text(
+            .01, .95, 'Nash-Sutcliffe: ---',
+            fontsize=8, horizontalalignment='left', transform=ax.transAxes
+        )
+        ax.text(
+            .01, 0.90, '$R^2$: ---',
+            fontsize=8, horizontalalignment='left', color='limegreen', transform=ax.transAxes
+        )
+        ax.text(
+            .99, 0.95, 'PBIAS: ---',
+            fontsize=8, horizontalalignment='right', color='limegreen', transform=ax.transAxes
+        )
+
+    def handle_exception(self, ax, exception_message):
+        ax.text(
+            .5, .5, exception_message,
+            fontsize=12, horizontalalignment='center', weight='extra bold', color='y', transform=ax.transAxes
+        )

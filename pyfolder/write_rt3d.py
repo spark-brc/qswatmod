@@ -17,7 +17,7 @@ from qgis.PyQt.QtCore import(
                             QVariant, QCoreApplication, QSettings, QFileInfo
                             )
 import processing
-from .qswatmod_utils import DefineTime
+from .utils import DefineTime
 
 
 def get_nrows_ncols(self):

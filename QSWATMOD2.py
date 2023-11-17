@@ -68,6 +68,7 @@ from .pyfolder import linking_process
 # from .pyfolder import post_i_str
 from .pyfolder import post_i_sw
 from .pyfolder import post_ii_wt
+from .pyfolder import post_ii_gw
 from .pyfolder import post_iii_rch
 from .pyfolder import post_iv_gwsw
 from .pyfolder import post_v_wb
@@ -1042,17 +1043,20 @@ class QSWATMOD2(object):
         ts = self.dlg.comboBox_SD_timeStep.currentText()
         post_i_sw.export_stf(self, ts)
 
-    def plot_wt(self):
-        if self.dlg.comboBox_hh_time.currentText() == "Daily":
-            post_ii_wt.wt_plot_daily(self)
-        elif self.dlg.comboBox_hh_time.currentText() == "Monthly":
-            post_ii_wt.wt_plot_monthly(self)           
-        elif self.dlg.comboBox_hh_time.currentText() == "Annual":
-            post_ii_wt.wt_plot_annual(self)
-        else:
-            msgBox = QMessageBox()
-            msgBox.setText("There was a problem plotting the result!")
-            msgBox.exec_()  
+    def plot_wt(self, ts):
+        ts = self.dlg.comboBox_hh_time.currentText()
+        post_ii_gw.plot_gw(self, ts)
+
+        # if self.dlg.comboBox_hh_time.currentText() == "Daily":
+        #     post_ii_wt.wt_plot_daily(self)
+        # elif self.dlg.comboBox_hh_time.currentText() == "Monthly":
+        #     post_ii_wt.wt_plot_monthly(self)           
+        # elif self.dlg.comboBox_hh_time.currentText() == "Annual":
+        #     post_ii_wt.wt_plot_annual(self)
+        # else:
+        #     msgBox = QMessageBox()
+        #     msgBox.setText("There was a problem plotting the result!")
+        #     msgBox.exec_()  
 
     def export_wt(self):
         if self.dlg.comboBox_hh_time.currentText() == "Daily":
