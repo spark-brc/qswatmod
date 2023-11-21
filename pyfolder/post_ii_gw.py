@@ -126,13 +126,13 @@ def plot_gw_sim_obd(self, ax, wd, obd_file, startDate, grid_id, ts):
             df = df[str(grid_id)] - float(mf_obs.loc[int(grid_id)])
         else:
             df = df[str(grid_id)]
-        ax.plot(df.index.values, df, c='limegreen', lw=1, label="Simulated")
+        ax.plot(df.index.values, df.values, c='limegreen', lw=1, label="Simulated")
         df2 = pd.concat([df, gw_obd[obd_col]], axis=1)
         df3 = df2.dropna()
         plot_observed_data(self, ax, df3, grid_id, obd_col)
     except Exception as e:
         pu = PlotUtils()
-        pu.handle_exception(self, ax, str(e))
+        pu.handle_exception(ax, str(e))
 
 
 def plot_simulated(self, ax, wd, grid_id, startDate, ts):
@@ -153,7 +153,7 @@ def plot_simulated(self, ax, wd, grid_id, startDate, ts):
             ax.set_title(
                         u'Daily Watertable Elevation' + u" @ Grid id: " + grid_id, fontsize = 10,
                         loc='left')
-        ax.plot(df.index, df, c = 'dodgerblue', lw = 1, label = "Simulated")
+        ax.plot(df.index.values, df.values, c = 'dodgerblue', lw = 1, label = "Simulated")
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d\n%Y'))
     except Exception as e:
         pu = PlotUtils()
@@ -289,23 +289,32 @@ def export_data(
         self, outfolder, grid_id, obd_col, ts, version, ctime, df3, 
         rsq=None, rmse=None, pbias=None
         ):
-        eu = ExportUtils()
-        try:
-            file_name = f"swatmf_gw({grid_id})_obd({obd_col})_{ts.lower()}.txt"
-            with open(os.path.join(outfolder, file_name), 'w') as f:
-                f.write(f"# {file_name} is created by QSWATMOD2 plugin {version}{ctime}\n")
-                df3.to_csv(
-                    f, index_label="Date", sep='\t', float_format='%10.4f', line_terminator='\n', encoding='utf-8'
-                )
-                f.write('\n')
-                f.write("# Statistics\n")
-                if rsq is not None:
-                    f.write("R-squared: " + str('{:.4f}'.format(rsq) + "\n"))
-                    f.write("RMSE: " + str('{:.4f}'.format(rmse) + "\n"))
-                    f.write("PBIAS: " + str('{:.4f}'.format(pbias) + "\n"))
-                else:
-                    f.write("R-squared: ---\n")
-                    f.write("RMSE: ---\n")
-                    f.write("PBIAS: ---\n")
-        except Exception as e:
-            eu.show_error_message("Error exporting data", str(e))
+    eu = ExportUtils()
+    try:
+        file_name = f"swatmf_gw({grid_id})_obd({obd_col})_{ts.lower()}.txt"
+        with open(os.path.join(outfolder, file_name), 'w') as f:
+            f.write(f"# {file_name} is created by QSWATMOD2 plugin {version}{ctime}\n")
+            df3.to_csv(
+                f, index_label="Date", sep='\t', float_format='%10.4f', 
+                lineterminator='\n', 
+                encoding='utf-8'
+            )
+            f.write('\n')
+            f.write("# Statistics\n")
+            if rsq is not None:
+                f.write("R-squared: " + str('{:.4f}'.format(rsq) + "\n"))
+                f.write("RMSE: " + str('{:.4f}'.format(rmse) + "\n"))
+                f.write("PBIAS: " + str('{:.4f}'.format(pbias) + "\n"))
+            else:
+                f.write("R-squared: ---\n")
+                f.write("RMSE: ---\n")
+                f.write("PBIAS: ---\n")
+
+        msgBox = QMessageBox()
+        msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
+        msgBox.setWindowTitle("Exported!")
+        msgBox.setText(f"'{file_name}' file is exported to your 'exported_files' folder!")
+        msgBox.exec_() 
+                    
+    except Exception as e:
+        eu.show_error_message("Error exporting data", str(e))

@@ -713,7 +713,7 @@ def export_gwsw(self):
                 f,
                 # index_label="Date",
                 index=False,
-                sep='\t', float_format='%.2f', line_terminator='\n', encoding='utf-8')
+                sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
         msgBox.setWindowTitle("Exported!") 
         msgBox.setText(
             "'GWSW"+"(" + str(selectedDate) + 
@@ -726,7 +726,7 @@ def export_gwsw(self):
                 f,
                 # index_label="Date",
                 index=False,
-                sep='\t', float_format='%.2f', line_terminator='\n', encoding='utf-8')
+                sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
         msgBox.setWindowTitle("Exported!") 
         msgBox.setText(
             "'GWSW"+"(" + str(selectedDate) + 
@@ -739,7 +739,7 @@ def export_gwsw(self):
                 f,
                 # index_label="Date",
                 index=False,
-                sep='\t', float_format='%.2f', line_terminator='\n', encoding='utf-8')
+                sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
         msgBox.setWindowTitle("Exported!") 
         msgBox.setText(
             "'GWSW"+"(" + str(selectedDate) + 

@@ -309,11 +309,13 @@ def export_data(
         r_squared=None, dNS=None, PBIAS=None
         ):
         try:
-            file_name = f"swatmf_reach({subnum})_ob({obd_col})_{ts.lower()}.txt"
+            file_name = f"swatmf_reach({subnum})_obd({obd_col})_{ts.lower()}.txt"
             with open(os.path.join(outfolder, file_name), 'w') as f:
                 f.write(f"# {file_name} is created by QSWATMOD2 plugin {version}{ctime}\n")
-                df3.drop('filter', 1).to_csv(
-                    f, index_label="Date", sep='\t', float_format='%10.4f', line_terminator='\n', encoding='utf-8'
+                df3.drop('filter', axis=1).to_csv(
+                    f, index_label="Date", sep='\t', float_format='%10.4f', 
+                    lineterminator='\n', 
+                    encoding='utf-8'
                 )
                 f.write('\n')
                 f.write("# Statistics\n")
