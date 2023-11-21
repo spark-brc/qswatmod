@@ -1,6 +1,8 @@
 import numpy as np
 import datetime
 import os
+from PyQt5.QtWidgets import QMessageBox
+from qgis.PyQt import QtGui    
 
 class ObjFns:
     def __init__(self) -> None:
@@ -114,54 +116,11 @@ class DefineTime:
             startDate = stdate.strftime("%m/%d/%Y")
             endDate = eddate.strftime("%m/%d/%Y")
             duration_ = (eddate - stdate).days
-
-            # ##### 
-            # start_month = stdate.strftime("%b")
-            # start_day = stdate.strftime("%d")
-            # start_year = stdate.strftime("%Y")
-            # end_month = eddate.strftime("%b")
-            # end_day = eddate.strftime("%d")
-            # end_year = eddate.strftime("%Y")
-
-            # # Put dates into the gui
-            # self.dlg.lineEdit_start_m.setText(start_month)
-            # self.dlg.lineEdit_start_d.setText(start_day)
-            # self.dlg.lineEdit_start_y.setText(start_year)
-            # self.dlg.lineEdit_end_m.setText(end_month)
-            # self.dlg.lineEdit_end_d.setText(end_day)
-            # self.dlg.lineEdit_end_y.setText(end_year)
-            # self.dlg.lineEdit_duration.setText(str(duration))
-
-            # self.dlg.lineEdit_nyskip.setText(str(skipyear))
-
-            # # Check IPRINT option
-            # if iprint == 0:  # month
-            #     self.dlg.comboBox_SD_timeStep.clear()
-            #     self.dlg.comboBox_SD_timeStep.addItems(['Monthly', 'Annual'])
-            #     self.dlg.radioButton_month.setChecked(1)
-            #     self.dlg.radioButton_month.setEnabled(True)
-            #     self.dlg.radioButton_day.setEnabled(False)
-            #     self.dlg.radioButton_year.setEnabled(False)
-            # elif iprint == 1:
-            #     self.dlg.comboBox_SD_timeStep.clear()
-            #     self.dlg.comboBox_SD_timeStep.addItems(['Daily', 'Monthly', 'Annual'])
-            #     self.dlg.radioButton_day.setChecked(1)
-            #     self.dlg.radioButton_day.setEnabled(True)
-            #     self.dlg.radioButton_month.setEnabled(False)
-            #     self.dlg.radioButton_year.setEnabled(False)
-            # else:
-            #     self.dlg.comboBox_SD_timeStep.clear()
-            #     self.dlg.comboBox_SD_timeStep.addItems(['Annual'])
-            #     self.dlg.radioButton_year.setChecked(1)
-            #     self.dlg.radioButton_year.setEnabled(True)
-            #     self.dlg.radioButton_day.setEnabled(False)
-            #     self.dlg.radioButton_month.setEnabled(False)
             return duration_
         
 class PlotUtils:
     def __init__(self) -> None:
         pass
-
 
     # NOTE: metrics =======================================================================================
     def calculate_metrics(self, ax, df3, grid_id, obd_col):
@@ -205,3 +164,26 @@ class PlotUtils:
             .5, .5, exception_message,
             fontsize=12, horizontalalignment='center', weight='extra bold', color='y', transform=ax.transAxes
         )
+
+
+class ExportUtils:
+    def __init__(self) -> None:
+        pass
+
+    # NOTE: metrics =======================================================================================
+    def calculate_statistics(self, df3, grid_id, obd_col):
+        objf = ObjFns()
+        sims = df3[str(grid_id)].to_numpy()
+        obds = df3[str(obd_col)].to_numpy()
+        nse = objf.nse(sims, obds)
+        rmse = objf.rmse(sims, obds)
+        pbias = objf.pbias(sims, obds)
+        rsq = objf.rsq(sims, obds)
+        return rsq, rmse, pbias
+
+    def show_error_message(self, title, message):
+        msgBox = QMessageBox()
+        msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
+        msgBox.setWindowTitle(title)
+        msgBox.setText(message)
+        msgBox.exec_()

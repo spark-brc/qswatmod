@@ -669,8 +669,8 @@ def export_wt_daily(self):
         output_wt = pd.read_csv(
                                 os.path.join(wd, "swatmf_out_MF_obs"),
                                 delim_whitespace=True,
-                                skiprows = 1,
-                                names = grid_id_lst,)
+                                skiprows=1,
+                                names=grid_id_lst,)
 
         # get observed watertable
         wt_ob = self.dlg.comboBox_wt_obs_data.currentText()

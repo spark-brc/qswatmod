@@ -4649,6 +4649,9 @@ SWAT-MODFLOW Simulation</string>
                     <property name="text">
                      <string>  Depth to Water</string>
                     </property>
+                    <property name="checked">
+                     <bool>true</bool>
+                    </property>
                    </widget>
                   </item>
                   <item>
@@ -7818,17 +7821,17 @@ SWAT-MODFLOW Simulation</string>
   </connection>
  </connections>
  <buttongroups>
-  <buttongroup name="buttonGroup_rt3d_map"/>
-  <buttongroup name="buttonGroup_irrig_active"/>
-  <buttongroup name="buttonGroup_RT3D_active"/>
-  <buttongroup name="buttonGroup_gw_delay"/>
   <buttongroup name="buttonGroup_drain_active"/>
-  <buttongroup name="buttonGroup_str_obd"/>
   <buttongroup name="buttonGroup_rt_perc_conc"/>
-  <buttongroup name="buttonGroup_irrig_swat_active"/>
-  <buttongroup name="buttonGroup_head_recharge"/>
+  <buttongroup name="buttonGroup_RT3D_active"/>
+  <buttongroup name="buttonGroup_str_obd"/>
   <buttongroup name="buttonGroup_wt_obd"/>
-  <buttongroup name="buttonGroup_mf_active"/>
   <buttongroup name="buttonGroup_mf_swat"/>
+  <buttongroup name="buttonGroup_irrig_active"/>
+  <buttongroup name="buttonGroup_head_recharge"/>
+  <buttongroup name="buttonGroup_rt3d_map"/>
+  <buttongroup name="buttonGroup_gw_delay"/>
+  <buttongroup name="buttonGroup_irrig_swat_active"/>
+  <buttongroup name="buttonGroup_mf_active"/>
  </buttongroups>
 </ui>

@@ -12,9 +12,9 @@ import os
 from matplotlib import style
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMessageBox
-from .utils import PlotUtils
+from .utils import PlotUtils, ExportUtils
 import glob
-
+from datetime import datetime
 
 
 # MODFLOW water table plot =======================================================================
@@ -37,7 +37,6 @@ def read_grid_id(self):
 
 
 def check_gw_obd(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
     if self.dlg.checkBox_wt_obd.isChecked():
         self.dlg.frame_wt_obd.setEnabled(True)
         self.dlg.radioButton_wt_obd_line.setEnabled(True)
@@ -65,30 +64,32 @@ def check_gw_obd(self):
 
 
 def get_gwls_obds(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    dtw_obd_files = [
-        os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/dtw*.obd.csv')
-        ]
-    gwl_obd_files = [
-        os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/gwl*.obd.csv')
-        ]
-    tot_gd_files= dtw_obd_files + gwl_obd_files
-    self.dlg.comboBox_dtw_obd.clear()
-    self.dlg.comboBox_dtw_obd.addItems(tot_gd_files)
+    if self.dlg.checkBox_wt_obd.isChecked():
+        QSWATMOD_path_dict = self.dirs_and_paths()
+        dtw_obd_files = [
+            os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/dtw*.obd.csv')
+            ]
+        gwl_obd_files = [
+            os.path.basename(file) for file in glob.glob(str(QSWATMOD_path_dict['SMfolder']) + '/gwl*.obd.csv')
+            ]
+        tot_gd_files= dtw_obd_files + gwl_obd_files
+        self.dlg.comboBox_dtw_obd.clear()
+        self.dlg.comboBox_dtw_obd.addItems(tot_gd_files)
 
 
 def get_gwl_cols(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    wd = QSWATMOD_path_dict['SMfolder']
-    gd_obd_nam = self.dlg.comboBox_dtw_obd.currentText()
-    gd_obd = pd.read_csv(
-                    os.path.join(wd, gd_obd_nam),
-                    index_col=0,
-                    parse_dates=True,
-                    na_values=[-999, ""])
-    gd_obd_list = gd_obd.columns.tolist()
-    self.dlg.comboBox_wt_obs_data.clear()
-    self.dlg.comboBox_wt_obs_data.addItems(gd_obd_list)
+    if self.dlg.checkBox_wt_obd.isChecked():
+        QSWATMOD_path_dict = self.dirs_and_paths()
+        wd = QSWATMOD_path_dict['SMfolder']
+        gd_obd_nam = self.dlg.comboBox_dtw_obd.currentText()
+        gd_obd = pd.read_csv(
+                        os.path.join(wd, gd_obd_nam),
+                        index_col=0,
+                        parse_dates=True,
+                        na_values=[-999, ""])
+        gd_obd_list = gd_obd.columns.tolist()
+        self.dlg.comboBox_wt_obs_data.clear()
+        self.dlg.comboBox_wt_obs_data.addItems(gd_obd_list)
 
 
 def plot_gw(self, ts):
@@ -106,8 +107,6 @@ def plot_gw(self, ts):
     fig, ax = plt.subplots(figsize=(9, 4))
     ax.set_ylabel(r'Stream Discharge $[m^3/s]$', fontsize=8)
     ax.tick_params(axis='both', labelsize=8)
-
-
     if self.dlg.checkBox_wt_obd.isChecked():
         plot_gw_sim_obd(self, ax, wd, obd_file, startDate, grid_id, ts)
     else:
@@ -120,22 +119,20 @@ def plot_gw_sim_obd(self, ax, wd, obd_file, startDate, grid_id, ts):
     gw_obd = read_gw_obd(self, wd, obd_file)
     mf_obs, output_wt = read_swatmf_out_MF_obs(self, wd)
     obd_col = self.dlg.comboBox_wt_obs_data.currentText()
-    # try:
-    # df = output_wt[str(grid_id)]
-    df = update_index(self, output_wt, startDate)
-    df = time_cvt(self, df, ts)
-    if self.dlg.checkBox_depthTowater.isChecked():
-        df = df[str(grid_id)] - float(mf_obs.loc[int(grid_id)])
-    else:
-        df = df[str(grid_id)]
-    ax.plot(df.index.values, df, c='limegreen', lw=1, label="Simulated")
-    df2 = pd.concat([df, gw_obd[obd_col]], axis=1)
-    df3 = df2.dropna()
-    plot_observed_data(self, ax, df3, grid_id, obd_col)
-# except Exception as e:
-    #     handle_exception(self, ax, str(e))
-
-
+    try:
+        df = update_index(self, output_wt, startDate)
+        df = time_cvt(self, df, ts)
+        if self.dlg.checkBox_depthTowater.isChecked():
+            df = df[str(grid_id)] - float(mf_obs.loc[int(grid_id)])
+        else:
+            df = df[str(grid_id)]
+        ax.plot(df.index.values, df, c='limegreen', lw=1, label="Simulated")
+        df2 = pd.concat([df, gw_obd[obd_col]], axis=1)
+        df3 = df2.dropna()
+        plot_observed_data(self, ax, df3, grid_id, obd_col)
+    except Exception as e:
+        pu = PlotUtils()
+        pu.handle_exception(self, ax, str(e))
 
 
 def plot_simulated(self, ax, wd, grid_id, startDate, ts):
@@ -159,7 +156,8 @@ def plot_simulated(self, ax, wd, grid_id, startDate, ts):
         ax.plot(df.index, df, c = 'dodgerblue', lw = 1, label = "Simulated")
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d\n%Y'))
     except Exception as e:
-        handle_exception(self, ax, str(e))
+        pu = PlotUtils()
+        pu.handle_exception(ax, str(e))
 
 def plot_observed_data(self, ax, df3, grid_id, obd_col):
     pu = PlotUtils()
@@ -175,26 +173,10 @@ def plot_observed_data(self, ax, df3, grid_id, obd_col):
             label="Observed", zorder=3
         )
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d\n%Y'))
-
-
-
     if len(df3[obd_col]) > 1:
         pu.calculate_metrics(ax, df3, grid_id, obd_col)
     else:
         pu.display_no_data_message(ax)
-
-
-
-
-
-
-
-
-def handle_exception(self, ax, exception_message):
-    ax.text(
-        .5, .5, exception_message,
-        fontsize=12, horizontalalignment='center', weight='extra bold', color='y', transform=ax.transAxes
-    )
 
 
 def update_index(self, df, startDate):
@@ -214,13 +196,6 @@ def time_cvt(self, df, ts):
     except Exception as e:
         show_error_message(self, "Error converting time step", str(e))
 
-
-def show_error_message(self, title, message):
-    msgBox = QMessageBox()
-    msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-    msgBox.setWindowTitle(title)
-    msgBox.setText(message)
-    msgBox.exec_()
 
 def read_swatmf_out_MF_obs(self, wd):
     mf_obs = pd.read_csv(
@@ -249,46 +224,88 @@ def read_gw_obd(self, wd, obd_file):
     )
 
 
+def show_error_message(self, title, message):
+    msgBox = QMessageBox()
+    msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
+    msgBox.setWindowTitle(title)
+    msgBox.setText(message)
+    msgBox.exec_()
 
-# # NOTE: metrics =======================================================================================
-# def calculate_metrics(self, ax, df3, obd_col):
-#     r_squared = ((sum((df3[obd_col] - df3[obd_col].mean()) * (df3.stf_sim - df3.stf_sim.mean())))**2) / (
-#             (sum((df3[obd_col] - df3[obd_col].mean())**2) * (sum((df3.stf_sim - df3.stf_sim.mean())**2)))
-#     )
-#     dNS = 1 - (sum((df3.stf_sim - df3[obd_col])**2) / sum((df3[obd_col] - (df3[obd_col]).mean())**2))
-#     PBIAS = 100 * (sum(df3[obd_col] - df3.stf_sim) / sum(df3[obd_col]))
-#     display_metrics(self, ax, dNS, r_squared, PBIAS)
 
-# def display_metrics(self, ax, dNS, r_squared, PBIAS):
-#     ax.text(
-#         .01, 0.95, f'Nash-Sutcliffe: {dNS:.4f}',
-#         fontsize=8, horizontalalignment='left', color='limegreen', transform=ax.transAxes
-#     )
-#     ax.text(
-#         .01, 0.90, f'$R^2$: {r_squared:.4f}',
-#         fontsize=8, horizontalalignment='left', color='limegreen', transform=ax.transAxes
-#     )
-#     ax.text(
-#         .99, 0.95, f'PBIAS: {PBIAS:.4f}',
-#         fontsize=8, horizontalalignment='right', color='limegreen', transform=ax.transAxes
-#     )
 
-# def display_no_data_message(self, ax):
-#     ax.text(
-#         .01, .95, 'Nash-Sutcliffe: ---',
-#         fontsize=8, horizontalalignment='left', transform=ax.transAxes
-#     )
-#     ax.text(
-#         .01, 0.90, '$R^2$: ---',
-#         fontsize=8, horizontalalignment='left', color='limegreen', transform=ax.transAxes
-#     )
-#     ax.text(
-#         .99, 0.95, 'PBIAS: ---',
-#         fontsize=8, horizontalalignment='right', color='limegreen', transform=ax.transAxes
-#     )
+# -----------------------------
+# NOTE: export data
+# -----------------------------
+def export_gw(self, ts):
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    stdate, eddate, stdate_warmup, eddate_warmup = self.define_sim_period()
+    wd = QSWATMOD_path_dict['SMfolder']
+    outfolder = QSWATMOD_path_dict['exported_files']
+    startDate = stdate_warmup.strftime("%m/%d/%Y")
+    endDate = eddate_warmup.strftime("%m/%d/%Y")
+    
+    obd_file = self.dlg.comboBox_dtw_obd.currentText()
+    grid_id = self.dlg.comboBox_grid_id.currentText()
+    obd_col = self.dlg.comboBox_wt_obs_data.currentText()
+    
+    version = "version 2.7."
+    ctime = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
-# def handle_exception(self, ax, exception_message):
-#     ax.text(
-#         .5, .5, exception_message,
-#         fontsize=12, horizontalalignment='center', weight='extra bold', color='y', transform=ax.transAxes
-#     )
+    if self.dlg.checkBox_wt_obd.isChecked():
+        eu = ExportUtils()
+        # gw_sim = read_swatmf_out_MF_obs(self, wd).loc[grid_id]
+        df3 = process_data(self, wd, grid_id, ts, obd_file, obd_col, startDate)
+        if len(df3[obd_col]) > 1:
+            rsq, rmse, pbias = eu.calculate_statistics(df3, grid_id, obd_col)
+            export_data(
+                self, outfolder, grid_id, obd_col, ts, version, ctime, df3,
+                rsq, rmse, pbias
+                )
+    else:
+        # mf_obs, output_wt = read_swatmf_out_MF_obs(self, wd)
+        # gw_sim = output_wt[str(grid_id)]
+        df3 = process_data(self, wd, grid_id, ts, None, "", startDate)
+        export_data(self, outfolder, grid_id, "", ts, version, ctime, df3)
+
+def process_data(self, wd, grid_id, ts, obd_file, obd_col, startDate):
+    mf_obs, output_wt = read_swatmf_out_MF_obs(self, wd)
+    df = update_index(self, output_wt, startDate)
+    df = time_cvt(self, df, ts)
+    # df[str(grid_id)].to_csv(os.path.join(wd, 'test.csv'))
+    if self.dlg.checkBox_depthTowater.isChecked():
+        df = df[str(grid_id)] - float(mf_obs.loc[int(grid_id)])
+    else:
+        df = df[str(grid_id)]
+    if self.dlg.checkBox_wt_obd.isChecked():
+        obd = read_gw_obd(self, wd, obd_file)
+        df2 = pd.concat([df, obd[obd_col]], axis=1)
+        df3 = df2.dropna()
+    else:
+        df3 = df
+    return df3
+
+
+def export_data(
+        self, outfolder, grid_id, obd_col, ts, version, ctime, df3, 
+        rsq=None, rmse=None, pbias=None
+        ):
+        eu = ExportUtils()
+        try:
+            file_name = f"swatmf_gw({grid_id})_obd({obd_col})_{ts.lower()}.txt"
+            with open(os.path.join(outfolder, file_name), 'w') as f:
+                f.write(f"# {file_name} is created by QSWATMOD2 plugin {version}{ctime}\n")
+                df3.to_csv(
+                    f, index_label="Date", sep='\t', float_format='%10.4f', line_terminator='\n', encoding='utf-8'
+                )
+                f.write('\n')
+                f.write("# Statistics\n")
+                if rsq is not None:
+                    f.write("R-squared: " + str('{:.4f}'.format(rsq) + "\n"))
+                    f.write("RMSE: " + str('{:.4f}'.format(rmse) + "\n"))
+                    f.write("PBIAS: " + str('{:.4f}'.format(pbias) + "\n"))
+                else:
+                    f.write("R-squared: ---\n")
+                    f.write("RMSE: ---\n")
+                    f.write("PBIAS: ---\n")
+        except Exception as e:
+            eu.show_error_message("Error exporting data", str(e))

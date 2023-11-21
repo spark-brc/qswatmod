@@ -67,7 +67,7 @@ from .pyfolder import modflow_functions
 from .pyfolder import linking_process
 # from .pyfolder import post_i_str
 from .pyfolder import post_i_sw
-from .pyfolder import post_ii_wt
+# from .pyfolder import post_ii_wt
 from .pyfolder import post_ii_gw
 from .pyfolder import post_iii_rch
 from .pyfolder import post_iv_gwsw
@@ -320,7 +320,7 @@ class QSWATMOD2(object):
 
         # === Export data to file
         self.dlg.pushButton_export_sd.clicked.connect(self.export_stf)
-        self.dlg.pushButton_export_wt.clicked.connect(self.export_wt)
+        self.dlg.pushButton_export_wt.clicked.connect(self.export_gw)
 
         ## Export mf_recharge to shapefile
         self.dlg.radioButton_mf_results_d.toggled.connect(self.import_mf_dates)
@@ -360,7 +360,7 @@ class QSWATMOD2(object):
         self.dlg.pushButton_std_export_wb.clicked.connect(self.export_wb)
         ##
         self.dlg.checkBox_stream_obd.toggled.connect(self.check_stf_obd)
-        self.dlg.checkBox_wt_obd.toggled.connect(self.read_wtObd)
+        self.dlg.checkBox_wt_obd.toggled.connect(self.check_gw_obd)
         # self.dlg.pushButton_refresh.clicked.connect(self.swat_analyze_subbasin)
         self.dlg.pushButton_createMF.clicked.connect(self.createMF)
         self.dlg.pushButton_execute_linking.clicked.connect(self.geoprocessing_prepared)
@@ -528,8 +528,8 @@ class QSWATMOD2(object):
     def check_stf_obd(self):
         post_i_sw.check_stf_obd(self)
 
-    def read_wtObd(self):
-        post_ii_wt.read_wtObd(self)
+    def check_gw_obd(self):
+        post_ii_gw.check_gw_obd(self)
 
     def export_mf_results(self):
         if (
@@ -657,7 +657,7 @@ class QSWATMOD2(object):
     def export_mf_obs(self):
         modflow_functions.export_modflow_obs(self)
         self.dlg.groupBox_plot_wt.setEnabled(True)
-        post_ii_wt.read_grid_id(self)
+        post_ii_gw.read_grid_id(self)
         msgBox = QMessageBox()
         msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
         msgBox.setMaximumSize(1000, 200) # resize not working
@@ -975,7 +975,7 @@ class QSWATMOD2(object):
             # db_functions.DB_Pull_Project(self)
 
             post_i_sw.read_sub_no(self)
-            post_ii_wt.read_grid_id(self)
+            post_ii_gw.read_grid_id(self)
             retrieve_ProjHistory.wt_act(self)
             self.dlg.raise_()     
             # self.define_sim_period()  
@@ -1058,17 +1058,9 @@ class QSWATMOD2(object):
         #     msgBox.setText("There was a problem plotting the result!")
         #     msgBox.exec_()  
 
-    def export_wt(self):
-        if self.dlg.comboBox_hh_time.currentText() == "Daily":
-            post_ii_wt.export_wt_daily(self)
-        elif self.dlg.comboBox_hh_time.currentText() == "Monthly":
-            post_ii_wt.export_wt_monthly(self)         
-        elif self.dlg.comboBox_hh_time.currentText() == "Annual":
-            post_ii_wt.export_wt_annual(self)
-        else:
-            msgBox = QMessageBox()
-            msgBox.setText("There was a problem plotting the result!")
-            msgBox.exec_()  
+    def export_gw(self):
+        ts = self.dlg.comboBox_hh_time.currentText()
+        post_ii_gw.export_gw(self, ts)
 
     def plot_gwsw(self):
         post_iv_gwsw.plot_gwsw(self)
@@ -1987,4 +1979,5 @@ class QSWATMOD2(object):
         post_i_sw.get_stf_cols(self)
 
     def get_gwl_cols(self):
-        post_ii_wt.get_gwl_cols(self)
+        # if self.dlg.checkBox_wt_obd.isChecked():
+        post_ii_gw.get_gwl_cols(self)
