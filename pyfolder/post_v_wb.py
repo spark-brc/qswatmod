@@ -1073,21 +1073,21 @@ def export_wb_d(self):
         dff = data[ssdate:sedate]
         with open(os.path.join(outfolder, "wb_daily.txt"), 'w') as f:
             f.write("# Daily water balance [mm] - QSWATMOD2 Plugin " + version + time + "\n")
-            dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', line_terminator='\n', encoding='utf-8')
+            dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
         msgBox.setText("'wb_daily.txt' file is exported to your 'exported_files' folder!")
     elif self.dlg.radioButton_std_month.isChecked():
         dfm = data.resample('M').mean()
         dff = dfm[ssdate:sedate]
         with open(os.path.join(outfolder, "wb_monthly_average.txt"), 'w') as f:
             f.write("# Monthly average water balance [mm] - QSWATMOD2 Plugin " + version + time + "\n")
-            dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', line_terminator='\n', encoding='utf-8')
+            dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
         msgBox.setText("'wb_monthly_average.txt' file is exported to your 'exported_files' folder!")
     elif self.dlg.radioButton_std_year.isChecked():
         dfa = data.resample('A').mean()
         dff = dfa[ssdate:sedate]
         with open(os.path.join(outfolder, "wb_annual_average.txt"), 'w') as f:
             f.write("# Annual average water balance [mm] - QSWATMOD2 Plugin " + version + time + "\n")
-            dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', line_terminator='\n', encoding='utf-8')
+            dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
         msgBox.setText("'wb_annual_average.txt' file is exported to your 'exported_files' folder!")
     msgBox.exec_()
 
@@ -1149,14 +1149,14 @@ def export_wb_m(self):
         dff = data[ssdate:sedate]
         with open(os.path.join(outfolder, "wb_monthly_total.txt"), 'w') as f:
             f.write("# Monthly total water balance [mm] - QSWATMOD2 Plugin " + version + time + "\n")
-            dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', line_terminator='\n', encoding='utf-8')
+            dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
         msgBox.setText("'wb_monthly_total.txt' file is exported to your 'exported_files' folder!")
     elif self.dlg.radioButton_std_year.isChecked():
         dfa = data.resample('A').mean()
         dff = dfa[ssdate:sedate]
         with open(os.path.join(outfolder, "wb_annual_avg_monthly_total.txt"), 'w') as f:
             f.write("# Annual average monthly total water balance [mm] - QSWATMOD2 Plugin " + version + time + "\n")
-            dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', line_terminator='\n', encoding='utf-8')
+            dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
         msgBox.setText("'wb_annual_avg_monthly_total.txt' file is exported to your 'exported_files' folder!")
     msgBox.exec_()
 
@@ -1212,7 +1212,7 @@ def export_wb_a(self):
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
     with open(os.path.join(outfolder, "wb_annual_total.txt"), 'w') as f:
         f.write("# Annual total water balance [mm] - QSWATMOD2 Plugin " + version + time + "\n")
-        dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', line_terminator='\n', encoding='utf-8')
+        dff.to_csv(f, index_label="Date", sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
     msgBox = QMessageBox()
     msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
     msgBox.setWindowTitle("Exported!")

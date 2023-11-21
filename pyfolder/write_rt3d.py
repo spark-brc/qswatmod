@@ -633,16 +633,16 @@ def write_rt3d_inputs(self):
         #     pr_df = create_porosity_array(self)
         #     pr_df.to_csv(
         #             f, sep=' ', index=False, header=None, float_format='%.5e',
-        #             line_terminator='\n', encoding='utf-8')
+        #             lineterminator='\n', encoding='utf-8')
         create_icbund(self)
         icb_df = create_icbund_array(self)
         por_df_ = create_porosity_array2(self)
-        por_df_.to_csv(f, sep='\t', index=False, header=None, line_terminator='\n', encoding='utf-8')
+        por_df_.to_csv(f, sep='\t', index=False, header=None, lineterminator='\n', encoding='utf-8')
         # ICBUND
         f.write("'ICBUND ARRAY -----------------------------------------------------------------'\n")
         # create_icbund(self)
         # icb_df = create_icbund_array(self)
-        icb_df.to_csv(f, sep='\t', index=False, header=None, line_terminator='\n', encoding='utf-8')
+        icb_df.to_csv(f, sep='\t', index=False, header=None, lineterminator='\n', encoding='utf-8')
         f.write("'INITIAL CONCENTRATIONS: EACH SPECIES -----------------------------------------'\n")
         # NO3
         if self.radioButton_no3_s.isChecked() and self.lineEdit_no3_s.text():
@@ -652,7 +652,7 @@ def write_rt3d_inputs(self):
             no3_df = create_no3_array(self)
             no3_df.to_csv(
                     f, sep=' ', index=False, header=None, float_format='%.5e',
-                    line_terminator='\n', encoding='utf-8')
+                    lineterminator='\n', encoding='utf-8')
         # P
         if self.radioButton_p_s.isChecked() and self.lineEdit_p_s.text():
             f.write("0 {} P\n".format(create_p_s(self)))
@@ -661,7 +661,7 @@ def write_rt3d_inputs(self):
             p_df = create_p_array(self)
             p_df.to_csv(
                     f, sep=' ', index=False, header=None, float_format='%.5e',
-                    line_terminator='\n', encoding='utf-8')
+                    lineterminator='\n', encoding='utf-8')
         # options
         f.write("'VALUE INDICATING INACTIVE CELL CONCENTRATION ---------------------------------'\n")
         f.write(" -999.0000\n")
@@ -679,7 +679,7 @@ def write_rt3d_inputs(self):
         f.write("{} 1\n".format(obs_info))
         obs_df.to_csv(
                 f, sep=' ', index=False, header=None,
-                line_terminator='\n', encoding='utf-8')        
+                lineterminator='\n', encoding='utf-8')        
         f.write("'OUTPUT MASS BUDGET FILES	----------------------------------------------------'\n")
         f.write("F\n")
 
