@@ -1700,8 +1700,6 @@ class QSWATMOD2(object):
         # self.dlg.textEdit_sm_link_log.append('MODFLOW grid area is calculated!')
         # QCoreApplication.processEvents()
 
-
-
         # Get dhru_grid
         linking_process.dhru_grid(self)
         self.dlg.progressBar_sm_link.setValue(70) 
@@ -1782,7 +1780,7 @@ class QSWATMOD2(object):
         exe_file = os.path.normpath(os.path.join(output_dir, name ))
 
         # os.startfile(File_Physical)
-        p = subprocess.Popen(exe_file , cwd = output_dir) # cwd -> current working directory    
+        p = subprocess.Popen(exe_file , cwd=output_dir) # cwd -> current working directory    
         # p.wait()  ## following line to wait till running is finished. 
 
     def check_outputs(self):

@@ -1137,7 +1137,7 @@ def export_modflow_obs(self):
     l_sorted = sorted(l, key=operator.itemgetter(grid_id_index))
 
     # Extract grid_ids and layers as lists
-    grid_ids = [g[grid_id_index] for g in l_sorted]
+    grid_ids = [int(g[grid_id_index]) for g in l_sorted]
     layers = [l[layer_index] for l in l_sorted]
     elevs_mf = ['{:.2f}'.format(l[elev_mf_idx]) for l in l_sorted]
 
@@ -1164,8 +1164,8 @@ def export_modflow_obs(self):
     nrow = []
     ncol = []
     for grid_id in grid_ids:
-        nrow.append(iy[grid_id-1])
-        ncol.append(ix[grid_id-1])
+        nrow.append(iy[int(grid_id)-1])
+        ncol.append(ix[int(grid_id)-1])
     data = list(zip(nrow, ncol, layers, grid_ids, elevs_mf))
 
     # ------------ Export Data to file -------------- #
