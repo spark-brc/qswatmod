@@ -25,12 +25,13 @@ def read_grid_id(self):
             self.layer = QgsProject.instance().mapLayersByName("mf_obs (SWAT-MODFLOW)")[0]
             feats = self.layer.getFeatures()
             # get grid_id as a list
-            unsorted_grid_id = [str(f.attribute("grid_id")) for f in feats]
+            unsorted_grid_id = [int(f.attribute("grid_id")) for f in feats]
             # Sort this list
-            sorted_grid_id = sorted(unsorted_grid_id, key = int)
+            sorted_grid_id = sorted(unsorted_grid_id, key=int)
             # a = sorted(a, key=lambda x: float(x))
             self.dlg.comboBox_grid_id.clear()
             # self.dlg.comboBox_sub_number.addItem('')
+            sorted_grid_id = [str(i) for i in sorted_grid_id]
             self.dlg.comboBox_grid_id.addItems(sorted_grid_id) # in addItem list should contain string numbers
         else:
             self.dlg.groupBox_plot_wt.setEnabled(False)
