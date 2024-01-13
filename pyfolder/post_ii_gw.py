@@ -106,7 +106,10 @@ def plot_gw(self, ts):
     obd_file = self.dlg.comboBox_dtw_obd.currentText()
     grid_id = self.dlg.comboBox_grid_id.currentText()
     fig, ax = plt.subplots(figsize=(9, 4))
-    ax.set_ylabel(r'Stream Discharge $[m^3/s]$', fontsize=8)
+    if self.dlg.checkBox_depthTowater.isChecked():
+        ax.set_ylabel(r'Depth to water $[m]$', fontsize=8)
+    else:
+        ax.set_ylabel(r'Groundwater level $[m]$', fontsize=8)
     ax.tick_params(axis='both', labelsize=8)
     if self.dlg.checkBox_wt_obd.isChecked():
         plot_gw_sim_obd(self, ax, wd, obd_file, startDate, grid_id, ts)

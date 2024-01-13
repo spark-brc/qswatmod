@@ -26,7 +26,7 @@ if __name__ == "__main__":
     wd = "D:/Projects/Watersheds/Koksilah/analysis/koksilah_swatmf/SWAT-MODFLOW"
     # outfd = "d:/Projects/Watersheds/Okavango/Analysis/2nd_cali"
     # get_rech_avg_m_df(wd).to_csv(os.path.join(outfd, 'test.csv'))
-    obd_file = "dtw_day.obd.csv"
+    obd_file = "stf_day.obd.csv"
     startDate = "1/1/2009"
     strObd = read_stf_obd(wd, obd_file)
     # output_rch = read_output_rch_data(wd)
