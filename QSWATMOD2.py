@@ -1955,7 +1955,7 @@ class QSWATMOD2(object):
             post_iii_rch.create_rech_avg_mon_shp(self)
     
     def export_mf_rech_avg_m(self):
-        post_iii_rch.export_mf_rech_avg_m(self)
+        post_iii_rch.export_mf_rch_avg_m(self)
 
     def read_vector_maps_hydrology(self):
         post_iii_rch.read_vector_maps_hydrology(self)
