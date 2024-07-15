@@ -1681,7 +1681,7 @@ class QSWATMOD2(object):
         self.dlg.checkBox_filesPrepared.setChecked(0)
         self.dlg.progressBar_sm_link.setValue(0)
         self.dlg.textEdit_sm_link_log.append('======== Start Linking Process =========')
-
+        # '''
         # Calculate HRU area
         linking_process.calculate_hru_area(self)
         self.dlg.progressBar_sm_link.setValue(20)         
@@ -1741,7 +1741,7 @@ class QSWATMOD2(object):
         # linking_process.create_river_grid_filter(self) #SWAT
         # linking_process.delete_river_grid_with_threshold(self) #SWAT
         # ---------------------------------------------------------------
-
+        # '''
         # Export tables from layers
         time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
         self.dlg.textEdit_sm_link_log.append(time+' -> ' + 'Exporting tables from layers ... processing') 
