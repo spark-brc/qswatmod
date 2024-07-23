@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import glob
 
 def dummpy(wd):
 
@@ -31,8 +32,33 @@ def date_range_freq(df, startDate):
     #     return pd.date_range(startDate, periods=len(df.stf_sim), freq="A")
 
 
+def check_bas(wd):
+
+    for filename in glob.glob(wd+"/*.bas"):
+        with open(filename, "r") as f:
+            data = []
+            for line in f.readlines():
+                if not line.startswith("#"):
+                    data.append(line.replace('\n', '').split())
+    # Get an elevation list from discretiztion file
+    ii = 2  # Starting line
+    icbunds = []
+    # while float(data[ii][0]) > -2:
+    #     print(ii)
+    #     for jj in range(len(data[ii])):
+    #         icbunds.append(int(data[ii][jj]))
+    #     ii += 1
+    while data[ii][0] != "internal":
+        if float(data[ii][0]) < -2:
+            break
+        for jj in range(len(data[ii])):
+            icbunds.append(int(data[ii][jj]))
+        ii += 1
+    print(icbunds)
+
+
 
 
 if __name__ == "__main__":
-    wd = "D:\\Projects\\Watersheds\\MiddleBosque\\Analysis\\SWAT-MODFLOWs\\qsm_300\\SWAT-MODFLOW"
-    dummpy(wd)
+    wd = "D:\\Projects\\Watersheds\\minjing\\swmf_v2\\swmf2\\SWAT-MODFLOW"
+    check_bas(wd)

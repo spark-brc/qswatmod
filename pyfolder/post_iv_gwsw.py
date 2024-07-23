@@ -701,7 +701,7 @@ def export_gwsw(self):
     df = f_c.drop(['x_max', 'y_max'], axis=1)
 
     # Add info
-    version = "version 2.7."
+    version = "version 2.8."
     time = datetime.datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     # msgBox = QMessageBox()
@@ -950,3 +950,4 @@ def export_gwswToShp(self):
     msgBox.setWindowTitle("Exported!")
     msgBox.setText("GWSW results have been exported to the GWSW shapefile!")
     msgBox.exec_()
+

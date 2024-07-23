@@ -330,6 +330,8 @@ class QSWATMOD2(object):
         self.dlg.pushButton_export_mf_results.clicked.connect(self.export_mf_results)
         # average monthly
         self.dlg.groupBox_hr_avg_mon.toggled.connect(self.get_rech_avg_m_df)
+        self.dlg.groupBox_hr_avg_mon.toggled.connect(self.get_head_avg_m_df)
+
 
 
         # 4th Read GWSW
@@ -533,18 +535,27 @@ class QSWATMOD2(object):
 
     def export_mf_results(self):
         if (
-            self.dlg.checkBox_recharge.isChecked() and 
-            not self.dlg.groupBox_hr_avg_mon.isChecked() and
-            not self.dlg.mGroupBox_rt_avg.isChecked()
+            self.dlg.checkBox_recharge.isChecked() and  # recharge
+            not self.dlg.groupBox_hr_avg_mon.isChecked() and # not avg monthly
+            not self.dlg.mGroupBox_rt_avg.isChecked() # not avg rt
             ):
-            post_iii_rch.export_mf_recharge(self)
+            post_iii_rch.export_mf_recharge(self) # general recharge
         elif (
-            self.dlg.checkBox_recharge.isChecked() and 
-            self.dlg.groupBox_hr_avg_mon.isChecked()
+            self.dlg.checkBox_recharge.isChecked() and #recharge 
+            self.dlg.groupBox_hr_avg_mon.isChecked() # avg monthly
             ):
-            self.export_mf_rech_avg_m()
-        elif self.dlg.checkBox_head.isChecked():
+            self.export_mf_rech_avg_m() # avg month recharge
+        elif (
+            self.dlg.checkBox_head.isChecked() and
+            not self.dlg.groupBox_hr_avg_mon.isChecked() and # not avg monthly
+            not self.dlg.mGroupBox_rt_avg.isChecked() # not avg rt            
+            ):
             post_vi_head.export_mf_head(self)
+        elif (
+            self.dlg.checkBox_head.isChecked() and
+            self.dlg.groupBox_hr_avg_mon.isChecked()  # avg monthly
+            ):
+            post_vi_head.export_mf_head_avg_m(self)        
         elif self.dlg.checkBox_nitrate.isChecked() and not self.dlg.mGroupBox_rt_avg.isChecked():
             post_vii_nitrate.export_rt_cno3(self)
         elif  self.dlg.checkBox_nitrate.isChecked() and self.dlg.mGroupBox_rt_avg.isChecked():
@@ -1670,7 +1681,7 @@ class QSWATMOD2(object):
         self.dlg.checkBox_filesPrepared.setChecked(0)
         self.dlg.progressBar_sm_link.setValue(0)
         self.dlg.textEdit_sm_link_log.append('======== Start Linking Process =========')
-
+        # '''
         # Calculate HRU area
         linking_process.calculate_hru_area(self)
         self.dlg.progressBar_sm_link.setValue(20)         
@@ -1699,8 +1710,6 @@ class QSWATMOD2(object):
         # self.dlg.progressBar_sm_link.setValue(80)
         # self.dlg.textEdit_sm_link_log.append('MODFLOW grid area is calculated!')
         # QCoreApplication.processEvents()
-
-
 
         # Get dhru_grid
         linking_process.dhru_grid(self)
@@ -1732,7 +1741,7 @@ class QSWATMOD2(object):
         # linking_process.create_river_grid_filter(self) #SWAT
         # linking_process.delete_river_grid_with_threshold(self) #SWAT
         # ---------------------------------------------------------------
-
+        # '''
         # Export tables from layers
         time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
         self.dlg.textEdit_sm_link_log.append(time+' -> ' + 'Exporting tables from layers ... processing') 
@@ -1782,7 +1791,7 @@ class QSWATMOD2(object):
         exe_file = os.path.normpath(os.path.join(output_dir, name ))
 
         # os.startfile(File_Physical)
-        p = subprocess.Popen(exe_file , cwd = output_dir) # cwd -> current working directory    
+        p = subprocess.Popen(exe_file , cwd=output_dir) # cwd -> current working directory    
         # p.wait()  ## following line to wait till running is finished. 
 
     def check_outputs(self):
@@ -1957,7 +1966,7 @@ class QSWATMOD2(object):
             post_iii_rch.create_rech_avg_mon_shp(self)
     
     def export_mf_rech_avg_m(self):
-        post_iii_rch.export_mf_rech_avg_m(self)
+        post_iii_rch.export_mf_rch_avg_m(self)
 
     def read_vector_maps_hydrology(self):
         post_iii_rch.read_vector_maps_hydrology(self)
@@ -1966,6 +1975,13 @@ class QSWATMOD2(object):
         post_iii_rch.cvt_vtr_hydrology(self)
 
 
+# NOTE: --- head avg mon
+    def get_head_avg_m_df(self):
+        if self.dlg.groupBox_hr_avg_mon.isChecked():
+            post_vi_head.create_head_avg_mon_shp(self)
+
+    def export_mf_head_avg_m(self):
+        post_vi_head.export_mf_head_avg_m(self)
 
     # put another ui in main ui
     def openRT3Dui(self):

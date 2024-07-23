@@ -2,7 +2,8 @@ import numpy as np
 import datetime
 import os
 from PyQt5.QtWidgets import QMessageBox
-from qgis.PyQt import QtGui    
+from qgis.PyQt import QtGui
+import pandas as pd
 
 class ObjFns:
     def __init__(self) -> None:
@@ -124,6 +125,7 @@ class PlotUtils:
 
     # NOTE: metrics =======================================================================================
     def calculate_metrics(self, ax, df3, grid_id, obd_col):
+        # df3 = df3.astype({str(grid_id): float, obd_col: float})
         r_squared = ((sum((df3[obd_col] - df3[obd_col].mean()) * (df3[str(grid_id)] - df3[str(grid_id)].mean())))**2) / (
                 (sum((df3[obd_col] - df3[obd_col].mean())**2) * (sum((df3[str(grid_id)] - df3[str(grid_id)].mean())**2)))
         )

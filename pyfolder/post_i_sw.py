@@ -138,16 +138,16 @@ def plot_stf_obd(self, ax, wd, obd_file, startDate, subnum, ts):
     strObd = read_stf_obd(self, wd, obd_file)
     output_rch = read_output_rch_data(self, wd)
     obd_col = self.dlg.comboBox_SD_obs_data.currentText()
-    try:
-        df = output_rch.loc[subnum]
-        df = update_index(self, df, startDate)
-        df = time_cvt(self, df, ts)
-        ax.plot(df.index.values, df.stf_sim.values, c='limegreen', lw=1, label="Simulated")
-        df2 = pd.concat([df, strObd[obd_col]], axis=1)
-        df3 = df2.dropna()
-        plot_observed_data(self, ax, df3, obd_col)
-    except Exception as e:
-        handle_exception(self, ax, str(e))
+    # try:
+    df = output_rch.loc[subnum]
+    df = update_index(self, df, startDate)
+    df = time_cvt(self, df, ts)
+    ax.plot(df.index.values, df.stf_sim.values, c='limegreen', lw=1, label="Simulated")
+    df2 = pd.concat([df, strObd[obd_col]], axis=1)
+    df3 = df2.dropna()
+    plot_observed_data(self, ax, df3, obd_col)
+    # except Exception as e:
+    #     handle_exception(self, ax, str(e))
 
 def plot_simulated(self, ax, wd, subnum, startDate, ts):
     
@@ -275,7 +275,7 @@ def export_stf(self, ts):
     obd_file = self.dlg.comboBox_stf_obd.currentText()
     obd_col = self.dlg.comboBox_SD_obs_data.currentText()
 
-    version = "version 2.7."
+    version = "version 2.8."
     ctime = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     if self.dlg.checkBox_stream_obd.isChecked():

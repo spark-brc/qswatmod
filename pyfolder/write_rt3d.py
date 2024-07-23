@@ -115,7 +115,10 @@ def create_icbund(self):
         # Get an elevation list from discretiztion file
         ii = 2  # Starting line
         icbunds = []
-        while float(data[ii][0]) > -2:
+        # while float(data[ii][0]) > -2: BUG: ValueError: could not convert string to float: 'internal'
+        while data[ii][0] != "internal":
+            if float(data[ii][0]) < -2:
+                break
             for jj in range(len(data[ii])):
                 icbunds.append(int(data[ii][jj]))
             ii += 1
@@ -519,7 +522,7 @@ def rt3d_obs_shapefile(self):
         pattern = os.path.splitext(inFileName)[0] + '.*'
         
         # inName = os.path.splitext(inFile)[0]
-        inName = 'rt3d_obs_apexmf'
+        inName = 'rt3d_obs_swatmf'
         for f in glob.iglob(pattern):
             suffix = os.path.splitext(f)[1]
             if os.name == 'nt':

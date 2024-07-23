@@ -25,12 +25,13 @@ def read_grid_id(self):
             self.layer = QgsProject.instance().mapLayersByName("mf_obs (SWAT-MODFLOW)")[0]
             feats = self.layer.getFeatures()
             # get grid_id as a list
-            unsorted_grid_id = [str(f.attribute("grid_id")) for f in feats]
+            unsorted_grid_id = [int(f.attribute("grid_id")) for f in feats]
             # Sort this list
-            sorted_grid_id = sorted(unsorted_grid_id, key = int)
+            sorted_grid_id = sorted(unsorted_grid_id, key=int)
             # a = sorted(a, key=lambda x: float(x))
             self.dlg.comboBox_grid_id.clear()
             # self.dlg.comboBox_sub_number.addItem('')
+            sorted_grid_id = [str(i) for i in sorted_grid_id]
             self.dlg.comboBox_grid_id.addItems(sorted_grid_id) # in addItem list should contain string numbers
         else:
             self.dlg.groupBox_plot_wt.setEnabled(False)
@@ -105,7 +106,10 @@ def plot_gw(self, ts):
     obd_file = self.dlg.comboBox_dtw_obd.currentText()
     grid_id = self.dlg.comboBox_grid_id.currentText()
     fig, ax = plt.subplots(figsize=(9, 4))
-    ax.set_ylabel(r'Stream Discharge $[m^3/s]$', fontsize=8)
+    if self.dlg.checkBox_depthTowater.isChecked():
+        ax.set_ylabel(r'Depth to water $[m]$', fontsize=8)
+    else:
+        ax.set_ylabel(r'Groundwater level $[m]$', fontsize=8)
     ax.tick_params(axis='both', labelsize=8)
     if self.dlg.checkBox_wt_obd.isChecked():
         plot_gw_sim_obd(self, ax, wd, obd_file, startDate, grid_id, ts)
@@ -248,7 +252,7 @@ def export_gw(self, ts):
     grid_id = self.dlg.comboBox_grid_id.currentText()
     obd_col = self.dlg.comboBox_wt_obs_data.currentText()
     
-    version = "version 2.7."
+    version = "version 2.8."
     ctime = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     if self.dlg.checkBox_wt_obd.isChecked():
