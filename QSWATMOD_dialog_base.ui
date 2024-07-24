@@ -7760,7 +7760,7 @@ SWAT-MODFLOW Simulation</string>
           </font>
          </property>
          <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#0000ff;&quot;&gt;- Version: 2.7-&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#0000ff;&quot;&gt;- Version: 2.8-&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
