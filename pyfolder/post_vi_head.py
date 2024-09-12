@@ -403,7 +403,7 @@ def create_head_avg_mon_shp(self):
 
 def export_mf_head_avg_m(self):
     mbig_df = get_head_avg_m_df(self)
-    '''
+    # '''
     selected_months = post_iii_rch.selected_mf_mon(self)
     self.layer = QgsProject.instance().mapLayersByName("mf_head_avg_mon")[0]
     per = 0
@@ -443,4 +443,4 @@ def export_mf_head_avg_m(self):
     msgBox.setWindowTitle("Exported!")
     msgBox.setText("mf_head_avg_mon results were exported successfully!")
     msgBox.exec_()
-    '''
+    # '''

@@ -18,6 +18,7 @@ import os
 import processing
 from PyQt5.QtWidgets import QMessageBox
 from QSWATMOD2.modules import shapefile_sm
+from matplotlib.colors import Normalize
 
 
 # try:
@@ -174,7 +175,7 @@ def create_sm_riv(self):
         layer = QgsProject.instance().addMapLayer(layer)
 
 
-def plot_gwsw(self):
+def plot_gwsw_org(self):
     import scipy.stats as ss
     import operator
     import numpy as np
@@ -261,10 +262,12 @@ def plot_gwsw(self):
 
     # Sort coordinates by row
     c_sorted = sorted(coords, key=operator.itemgetter(0))
+    c_sorted = sorted(c_sorted, key=operator.itemgetter(1), reverse=True)
 
     # Put coordinates and gwsw data in Dataframe together
     f_c = pd.DataFrame(c_sorted, columns=['x_min', 'y_min', 'x_max', 'y_max'])
     f_c['gwsw'] = mf_gwsws
+    f_c['gwsw'] = f_c['gwsw'].astype('float') 
 
     #### ==========================================================================
     gwsw_f = f_c['gwsw'].astype('float') 
@@ -293,7 +296,10 @@ def plot_gwsw(self):
     fig.subplots_adjust(left = 0.1, right = 0.9, top = 0.9, bottom = 0.2, hspace=0.2, wspace=0.1)
     ax1 = fig.add_subplot(111, frameon=False)
     ax1.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-    ax1 = plt.imshow(np.array([[gwsw_f.max(), gwsw_f.min()]]), cmap = plt.cm.get_cmap(color))
+
+    # NOTE: temp: gives max and min for a paper
+    ax1 = plt.imshow(np.array([[-450, 450]]), cmap = plt.cm.get_cmap(color))
+    # ax1 = plt.imshow(np.array([[gwsw_f.max(), gwsw_f.min()]]), cmap = plt.cm.get_cmap(color))
     ax1.set_visible(False)
     ax.tick_params(axis='both', labelsize=6)
 
@@ -335,14 +341,14 @@ def plot_gwsw(self):
         cb = plt.colorbar(cax=cbaxes, orientation="horizontal")
         cb.ax.tick_params(labelsize= 7)
         # cb.ax.invert_yaxis()
-        cb.ax.set_title('Groundwater Discharge [$m^3/day$]', fontsize=8,
+        cb.ax.set_title(' - To Stream   |   + To Aquifer\n[$m^3/day$]', fontsize=8,
                         # position=(1.05, 0.17),
                         horizontalalignment='center',
                         # y = 1.05,
                         # fontweight='semibold',
                         # transform=axes[0,0].transAxes
                         )
-    # River
+        
     if self.dlg.checkBox_gwsw_river.isChecked():
         for rv in (river.shapeRecords()):
             rx = [i[0] for i in rv.shape.points[:]]
@@ -367,6 +373,237 @@ def plot_gwsw(self):
            width=width * widthExg, align='center',
            alpha=0.7, color=recols, zorder=3)
     plt.show()
+
+def plot_gwsw(self):
+    import scipy.stats as ss
+    import operator
+    import numpy as np
+
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    stdate, eddate, stdate_warmup, eddate_warmup = self.define_sim_period()
+    wd = QSWATMOD_path_dict['SMfolder']
+    startDate = stdate.strftime("%m-%d-%Y")
+    # Open "amf_MF_gwsw.out" file
+    y = ("for", "Positive:", "Negative:", "Daily", "Monthly", "Annual", "Layer,")  # Remove unnecssary lines
+    selectedDate = self.dlg.comboBox_gwsw_dates.currentText()
+
+    if self.dlg.radioButton_gwsw_day.isChecked():
+        filename = "swatmf_out_MF_gwsw"
+        with open(os.path.join(wd, filename), "r") as f:
+            data = [x.strip() for x in f if x.strip() and not x.strip().startswith(y)] # Remove blank lines
+        date = [x.strip().split() for x in data if x.strip().startswith("Day:")] # Collect only lines with dates
+        onlyDate = [x[1] for x in date]  # Only date
+        data1 = [x.split() for x in data]  # make each line a list
+        sdate = datetime.datetime.strptime(startDate, "%m-%d-%Y") # Change startDate format
+        dateList = [(sdate + datetime.timedelta(days=int(i)-1)).strftime("%m-%d-%Y") for i in onlyDate]
+
+        # Reverse step
+        dateIdx = dateList.index(selectedDate)
+        #only
+        onlyDate_lookup = onlyDate[dateIdx]
+        for num, line in enumerate(data1, 1):
+            if line[0] == "Day:" in line and line[1] == onlyDate_lookup in line:
+                ii = num # Starting line
+    elif self.dlg.radioButton_gwsw_month.isChecked():
+        filename = "swatmf_out_MF_gwsw_monthly"
+        with open(os.path.join(wd, filename), "r") as f:
+            data = [x.strip() for x in f if x.strip() and not x.strip().startswith(y)]  
+        date = [x.strip().split() for x in data if x.strip().startswith("month:")]
+        data1 = [x.split() for x in data]
+        onlyDate = [x[1] for x in date] 
+        dateList = pd.date_range(startDate, periods=len(onlyDate), freq='M').strftime("%b-%Y").tolist()
+        # Reverse step
+        dateIdx = dateList.index(selectedDate)
+        # Find year 
+        dt = datetime.datetime.strptime(selectedDate, "%b-%Y")
+        year = dt.year
+        # only
+        onlyDate_lookup = onlyDate[dateIdx]
+        for num, line in enumerate(data1, 1):
+            if ((line[0] == "month:" in line) and (line[1] == onlyDate_lookup in line) and (line[3] == str(year) in line)):
+                ii = num # Starting line
+    elif self.dlg.radioButton_gwsw_year.isChecked():
+        filename = "swatmf_out_MF_gwsw_yearly"
+        with open(os.path.join(wd, filename), "r") as f:
+            data = [x.strip() for x in f if x.strip() and not x.strip().startswith(y)]  
+        date = [x.strip().split() for x in data if x.strip().startswith("year:")]
+        data1 = [x.split() for x in data]
+        onlyDate = [x[1] for x in date] 
+        dateList = pd.date_range(startDate, periods=len(onlyDate), freq='A').strftime("%Y").tolist()
+
+        # Reverse step
+        dateIdx = dateList.index(selectedDate)
+        #only
+        onlyDate_lookup = onlyDate[dateIdx]
+        for num, line in enumerate(data1, 1):
+            if line[0] == "year:" in line and line[1] == onlyDate_lookup in line:
+                ii = num # Starting line
+    else:
+        msgBox = QMessageBox()
+        msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
+        msgBox.setWindowTitle("Oops!")
+        msgBox.setText("Please, select one of the time options!")
+        msgBox.exec_()
+
+    #### Layer
+    orgGIS = QSWATMOD_path_dict['org_shps']
+    smGIS = QSWATMOD_path_dict['SMshps']
+    river = shapefile_sm.Reader(os.path.join(orgGIS, "riv_SM.shp" )) # River
+    sub = shapefile_sm.Reader(os.path.join(orgGIS, "mf_boundary.shp" )) # dissolved sub
+    sm_riv = shapefile_sm.Reader(os.path.join(smGIS, "sm_riv.shp"))
+
+    # ------------------------------------------------------------------------------
+    sr = sm_riv.shapes() # property of sm_river
+    coords = [sr[i].bbox for i in range(len(sr))] # get coordinates for each river cell
+    width = abs(coords[0][2] - coords[0][0]) # get width for bar plot
+    nSM_riv = len(sr) # Get number of river cells
+    mf_gwsws = [data1[i][3] for i in range(ii, ii + nSM_riv)] # get gwsw data ranging from ii to 
+
+    # Sort coordinates by row
+    # c_sorted = sorted(coords, key=operator.itemgetter(1), reverse=True)
+    # c_sorted = sorted(c_sorted, key=operator.itemgetter(0))
+
+    c_sorted = sorted(coords, key=operator.itemgetter(0))
+    c_sorted = sorted(c_sorted, key=operator.itemgetter(1), reverse=True)
+
+
+
+    # Put coordinates and gwsw data in Dataframe together
+    f_c = pd.DataFrame(c_sorted, columns=['x_min', 'y_min', 'x_max', 'y_max'])
+    f_c['gwsw'] = mf_gwsws
+    f_c['gwsw'] = f_c['gwsw'].astype('float') 
+
+    #### ==========================================================================
+    gwsw_f = f_c['gwsw'].astype('float') 
+    # gwsw_f = f_c['gwsw'].values
+
+    # gwsw_ff = gwsw_f.astype('int')
+    ranks = ss.rankdata(gwsw_f, method='dense')
+
+    # colored bar with their ranks
+    if self.dlg.checkBox_color_reverse.isChecked():
+        color = self.dlg.comboBox_colormaps.currentText() + '_r'
+    else:
+        color = self.dlg.comboBox_colormaps.currentText()
+    colormap = plt.cm.get_cmap(color)
+
+
+    if self.dlg.checkBox_darktheme.isChecked():
+        plt.style.use('dark_background')
+    else:
+        plt.style.use('default')
+    
+    fig, ax = plt.subplots()
+    fig.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.2, hspace=0.2, wspace=0.1)
+    ax1 = fig.add_subplot(111, frameon=False)
+    ax1.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+    
+    # NOTE: temp: gives max and min for a paper
+    ax1 = plt.imshow(np.array([[-450, 450]]), cmap = plt.cm.get_cmap(color))
+    # ax1 = plt.imshow(np.array([[gwsw_f.max(), gwsw_f.min()]]), cmap = plt.cm.get_cmap(color))
+    ax1.set_visible(False)
+    ax.tick_params(axis='both', labelsize=6)
+
+    ### Get extent
+    self.layer = QgsProject.instance().mapLayersByName("sub (SWAT)")[0]
+    extent = self.layer.extent()
+    x_min = extent.xMinimum()
+    x_max = extent.xMaximum()
+    y_min = extent.yMinimum()
+    y_max = extent.yMaximum()
+
+    ### User inputs ===========================================================================
+    widthExg = float(self.dlg.doubleSpinBox_w_exag.value())
+    verExg = float(self.dlg.doubleSpinBox_h_exag.value())*0.01
+    # verExg = float(0.01)
+
+    # Title
+    if self.dlg.checkBox_gwsw_title.isChecked():
+        ax.set_title('- {} -'.format(selectedDate), loc = 'left', fontsize = 8, fontweight = 'bold' )
+
+    # frame
+    if self.dlg.checkBox_gwsw_frame.isChecked():
+        ax.axis('on') # -> takes ticks too.
+    else:
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        # ax.axis('off')
+
+    # coordinates
+    if not self.dlg.checkBox_gwsw_coords.isChecked():
+        ax.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)        
+    else:
+        # ax.tick_params(top='off', bottom='on', left='on', right='off')
+        ax.tick_params(top=False, bottom=True, left=True, right=False)
+    # colorbar
+    if self.dlg.checkBox_gwsw_colorbar.isChecked():
+        cbaxes = fig.add_axes([0.3, 0.05, 0.4, 0.02])
+        cb = plt.colorbar(cax=cbaxes, orientation="horizontal")
+        cb.ax.tick_params(labelsize=7)
+        # cb.ax.invert_yaxis()
+        cb.ax.set_title(' - To Stream   |   + To Aquifer\n[$m^3/day$]', fontsize=8,
+                        # position=(1.05, 0.17),
+                        horizontalalignment='center',
+                        # y = 1.05,
+                        # fontweight='semibold',
+                        # transform=axes[0,0].transAxes
+                        )
+    # River
+    if self.dlg.checkBox_gwsw_river.isChecked():
+        for rv in (river.shapeRecords()):
+            rx = [i[0] for i in rv.shape.points[:]]
+            ry = [i[1] for i in rv.shape.points[:]]
+            ax.plot(rx, ry, lw=1, c='b', alpha=0.5)
+    # Boundary
+    if self.dlg.checkBox_gwsw_boundary.isChecked():     
+        for sb in (sub.shapeRecords()):
+            sx = [i[0] for i in sb.shape.points[:]]
+            sy = [i[1] for i in sb.shape.points[:]]
+            ax.plot(sx, sy, lw = 0.5, c = 'grey')
+
+    # ----------------------------------------------------------------------------------------
+    if self.dlg.checkBox_gwsw_yaxes.isChecked():
+        y_axis_min = float(self.dlg.lineEdit_gwsw_y_min.text())
+        y_axis_max = float(self.dlg.lineEdit_gwsw_y_max.text())
+        ax.set_ylim([y_axis_min, y_axis_max])
+    # set size!
+    ax.imshow(np.random.random((10, 10)), extent=[x_min, x_max, y_min, y_max], alpha=0)
+
+    # NOTE: TEMP
+    # dicharge = f_c[f_c['gwsw'] < 0]
+    # seepage = f_c[f_c['gwsw'] > 0]
+
+
+    # # recols = [colors[(int(rank)-1)] for rank in ranks]
+    # ax.bar(
+    #         dicharge.x_min, (dicharge.gwsw.astype('float')*-1*verExg),
+    #         bottom=dicharge.y_min,
+    #         width=width * widthExg, align='center',
+    #         alpha=0.7, color='red', zorder=3,)
+    # ax.bar(
+    #         seepage.x_min, (seepage.gwsw.astype('float')*-1*verExg),
+    #         bottom=seepage.y_min,
+    #         width=width * widthExg, align='center',
+    #         alpha=0.7, color='b', zorder=3,)
+    # get normalize function (takes data in range [vmin, vmax] -> [0, 1])
+    # my_norm = Normalize(vmin=gwsw_f.min(), vmax=gwsw_f.max())
+    my_norm = Normalize(vmin=-450, vmax=450)
+    ax.bar(
+            f_c.x_min, (gwsw_f*-1*verExg),
+            bottom=f_c.y_min,
+            width=width * widthExg, align='center',
+            alpha=0.7, color=colormap(my_norm(np.array(gwsw_f))), zorder=3,)    
+
+    # NOTE:
+    plt.savefig(os.path.join(wd, 'fig_{}.png'.format(selectedDate)), transparent=True, dpi=300)
+    plt.show()
+
+
+
+
+
 
 
 def plot_gwsw_ani (self):
@@ -530,9 +767,6 @@ def plot_gwsw_ani (self):
             cb.ax.set_title('Groundwater Discharge [$m^3/day$]', fontsize = 8,
                             # position=(1.05, 0.17),
                             horizontalalignment = 'center',
-            #               y = 1.05,
-            #               fontweight='semibold',
-                            # transform=axes[0,0].transAxes
                             )       
 
         # River
@@ -694,6 +928,7 @@ def export_gwsw(self):
 
     # Sort coordinates by row
     c_sorted = sorted(coords, key=operator.itemgetter(0))
+    c_sorted = sorted(c_sorted, key=operator.itemgetter(1), reverse=True)
 
     # Put coordinates and gwsw data in Dataframe together
     f_c = pd.DataFrame(c_sorted, columns=['x_coord', 'y_coord', 'x_max', 'y_max'])
@@ -777,7 +1012,6 @@ def create_gwsw_shp(self):
                 sm_riv, gwsw_day_shp,
                 "utf-8", sm_riv.crs(), "ESRI Shapefile")
             layer = QgsVectorLayer(gwsw_day_shp, '{0}'.format("gwsw_day"), 'ogr')
-
             # Put in the group
             root = QgsProject.instance().layerTreeRoot()
             swatmf_results = root.findGroup("swatmf_results")
@@ -942,7 +1176,7 @@ def export_gwswToShp(self):
                     # Update progress bar 
                     count += 1
                     progress = (100*count) / totalDate
-                    self.dlg.progressBar_gwsw.setValue(progress)
+                    self.dlg.progressBar_gwsw.setValue(int(progress))
                     QCoreApplication.processEvents()
     self.layer.commitChanges()
     msgBox = QMessageBox()
