@@ -46,7 +46,7 @@ def check_stf_obd(self):
         if self.dlg.comboBox_stf_obd.count()==0:
             msgBox = QMessageBox()
             msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-            msgBox.setWindowTitle("No 'streamflow.obd' file found!")
+            msgBox.setWindowTitle("No 'streamflow.obd.csv' file found!")
             msgBox.setText("Please, provide streamflow measurement files!")
             msgBox.exec_()
             self.dlg.checkBox_stream_obd.setChecked(0)  

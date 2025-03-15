@@ -499,7 +499,8 @@ def plot_gwsw(self):
     ax1.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
     
     # NOTE: temp: gives max and min for a paper
-    ax1 = plt.imshow(np.array([[-450, 450]]), cmap = plt.cm.get_cmap(color))
+    ax1 = plt.imshow(np.array([[-1020, 1020]]), cmap = plt.cm.get_cmap(color))
+    # my_norm = Normalize(vmin=-1020, vmax=15)
     # ax1 = plt.imshow(np.array([[gwsw_f.max(), gwsw_f.min()]]), cmap = plt.cm.get_cmap(color))
     ax1.set_visible(False)
     ax.tick_params(axis='both', labelsize=6)
@@ -589,7 +590,7 @@ def plot_gwsw(self):
     #         alpha=0.7, color='b', zorder=3,)
     # get normalize function (takes data in range [vmin, vmax] -> [0, 1])
     # my_norm = Normalize(vmin=gwsw_f.min(), vmax=gwsw_f.max())
-    my_norm = Normalize(vmin=-450, vmax=450)
+    my_norm = Normalize(vmin=-1020, vmax=1020)
     ax.bar(
             f_c.x_min, (gwsw_f*-1*verExg),
             bottom=f_c.y_min,
@@ -1185,3 +1186,112 @@ def export_gwswToShp(self):
     msgBox.setText("GWSW results have been exported to the GWSW shapefile!")
     msgBox.exec_()
 
+def export_avg_mgwsw(self):
+    import scipy.stats as ss
+    import operator
+    import numpy as np
+
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    stdate, eddate, stdate_warmup, eddate_warmup = self.define_sim_period()
+    wd = QSWATMOD_path_dict['SMfolder']
+    outfolder = QSWATMOD_path_dict['exported_files']
+    startDate = stdate.strftime("%m-%d-%Y")
+    msgBox = QMessageBox()
+    msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
+
+    # Open "swatmf_out_MF_gwsw" file
+    y = ("for", "Positive:", "Negative:", "Daily", "Monthly", "Annual", "Layer,")  # Remove unnecssary lines
+    
+    
+    
+    
+    selectedDate = self.dlg.comboBox_gwsw_dates.currentText()
+
+    filename = "swatmf_out_MF_gwsw_monthly"
+    with open(os.path.join(wd, filename), "r") as f:
+        data = [x.strip() for x in f if x.strip() and not x.strip().startswith(y)]  
+    date = [x.strip().split() for x in data if x.strip().startswith("month:")]
+    data1 = [x.split() for x in data]
+    onlyDate = [x[1] for x in date] 
+    #dateList = [(sdate + datetime.timedelta(months = int(i)-1)).strftime("%m-%Y") for i in onlyDate]
+    dateList = pd.date_range(startDate, periods = len(onlyDate), freq = 'M').strftime("%b-%Y").tolist()
+    
+    
+    # Reverse step
+    dateIdx = dateList.index(selectedDate)
+    # Find year 
+    dt = datetime.datetime.strptime(selectedDate, "%b-%Y")
+    year = dt.year
+    #only
+    onlyDate_lookup = onlyDate[dateIdx]
+    for num, line in enumerate(data1, 1):
+        if ((line[0] == "month:" in line) and (line[1] == onlyDate_lookup in line) and (line[3] == str(year) in line)):
+            ii = num # Starting line
+
+    #### Layer
+    orgGIS = QSWATMOD_path_dict['org_shps']
+    smGIS = QSWATMOD_path_dict['SMshps']
+    river = shapefile_sm.Reader(os.path.join(orgGIS, "riv_SM.shp" )) # River
+    sub = shapefile_sm.Reader(os.path.join(orgGIS, "mf_boundary.shp" )) # dissolved sub
+    sm_riv = shapefile_sm.Reader(os.path.join(smGIS, "sm_riv.shp"))
+    # ------------------------------------------------------------------------------
+    sr = sm_riv.shapes() # property of sm_river
+    coords = [sr[i].bbox for i in range(len(sr))] # get coordinates for each river cell
+    width = abs(coords[0][2] - coords[0][0]) # get width for bar plot
+    nSM_riv = len(sr) # Get number of river cells
+    mf_gwsws = [data1[i][3] for i in range(ii, ii + nSM_riv)] # get gwsw data ranging from ii to 
+
+    # Sort coordinates by row
+    c_sorted = sorted(coords, key=operator.itemgetter(0))
+    c_sorted = sorted(c_sorted, key=operator.itemgetter(1), reverse=True)
+
+    # Put coordinates and gwsw data in Dataframe together
+    f_c = pd.DataFrame(c_sorted, columns=['x_coord', 'y_coord', 'x_max', 'y_max'])
+    f_c['gwsw'] = mf_gwsws
+    df = f_c.drop(['x_max', 'y_max'], axis=1)
+
+    # Add info
+    version = "version 2.8."
+    time = datetime.datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
+
+    # msgBox = QMessageBox()
+    # msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))   
+    if self.dlg.radioButton_gwsw_day.isChecked():
+        with open(os.path.join(outfolder, "GWSW(" + str(selectedDate) + ")_daily.txt"), 'w') as f:
+            f.write("# GWSW(" + str(selectedDate) + ")_daily - QSWATMOD2 Plugin " + version + time + "\n")
+            df.to_csv(
+                f,
+                # index_label="Date",
+                index=False,
+                sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
+        msgBox.setWindowTitle("Exported!") 
+        msgBox.setText(
+            "'GWSW"+"(" + str(selectedDate) + 
+            ")_daily.txt' file is exported to your 'exported_files' folder!")
+        msgBox.exec_()
+    elif self.dlg.radioButton_gwsw_month.isChecked():
+        with open(os.path.join(outfolder, "GWSW(" + str(selectedDate) + ")_monthly.txt"), 'w') as f:
+            f.write("# GWSW(" + str(selectedDate) + ")_monthly - QSWATMOD2 Plugin " + version + time + "\n")
+            df.to_csv(
+                f,
+                # index_label="Date",
+                index=False,
+                sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
+        msgBox.setWindowTitle("Exported!") 
+        msgBox.setText(
+            "'GWSW"+"(" + str(selectedDate) + 
+            ")_monthly.txt' file is exported to your 'exported_files' folder!")
+        msgBox.exec_()
+    elif self.dlg.radioButton_gwsw_year.isChecked():
+        with open(os.path.join(outfolder, "GWSW(" + str(selectedDate) + ")_annual.txt"), 'w') as f:
+            f.write("# GWSW(" + str(selectedDate) + ")_annual - QSWATMOD2 Plugin " + version + time + "\n")
+            df.to_csv(
+                f,
+                # index_label="Date",
+                index=False,
+                sep='\t', float_format='%.2f', lineterminator='\n', encoding='utf-8')
+        msgBox.setWindowTitle("Exported!") 
+        msgBox.setText(
+            "'GWSW"+"(" + str(selectedDate) + 
+            ")_annual.txt' file is exported to your 'exported_files' folder!")
+        msgBox.exec_()
