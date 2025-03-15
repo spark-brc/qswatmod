@@ -414,7 +414,7 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
 
 
 
-    def create_MF_grid_autocorrect(self): # Create fishnet based on user inputs
+    def create_MF_grid_autocorrect(self): # Create fishnet based on user inputs no more needed
         time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
         self.textEdit_mf_log.append(time+' -> ' + "Creating MODFLOW grids ... processing")
         self.label_mf_status.setText("Creating MODFLOW grids ... ")
