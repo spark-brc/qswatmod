@@ -25,8 +25,9 @@ from builtins import zip
 from builtins import str
 from builtins import range
 import pandas as pd
-import geopandas as gpd
+import time
 import sqlite3
+import csv
 import os
 import os.path
 import posixpath
@@ -34,12 +35,13 @@ import ntpath
 import shutil
 import glob
 import processing
+from qgis.utils import iface
 from qgis.PyQt.QtSql import QSqlDatabase, QSqlQuery
 from qgis.PyQt.QtCore import QCoreApplication, QVariant, QSettings, QFileInfo
 from qgis.PyQt import QtGui, uic, QtCore, QtSql
 import numpy as np
 # import pandas as pd
-from qgis.core import QgsProject, QgsFeatureRequest
+from qgis.core import QgsProject, QgsFeatureRequest, QgsProcessingException
 import distutils.dir_util
 from datetime import datetime
 
@@ -58,7 +60,7 @@ from qgis.core import (
                     QgsProject, QgsVectorLayer, QgsVectorFileWriter, QgsField, 
                     QgsLayerTreeLayer, QgsRasterLayer
                     )
-
+from PyQt5.QtCore import QTimer
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'ui/createMFmodel.ui'))
 class createMFmodelDialog(QDialog, FORM_CLASS):
@@ -94,7 +96,9 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
         self.radioButton_initialH_uniform.toggled.connect(self.initialH_option)
         self.radioButton_initialH_raster.toggled.connect(self.initialH_option)
         self.pushButton_initialH_raster.clicked.connect(self.loadInitialH)
-        self.pushButton_evt_raster.clicked.connect(self.loadEVT)        
+        self.radioButton_evt_single.toggled.connect(self.evt_option)
+        self.radioButton_evt_raster.toggled.connect(self.evt_option)
+        self.pushButton_evt_raster.clicked.connect(self.loadEVT)
         self.pushButton_writeMF.clicked.connect(self.writeMF)
         self.DB_Pull_mf_inputs()  # instant call
         self.pushButton_reset.clicked.connect(self.DB_resetTodefaultVal)
@@ -189,8 +193,6 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
         self.progressBar_mf_status.setValue(100)
         QCoreApplication.processEvents()
 
-
-
     def createMFfolder(self):
         settings = QSettings()
         if settings.contains('/QSWATMOD2/LastInputPath'):
@@ -205,67 +207,34 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
         return mffolder_path
 
     # navigate to the DEM raster from SWAT
-    def loadDEM(self):        
-        QSWATMOD_path_dict = self.dirs_and_paths()
-        settings = QSettings()
-        if settings.contains('/QSWATMOD2/LastInputPath'):
-            path = str(settings.value('/QSWATMOD2/LastInputPath'))
-        else:
-            path = ''
-        title = "Choose DEM rasterfile"
-        inFileName, __ = QFileDialog.getOpenFileName(None, title, path, "Rasterfiles (*.tif);; All files (*.*)")
-        if inFileName:
-            settings.setValue('/QSWATMOD2/LastInputPath', os.path.dirname(str(inFileName)))
-            Out_folder = QSWATMOD_path_dict['org_shps']
-            inInfo = QFileInfo(inFileName)
-            inFile = inInfo.fileName()
-            pattern = os.path.splitext(inFileName)[0] + '.*'
-            baseName = inInfo.baseName()    
-            # inName = os.path.splitext(inFile)[0]
-            inName = 'DEM'
-            for f in glob.iglob(pattern):
-                suffix = os.path.splitext(f)[1]
-                if os.name == 'nt':
-                    outfile = ntpath.join(Out_folder, inName + suffix)
-                else:
-                    outfile = posixpath.join(Out_folder, inName + suffix)                    
-                shutil.copy(f, outfile)        
-            if os.name == 'nt':
-                DEM = ntpath.join(Out_folder, inName + ".tif")
-            else:
-                DEM = posixpath.join(Out_folder, inName + ".tif")
-            layer = QgsRasterLayer(DEM, '{0} ({1})'.format("DEM","SWAT"))
-            # Put in the group
-            root = QgsProject.instance().layerTreeRoot()
-            swat_group = root.findGroup("SWAT") 
-            QgsProject.instance().addMapLayer(layer, False)
-            swat_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-            self.lineEdit_loadDEM.setText(DEM)
-            return DEM
+    def loadDEM(self):
+        geovar_path = writeMF.load_geovar_raster(self, geovar='top_elev')
+        self.lineEdit_loadDEM.setText(geovar_path)
 
     def loadHK(self):
-        writeMF.loadHK(self)
-        writeMF.getHKfromR(self)
+        # writeMF.loadHK(self)
+        geovar_path = writeMF.load_geovar_raster(self, geovar='hk')
+        self.lineEdit_hk_raster.setText(geovar_path)
 
     def loadBotElev(self):
-        writeMF.loadBotElev(self)
-        writeMF.getBotfromR(self)
+        geovar_path = writeMF.load_geovar_raster(self, geovar='evt')
+        self.lineEdit_evt_raster.setText(geovar_path)
 
     def loadSS(self):
-        writeMF.loadSS(self)
-        writeMF.getSSfromR(self)
+        geovar_path = writeMF.load_geovar_raster(self, geovar='ss')
+        self.lineEdit_ss_raster.setText(geovar_path)
 
     def loadSY(self):
-        writeMF.loadSY(self)
-        writeMF.getSYfromR(self)
+        geovar_path = writeMF.load_geovar_raster(self, geovar='sy')
+        self.lineEdit_sy_raster.setText(geovar_path)
 
     def loadInitialH(self):
-        writeMF.loadInitialH(self)
-        writeMF.getIHfromR(self)
+        geovar_path = writeMF.load_geovar_raster(self, geovar='ih')
+        self.lineEdit_initialH_raster.setText(geovar_path)
 
     def loadEVT(self):
-        writeMF.loadEVT(self)
-        writeMF.getEVTfromR(self)
+        geovar_path = writeMF.load_geovar_raster(self, geovar='evt')
+        self.lineEdit_evt_raster.setText(geovar_path)
 
     def import_mf_bd(self):
     # Initiate function
@@ -330,7 +299,7 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
             self.lineEdit_boundary.setText(mf_bd_gpkg)
 
     # NOTE: clear about gpkg or shp
-    def use_sub_shapefile(self):
+    def use_sub_shapefile_bak(self):
         QSWATMOD_path_dict = self.dirs_and_paths()
 
         try:
@@ -367,6 +336,35 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
             # self.dlg.checkBox_default_extent.setChecked(0)
         # return layer
 
+
+    def use_sub_shapefile(self):
+        QSWATMOD_path_dict = self.dirs_and_paths()
+
+
+        input1 = QgsProject.instance().mapLayersByName("sub (SWAT)")[0]
+        #provider = layer.dataProvider()
+        name = "mf_boundary"
+        name_ext = "mf_boundary.shp"
+        output_dir = QSWATMOD_path_dict['org_shps']
+        mf_boundary = os.path.join(output_dir, name_ext)
+        params = {
+            'INPUT': input1,
+            'OUTPUT': mf_boundary
+        }
+        processing.run("native:dissolve", params)
+
+        # defining the outputfile to be loaded into the canvas
+        layer = QgsVectorLayer(mf_boundary, '{0} ({1})'.format("mf_boundary","MODFLOW"), 'ogr')
+
+        # Put in the group
+        root = QgsProject.instance().layerTreeRoot()
+        mf_group = root.findGroup("MODFLOW")    
+        QgsProject.instance().addMapLayer(layer, False)
+        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
+        #subpath = layer.source()
+        self.lineEdit_boundary.setText(mf_boundary)
+
+
     def get_attribute_to_dataframe(self, layer):
         #List all columns you want to include in the dataframe. I include all with:
         cols = [f.name() for f in layer.fields()] #Or list them manually: ['kommunnamn', 'kkod', ... ]
@@ -375,157 +373,23 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
         df = pd.DataFrame.from_records(data=datagen, columns=cols)
         return df
 
+    def delete_layers(self, layer_names):
+        for lyr in list(QgsProject.instance().mapLayers().values()):
+            if lyr.name() in layer_names:
+                lyr_source = lyr.source()
+                QgsProject.instance().removeMapLayers([lyr.id()])
+                time.sleep(1)
+                if os.path.exists(lyr_source):
+                    os.remove(lyr_source)
+                self.iface.mapCanvas().refreshAllLayers()
+                self.iface.mapCanvas().refresh()
+                
 
-
-
-    def check_mf_grid(self):
-        if QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)"):
-            layer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-            df = self.get_attribute_to_dataframe(layer)
-            max_col = df['col'].max()
-            last_col = df['col'].iloc[-1]
-            if max_col == last_col:
-                print("True")
-            else:
-                for lyr in list(QgsProject.instance().mapLayers().values()):
-                    if lyr.name() == ("mf_grid (MODFLOW)"):
-                        QgsProject.instance().removeMapLayers([lyr.id()])
-                    if lyr.name() == ("top_elev (MODFLOW)"):
-                        QgsProject.instance().removeMapLayers([lyr.id()])                   
-                    if lyr.name() == ("mf_act_grid (MODFLOW)"):
-                        QgsProject.instance().removeMapLayers([lyr.id()])
-                self.create_MF_grid_autocorrect()
-                    
-
-
-        #     msgBox = QMessageBox()
-        #     msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-        #     msgBox.setWindowTitle("Completed!")
-        #     msgBox.setText("Linking process has been completed successfully!")
-        #     msgBox.exec_()
-
-        # else:
-        #     msgBox = QMessageBox()
-        #     msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-        #     msgBox.setWindowTitle("Completed!")
-        #     msgBox.setText("LOL!")
-        #     msgBox.exec_()
-        
-
-
-
-    def create_MF_grid_autocorrect(self): # Create fishnet based on user inputs
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Creating MODFLOW grids ... processing")
-        self.label_mf_status.setText("Creating MODFLOW grids ... ")
-        self.progressBar_mf_status.setValue(0)
-        QCoreApplication.processEvents()
-
-        QSWATMOD_path_dict = self.dirs_and_paths()
-        input1 = QgsProject.instance().mapLayersByName("mf_boundary (MODFLOW)")[0]
-        ext = input1.extent()
-        xmin = ext.xMinimum()
-        xmax = ext.xMaximum()
-        ymin = ext.yMinimum()
-        ymax = ext.yMaximum()
-        delc = float(self.doubleSpinBox_delc.value())
-        delr = float(self.doubleSpinBox_delr.value())
-
-        # Add_Subtract number of column, row
-        n_row = self.spinBox_row.value()
-        n_col = 1
-
-        xmax = xmax + (delc * n_col)
-        ymin = ymin - (delr * n_row)
-        nx = round(abs(abs(xmax) - abs(xmin)) / delc)
-        ny = round(abs(abs(ymax) - abs(ymin)) / delr)    
-
-
-        # if self.groupBox_mf_add.isChecked():
-        #     xmax = xmax + (delc * n_col)
-        #     ymin = ymin - (delr * n_row)
-        #     nx = round(abs(abs(xmax) - abs(xmin)) / delc)
-        #     ny = round(abs(abs(ymax) - abs(ymin)) / delr)            
-        # else:
-        #     nx = round(abs(abs(xmax) - abs(xmin)) / delc)
-        #     ny = round(abs(abs(ymax) - abs(ymin)) / delr)
-        ngrid = abs(int(nx*ny))
-        MF_extent = "{a},{b},{c},{d}".format(a=xmin, b=xmax, c=ymin, d=ymax)
-
-        # create dummy grid
-        name_ext_ = "mf_grid_.gpkg"
-        output_dir = QSWATMOD_path_dict['org_shps']
-        output_file_ = os.path.normpath(os.path.join(output_dir, name_ext_))
-
-        crs = input1.crs()
-        # running the acutal routine:
-        params_ = {
-            'TYPE': 2,
-            'EXTENT': MF_extent,
-            'HSPACING': delc,
-            'VSPACING': delr,
-            'CRS': crs,
-            'OUTPUT': output_file_
-        }
-        processing.run("native:creategrid", params_)
-
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Creating MODFLOW grids ... passed")
-        self.label_mf_status.setText('Step Status: ')
-        self.progressBar_mf_status.setValue(100)
-        QCoreApplication.processEvents()
-
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Fixing starting index ... processing")
-        self.label_mf_status.setText("Fixing starting index... ")
-        self.progressBar_mf_status.setValue(0)
-        QCoreApplication.processEvents()
-
-        # rasterize
-        name_ext_r = 'mf_grid_.tif'
-        output_file_r = os.path.normpath(os.path.join(output_dir, name_ext_r))
-        params_r = {
-            'INPUT': output_file_,
-            'UNITS': 1,
-            'WIDTH': delc,
-            'HEIGHT': delr,
-            'EXTENT': MF_extent,
-            'NODATA': -9999,
-            'DATA_TYPE': 5,
-            'OUTPUT': output_file_r
-        }
-        processing.run("gdal:rasterize", params_r)
-        # vecterize
-        name_ext_v = 'mf_grid.gpkg'
-        output_file_v = os.path.normpath(os.path.join(output_dir, name_ext_v))
-        #
-        params_v = {
-            'INPUT_RASTER': output_file_r,
-            'RASTER_BAND': 1,
-            'FIELD': 'VALUE',
-            'OUTPUT': output_file_v
-        }
-        processing.run("native:pixelstopolygons", params_v)
-        # Define the outputfile to be loaded into the canvas
-        mf_grid_shapefile = os.path.join(output_dir, name_ext_v)
-        layer = QgsVectorLayer(mf_grid_shapefile, '{0} ({1})'.format("mf_grid","MODFLOW"), 'ogr')
-        # Put in the group
-        root = QgsProject.instance().layerTreeRoot()
-        mf_group = root.findGroup("MODFLOW")    
-        QgsProject.instance().addMapLayer(layer, False)
-        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Fixing starting index ... passed")
-        self.label_mf_status.setText('Step Status: ')
-        self.progressBar_mf_status.setValue(100)
-        QCoreApplication.processEvents()
 
     def create_MF_grid(self):
         # Create fishnet based on user inputs
         desc = "Creating MODFLOW grids"
         self.start_time(desc) 
-
         QSWATMOD_path_dict = self.dirs_and_paths()
         input1 = QgsProject.instance().mapLayersByName("mf_boundary (MODFLOW)")[0]
         ext = input1.extent()
@@ -535,11 +399,9 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
         ymax = ext.yMaximum()
         delc = float(self.doubleSpinBox_delc.value())
         delr = float(self.doubleSpinBox_delr.value())
-
         # Add_Subtract number of column, row
         n_row = self.spinBox_row.value()
         n_col = self.spinBox_col.value()
-
         if self.groupBox_mf_add.isChecked():
             xmax = xmax + (delc * n_col)
             ymin = ymin - (delr * n_row)
@@ -550,12 +412,6 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
             ny = round(abs(abs(ymax) - abs(ymin)) / delr)
         ngrid = abs(int(nx*ny))
         MF_extent = "{a},{b},{c},{d}".format(a=xmin, b=xmax, c=ymin, d=ymax)
-
-        # create dummy grid
-        name_ext_ = "mf_grid_.gpkg"
-        output_dir = QSWATMOD_path_dict['org_shps']
-        output_file_ = os.path.normpath(os.path.join(output_dir, name_ext_))
-
         crs = input1.crs()
         # running the acutal routine:
         params_ = {
@@ -564,18 +420,28 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
             'HSPACING': delc,
             'VSPACING': delr,
             'CRS': crs,
-            'OUTPUT': output_file_
+            'OUTPUT': f"memory:{'mf_grid (MODFLOW)'}"
         }
-        processing.run("native:creategrid", params_)
+
+        mf_grid_lyr = processing.run("native:creategrid", params_)
+        mf_grid_lyr = mf_grid_lyr['OUTPUT']
+
+        # Put in the group  
+        root = QgsProject.instance().layerTreeRoot()
+        mf_group = root.findGroup("MODFLOW")
+        QgsProject.instance().addMapLayer(mf_grid_lyr, False)
+        mf_group.insertChildNode(0, QgsLayerTreeLayer(mf_grid_lyr))
         self.end_time(desc)
 
         desc = "Fixing starting index"
         self.start_time(desc)
         # rasterize
+        # rasterize
         name_ext_r = 'mf_grid_.tif'
+        output_dir = QSWATMOD_path_dict['org_shps']
         output_file_r = os.path.normpath(os.path.join(output_dir, name_ext_r))
         params_r = {
-            'INPUT': output_file_,
+            'INPUT': mf_grid_lyr.source(),
             'UNITS': 1,
             'WIDTH': delc,
             'HEIGHT': delr,
@@ -585,6 +451,9 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
             'OUTPUT': output_file_r
         }
         processing.run("gdal:rasterize", params_r)
+        for lyr in list(QgsProject.instance().mapLayers().values()):
+            if lyr.name() == ("mf_grid (MODFLOW)"):
+                QgsProject.instance().removeMapLayers([lyr.id()])
         # vecterize
         name_ext_v = 'mf_grid.gpkg'
         output_file_v = os.path.normpath(os.path.join(output_dir, name_ext_v))
@@ -596,18 +465,17 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
             'OUTPUT': output_file_v
         }
         processing.run("native:pixelstopolygons", params_v)
-        # Define the outputfile to be loaded into the canvas
-        mf_grid_shapefile = os.path.join(output_dir, name_ext_v)
-        layer = QgsVectorLayer(mf_grid_shapefile, '{0} ({1})'.format("mf_grid","MODFLOW"), 'ogr')
-        # Put in the group
-        root = QgsProject.instance().layerTreeRoot()
-        mf_group = root.findGroup("MODFLOW")    
-        QgsProject.instance().addMapLayer(layer, False)
-        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
         self.end_time(desc)
 
+    def mf_grid_layer(self):
+        output_dir = QSWATMOD_path_dict['org_shps']
+        name_ext_v = 'mf_grid.gpkg'
+        output_file_v = os.path.normpath(os.path.join(output_dir, name_ext_v))
+        layer = QgsVectorLayer(output_file_v, '{0} ({1})'.format("mf_grid","MODFLOW"), 'ogr')
+        return layer
+
     def get_numb_of_colunm(self):
-        layer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
+        layer = self.mf_grid_layer()
         x_cords = []
         for feat in layer.getFeatures():
             # Get the geometry of the feature
@@ -622,13 +490,12 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
         return numb_of_col
 
     def create_mf_db(self):
-        layer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]     
+        layer = self.mf_grid_layer()
         numb_of_col = self.get_numb_of_colunm()
         df = self.get_attribute_to_dataframe(layer)
         tot_feats = len(df)
         df["grid_id"] = df.iloc[:, 0]
         numb_of_row = int(tot_feats / numb_of_col)
-
         # Get row and column lists
         iy = [] # row
         ix = [] # col
@@ -639,15 +506,18 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
         df["row"] = iy
         df["col"] = ix
         output_dir = QSWATMOD_path_dict['db_files']
+        if os.path.exists(os.path.join(output_dir, 'mf.db')):
+            os.remove(os.path.join(output_dir, 'mf.db'))
         connection = sqlite3.connect(os.path.join(output_dir, 'mf.db')) # Creates a new file if it doesn't exist
         df.to_sql('mf_db', connection, if_exists='replace', index=False)
         connection.close()
 
     def join_mf_grid_db(self):
-        layer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-        output_dir = QSWATMOD_path_dict['SMshps']
+        layer = self.mf_grid_layer()
+        output_dir = QSWATMOD_path_dict['org_shps']
         db_dir = QSWATMOD_path_dict['db_files']
-        mf_grid_join = os.path.join(output_dir, 'mf_grid.gpkg')
+        mf_grid_join = os.path.join(output_dir, 'mf_grid_f.gpkg')
+
         params = {
             'INPUT': layer.source(),
             'FIELD': 'fid',
@@ -659,141 +529,14 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
             'PREFIX': '',
             'OUTPUT': mf_grid_join
         }
-        # if there is an existing mf_grid shapefile, it will be removed
-        for lyr in list(QgsProject.instance().mapLayers().values()):
-            if lyr.name() == ("mf_grid (MODFLOW)"):
-                QgsProject.instance().removeMapLayers([lyr.id()])
         processing.run("native:joinattributestable", params)
 
-        # Define the outputfile to be loaded into the canvas
-        # mf_grid_shapefile = os.path.join(output_dir, name_ext_v)
-        layer = QgsVectorLayer(mf_grid_join, '{0} ({1})'.format("mf_grid","MODFLOW"), 'ogr')
-        # Put in the group
-        root = QgsProject.instance().layerTreeRoot()
-        mf_group = root.findGroup("MODFLOW")    
-        QgsProject.instance().addMapLayer(layer, False)
-        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-        # self.end_time(desc)
-
-
-    def create_grid_id_ii(self):
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Creating 'grid_id' ... processing")
-        self.label_mf_status.setText("Creating 'grid_id' ... ")
-        self.progressBar_mf_status.setValue(0)
-        QCoreApplication.processEvents()
-
-        self.layer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-        provider = self.layer.dataProvider()
-
-        if provider.fields().indexFromName("grid_id") == -1:
-            field = QgsField("grid_id", QVariant.Int)
-            provider.addAttributes([field])
-            self.layer.updateFields()
-
-            # I don't know
-            grid_id = provider.fields().indexFromName("grid_id")
-            feats = self.layer.getFeatures()
-            tot_feats = self.layer.featureCount()
-            count = 0
-            self.layer.startEditing()
-            for i, f in enumerate(feats):
-                self.layer.changeAttributeValue(f.id(), grid_id, i+1)
-                count += 1
-                provalue = round(count/tot_feats*100)
-                self.progressBar_mf_status.setValue(provalue)
-                QCoreApplication.processEvents()
-            self.layer.commitChanges()
-            QCoreApplication.processEvents()
-        else:
-            time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-            self.textEdit_mf_log.append(time+' -> ' + "'grid_id' already exists ...")
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Creating 'grid_id' ... passed")
-        self.label_mf_status.setText('Step Status: ')
-        QCoreApplication.processEvents()
-    
-    # for elev, not using *.dis file. instead using DEM
-    def create_row_col_elev_mf_ii (self):
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Creating 'row', 'col, 'elev' ... processing")
-        self.label_mf_status.setText("Creating 'row', 'col, 'elev' ... ")
-        self.progressBar_mf_status.setValue(0)
-        QCoreApplication.processEvents()
-
-        import math
-        QSWATMOD_path_dict = self.dirs_and_paths()
-        self.layer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-        provider = self.layer.dataProvider()
-
-        # from qgis.core import QgsField, QgsExpression, QgsFeature
-        if provider.fields().indexFromName( "row" ) == -1:
-            field = QgsField("row", QVariant.Int)
-            provider.addAttributes([field])
-            self.layer.updateFields()
-        
-        # Create Column field
-        if provider.fields().indexFromName( "col" ) == -1:
-            field = QgsField("col", QVariant.Int)
-            provider.addAttributes([field])
-            self.layer.updateFields()
-
-        # Get the index numbers of the fields
-        # elev_mean = provider.fields().indexFromName( "elev_mean" )
-        row = provider.fields().indexFromName("row")
-        col = provider.fields().indexFromName("col")
-
-        # Change name
-        for field in self.layer.fields():
-            if field.name() == 'elev_mean':
-                self.layer.startEditing()
-                idx = provider.fields().indexFromName(field.name())
-                self.layer.renameAttribute(idx, "elev_mf")
-                self.layer.commitChanges()
-
-        # Get number of rows and of columns
-        input1 = QgsProject.instance().mapLayersByName("mf_boundary (MODFLOW)")[0]
-        ext = input1.extent()
-        xmin = ext.xMinimum()
-        xmax = ext.xMaximum()
-        ymin = ext.yMinimum()
-        ymax = ext.yMaximum()
-
-        delc = float(self.doubleSpinBox_delc.value())
-        delr = float(self.doubleSpinBox_delr.value())
-
-        nx = math.ceil(abs(abs(xmax) - abs(xmin)) / delc)
-        ny = math.ceil(abs(abs(ymax) - abs(ymin)) / delr) 
-    
-        # Get row and column lists
-        iy = [] # row
-        ix = [] # col
-        for i in range(1, ny + 1):
-            for j in range(1, nx + 1):
-                ix.append(j)
-                iy.append(i)
-
-        # Get features (Find out a way to change attribute values using another field)
-        feats = self.layer.getFeatures()
-        tot_feats = self.layer.featureCount()
-        count = 0
-        self.layer.startEditing()
-
-        # add row number
-        for f, r, c in zip(feats, iy, ix):
-            self.layer.changeAttributeValue(f.id(), row, r)
-            self.layer.changeAttributeValue(f.id(), col, c)
-            count += 1
-            provalue = round(count/tot_feats*100)
-            self.progressBar_mf_status.setValue(provalue)
-            QCoreApplication.processEvents()
-        self.layer.commitChanges()
-        QCoreApplication.processEvents()
-
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Creating 'row', 'col, 'elev' ... passed")
-        self.label_mf_status.setText('Step Status: ')
-        QCoreApplication.processEvents()
+    def mf_grid_layer_f(self):
+        output_dir = QSWATMOD_path_dict['org_shps']
+        name_ext_v = 'mf_grid_f.gpkg'
+        output_file_v = os.path.normpath(os.path.join(output_dir, name_ext_v))
+        layer = QgsVectorLayer(output_file_v, '{0} ({1})'.format("mf_grid","MODFLOW"), 'ogr')
+        return layer
 
 
     #  ======= Update automatically when 1:1 ratio is checked
@@ -829,8 +572,9 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
     def create_mf_act_grid(self):
         desc = "Creating active MODFLOW grids"
         self.start_time(desc)
+        # self.delete_layer("mf_act_grid (MODFLOW)")
         QSWATMOD_path_dict = self.dirs_and_paths()
-        input1 = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
+        input1 = self.mf_grid_layer_f()
         input2 = QgsProject.instance().mapLayersByName("mf_boundary (MODFLOW)")[0]
 
         name = "mf_grid_act"
@@ -854,166 +598,110 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
             "native:saveselectedfeatures",
             {'INPUT': input1, 'OUTPUT':mf_grid_act}
         )
-
         # Deselect the features
         input1.removeSelection()
-        layer = QgsVectorLayer(mf_grid_act, '{0} ({1})'.format("mf_act_grid","MODFLOW"), 'ogr')
-
-        # Put in the group
-        root = QgsProject.instance().layerTreeRoot()
-        mf_group = root.findGroup("MODFLOW")
-        QgsProject.instance().addMapLayer(layer, False)
-        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
         self.end_time(desc)
+        
+    def mf_act_grid_layer(self):
+        output_dir = QSWATMOD_path_dict['org_shps']
+        name_ext_v = 'mf_grid_act.gpkg'
+        output_file_v = os.path.normpath(os.path.join(output_dir, name_ext_v))
+        layer = QgsVectorLayer(output_file_v, '{0} ({1})'.format("mf_act_grid","MODFLOW"), 'ogr')
+        return layer
+
+
+    def only_mf_grid_fields(self):
+        layer = self.mf_grid_layer_f()
+        fields = layer.dataProvider()
+        fdname = [
+                fields.fields().indexFromName(field.name()) for field in fields.fields() if not (
+                    (field.name() == 'fid') or
+                    (field.name() == 'grid_id') or
+                    (field.name() == 'row') or
+                    (field.name() == 'col') or
+                    (field.name() == 'top_elev')
+                    )
+                ]
+        fields.deleteAttributes(fdname)
+        layer.updateFields()
 
     def create_MF_shps(self):
+        layer_names = ["mf_grid (MODFLOW)", "top_elev (MODFLOW)", "mf_act_grid (MODFLOW)"]
+        self.delete_layers(layer_names)
+        self.iface.mapCanvas().refreshAllLayers()
         self.progressBar_mf.setValue(0)
         self.create_MF_grid()
         # self.check_mf_grid()
         self.progressBar_mf.setValue(30)
-        QCoreApplication.processEvents() # it works as F5 !! Be careful to use this for long geoprocessing
+        QCoreApplication.processEvents()
+        # Extract elevation
+
+        # it works as F5 !! Be careful to use this for long geoprocessing
         self.create_mf_db()
         self.join_mf_grid_db()
         # Extract elevation
-        self.getElevfromDem()
         self.progressBar_mf.setValue(50)
         QCoreApplication.processEvents()
-
+        self.only_mf_grid_fields()
+        writeMF.getElevfromDem(self)
         # Get active cells
         self.create_mf_act_grid()
+        writeMF.cvt_geovarToR(self, 'top_elev', geovar_group='DATA')
         self.progressBar_mf.setValue(70)
         QCoreApplication.processEvents()
-
         self.mf_act_grid_delete_NULL()
         QCoreApplication.processEvents()
 
-        '''
-        self.cvtElevToR()
         QCoreApplication.processEvents()
+        # Put in the group
+
+        layer = self.mf_grid_layer_f()
+        root = QgsProject.instance().layerTreeRoot()
+        mf_group = root.findGroup("MODFLOW")    
+        QgsProject.instance().addMapLayer(layer, False)
+        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
+        layer_act = self.mf_act_grid_layer()
+        QgsProject.instance().addMapLayer(layer_act, False)
+        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer_act))
 
         time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
         self.textEdit_mf_log.append(time+' -> ' + 'Done!')
         self.progressBar_mf.setValue(100)
         QCoreApplication.processEvents()
-
+        '''
+        ''' 
+        self.iface.mapCanvas().refreshAllLayers()
+        self.iface.mapCanvas().refresh()
         msgBox = QMessageBox()
         msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
         msgBox.setWindowTitle("Created!")
         msgBox.setText("MODFLOW grids and rasters were created!")
         msgBox.exec_()
-        '''
-
-    # sp 03-20-18 : Change input1 mf_act_grid to mf_grid  
-    def getElevfromDem(self):
-        decs = "Extracting elevation from SWAT DEM"
-        self.start_time(decs)
-
-        input1 = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-        provider = input1.dataProvider()
-        input2 = QgsProject.instance().mapLayersByName("DEM (SWAT)")[0]
-        params = {
-            'INPUT_RASTER': input2,
-            'RASTER_BAND':1,
-            'INPUT_VECTOR': input1,
-            'COLUMN_PREFIX':'elev_',
-            'STATS':[2]            
-        }
-        processing.run("qgis:zonalstatistics", params)
-        # Change name
-        for field in input1.fields():
-            if field.name() == 'elev_mean':
-                input1.startEditing()
-                idx = provider.fields().indexFromName(field.name())
-                input1.renameAttribute(idx, "elev_mf")
-                input1.commitChanges()
-        self.end_time(decs)
-
-    def cvtElevToR(self):
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Converting elevation data to raster ... processing")
-        self.label_mf_status.setText("Converting elevation data to raster ... ")
-        self.progressBar_mf_status.setValue(0)
-        QCoreApplication.processEvents()
-
-        QSWATMOD_path_dict = self.dirs_and_paths()
-        delc = float(self.doubleSpinBox_delc.value())
-        delr = float(self.doubleSpinBox_delr.value())
-        extlayer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-        input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-
-        # get extent
-        ext = extlayer.extent()
-        xmin = ext.xMinimum()
-        xmax = ext.xMaximum()
-        ymin = ext.yMinimum()
-        ymax = ext.yMaximum()
-        extent = "{a},{b},{c},{d}".format(a=xmin, b=xmax, c=ymin, d=ymax)
-
-        name = 'top_elev'
-        name_ext = "top_elev.tif"
-        output_dir = QSWATMOD_path_dict['org_shps']
-        output_raster = os.path.join(output_dir, name_ext)
-        params = {
-            'INPUT': input1,
-            'FIELD': "elev_mf",
-            'UNITS': 1,
-            'WIDTH': delc,
-            'HEIGHT': delr,
-            'EXTENT': extent,
-            'NODATA': -9999,
-            'DATA_TYPE': 5,
-            'OUTPUT': output_raster
-        }
-        processing.run("gdal:rasterize", params)
-
-        # for raster no 'ogr'
-        layer = QgsRasterLayer(output_raster, '{0} ({1})'.format("top_elev","MODFLOW"))
-        
-        # Put in the group
-        root = QgsProject.instance().layerTreeRoot()
-        mf_group = root.findGroup("MODFLOW")
-        QgsProject.instance().addMapLayer(layer, False)
-        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Converting elevation data to raster ... passed")
-        self.label_mf_status.setText('Step Status: ')
-        self.progressBar_mf_status.setValue(100)
-        QCoreApplication.processEvents()
-
-
-
-
-
+        self.iface.mapCanvas().refreshAllLayers()
 
     def mf_act_grid_delete_NULL(self):
         desc = "Deleting nulls"
         self.start_time(desc)
+        ## old way
         # layer = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-
         # params = {
         #     'INPUT': layer,
-        #     'EXPRESSION': '"elev_mf" is NULL',
+        #     'EXPRESSION': '"top_elev" is NULL',
         #     'METHOD': 0
         # }
         # processing.run(
         #     "qgis:selectbyexpression", 
         #     params)
-        
+        ## ---
 
-
-
-        layer = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-        request =  QgsFeatureRequest().setFilterExpression('"elev_mf" IS NULL' )
+        layer = self.mf_act_grid_layer()
+        request =  QgsFeatureRequest().setFilterExpression('"top_elev" IS NULL' )
         request.setSubsetOfAttributes([])
         request.setFlags(QgsFeatureRequest.NoGeometry)
         listOfIds = [f.id() for f in layer.getFeatures(request)]
         # layer.deleteFeature(listOfIds)
         layer.startEditing()
         layer.dataProvider().deleteFeatures( listOfIds )
-
-
-
         # for f in layer.getFeatures(request):
         #     layer.deleteFeature(f.id())
         #     count += 1
@@ -1021,14 +709,16 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
         #     self.progressBar_mf_status.setValue(provalue)
         #     QCoreApplication.processEvents()
         layer.commitChanges()
-
-
-
-
         self.end_time(desc)
 
-    # TODO: create message after finished.
-    def create_mf_riv(self):
+
+    def create_mf_riv_old(self):
+        layer_names = ["mf_riv2 (MODFLOW)", "river_grid (SWAT-MODFLOW)"]
+        self.delete_layers(layer_names)
+        output_dir = QSWATMOD_path_dict['org_shps']
+        name_ext_v = 'mf_riv2.gpkg'
+        if os.path.exists(os.path.join(output_dir, name_ext_v)):
+            os.remove(os.path.join(output_dir, name_ext_v))
         ### ============================================ why!!!!!!!!!!!!!!!!!!!!!!!!
         self.dlg = QSWATMODDialog()
         self.dlg.groupBox_river_cells.setEnabled(True) # not working
@@ -1050,6 +740,307 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
         msgBox.setWindowTitle("Identified!")
         msgBox.setText("River cells have been identified!")
         msgBox.exec_()
+
+    # CREATE MF_RIV
+    def create_mf_riv(self):
+        layer_names = ["mf_riv2 (MODFLOW)", "river_grid (SWAT-MODFLOW)"]
+        self.delete_layers(layer_names)
+        self.iface.mapCanvas().refreshAllLayers()
+        self.mf_riv2()
+        self.river_grid()
+        self.river_grid_delete_NULL()
+        self.rgrid_len()
+        self.delete_river_grid_with_threshold()
+        self.rivInfoTo_mf_riv2_ii()
+        self.riv_cond_delete_NULL()
+        self.create_layer_inRiv()
+        self.export_rgrid_len()
+        QCoreApplication.processEvents()
+
+        root = QgsProject.instance().layerTreeRoot()
+        mf_riv2_layer = self.mf_riv2_layer()
+        mf_group = root.findGroup("MODFLOW")
+        QgsProject.instance().addMapLayer(mf_riv2_layer, False)
+        mf_group.insertChildNode(0, QgsLayerTreeLayer(mf_riv2_layer))
+        river_grid_layer = self.river_grid_layer()
+        sm_group = root.findGroup("SWAT-MODFLOW")
+        QgsProject.instance().addMapLayer(river_grid_layer, False)
+        sm_group.insertChildNode(0, QgsLayerTreeLayer(river_grid_layer))
+        self.iface.mapCanvas().refreshAllLayers()
+        msgBox = QMessageBox()
+        msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
+        msgBox.setWindowTitle("Identified!")
+        msgBox.setText("River cells have been identified!")
+        msgBox.exec_()
+
+
+    def mf_riv2(self):  
+        QSWATMOD_path_dict = self.dirs_and_paths()
+        input1 = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
+        input2 = QgsProject.instance().mapLayersByName("riv (SWAT)")[0]
+        name = "mf_riv2"
+        name_ext = "mf_riv2.gpkg"
+        output_dir = QSWATMOD_path_dict['org_shps']
+        # Select features by location
+        params = { 
+            'INPUT' : input1,
+            'PREDICATE': [0],
+            'INTERSECT': input2,
+            'METHOD': 0,
+        }
+        processing.run('qgis:selectbylocation', params)
+
+        # Save just the selected features of the target layer
+        riv_swat_shp = os.path.join(output_dir, name_ext)
+
+        # Extract selected features
+        processing.run(
+            "native:saveselectedfeatures",
+            {'INPUT': input1, 'OUTPUT':riv_swat_shp, 'OVERWRITE': True}
+        )
+        # Deselect the features
+        input1.removeSelection()
+
+    def mf_riv2_layer(self):
+        QSWATMOD_path_dict = self.dirs_and_paths()
+        output_dir = QSWATMOD_path_dict['org_shps']
+        name_ext_v = 'mf_riv2.gpkg'
+        output_file_v = os.path.normpath(os.path.join(output_dir, name_ext_v))
+        layer = QgsVectorLayer(output_file_v, '{0} ({1})'.format("mf_riv2","MODFLOW"), 'ogr')
+        return layer
+
+    def river_grid(self):
+        input1 = QgsProject.instance().mapLayersByName("riv (SWAT)")[0]
+        input2 = self.mf_riv2_layer()
+        name = "river_grid"
+        name_ext = "river_grid.gpkg"
+        output_dir = QSWATMOD_path_dict['SMshps']
+        output_file = os.path.normpath(os.path.join(output_dir, name_ext))
+        # runinng the actual routine:
+        params = { 
+            'INPUT' : input1,
+            'OVERLAY' : input2, 
+            'OUTPUT' : output_file,
+            'OVERWRITE': True
+        }
+        processing.run('qgis:intersection', params)
+
+    def river_grid_layer(self):
+        QSWATMOD_path_dict = self.dirs_and_paths()
+        output_dir = QSWATMOD_path_dict['SMshps']
+        name_ext_v = 'river_grid.gpkg'
+        output_file_v = os.path.normpath(os.path.join(output_dir, name_ext_v))
+        layer = QgsVectorLayer(output_file_v, '{0} ({1})'.format("river_grid","SWAT-MODFLOW"), 'ogr')
+        return layer   
+
+    def river_grid_delete_NULL(self):
+        layer = self.river_grid_layer()
+        provider = layer.dataProvider()
+        request =  QgsFeatureRequest().setFilterExpression("grid_id IS NULL" )
+        request.setSubsetOfAttributes([])
+        request.setFlags(QgsFeatureRequest.NoGeometry)
+        request2 = QgsFeatureRequest().setFilterExpression("subbasin IS NULL" )
+        request2.setSubsetOfAttributes([])
+        request2.setFlags(QgsFeatureRequest.NoGeometry)
+
+        layer.startEditing()
+        for f in layer.getFeatures(request):
+            layer.deleteFeature(f.id())
+        for f in layer.getFeatures(request2):
+            layer.deleteFeature(f.id())
+        layer.commitChanges()
+
+    def rgrid_len(self):
+        layer = self.river_grid_layer()
+        provider = layer.dataProvider()
+        field = QgsField("rgrid_len", QVariant.Int)
+        provider.addAttributes([field])
+        layer.updateFields()
+        feats = layer.getFeatures()
+        layer.startEditing()
+        for feat in feats:
+            length = feat.geometry().length()
+            #score = scores[i]
+            feat['rgrid_len'] = length
+            layer.updateFeature(feat)
+        layer.commitChanges()
+
+    def delete_river_grid_with_threshold(self):
+        layer = self.river_grid_layer()
+        provider = layer.dataProvider()
+        request =  QgsFeatureRequest().setFilterExpression('"rgrid_len" < 0.5')
+        request.setSubsetOfAttributes([])
+        request.setFlags(QgsFeatureRequest.NoGeometry)
+        layer.startEditing()
+        for f in layer.getFeatures(request):
+            layer.deleteFeature(f.id())
+        layer.commitChanges()
+
+    def rivInfoTo_mf_riv2_ii(self):
+        QSWATMOD_path_dict = self.dirs_and_paths()
+        # try:
+        river_grid = self.river_grid_layer()
+        provider1 = river_grid.dataProvider()
+
+        # Get the index numbers of the fields
+        grid_id_idx = provider1.fields().indexFromName("grid_id")
+        width_idx = provider1.fields().indexFromName("Wid2")
+        depth_idx = provider1.fields().indexFromName("Dep2")
+        row_idx = provider1.fields().indexFromName("row")
+        col_idx = provider1.fields().indexFromName("col")
+        elev_idx = provider1.fields().indexFromName("top_elev")
+        length_idx = provider1.fields().indexFromName("rgrid_len")         
+
+        # transfer the shapefile layer to a python list 
+        l = []
+        for i in river_grid.getFeatures():
+            l.append(i.attributes())
+
+        # then sort by grid_id
+        import operator
+        l_sorted = sorted(l, key=operator.itemgetter(grid_id_idx))
+
+        # Extract grid_ids and layers as lists
+        grid_ids = [g[grid_id_idx] for g in l_sorted]
+        widths = [w[width_idx] for w in l_sorted]
+        depths = [d[depth_idx] for d in l_sorted]
+        rows = [r[row_idx] for r in l_sorted]
+        cols = [c[col_idx] for c in l_sorted]
+        elevs = [e[elev_idx] for e in l_sorted]
+        lengths = [leng[length_idx] for leng in l_sorted]
+
+        data = pd.DataFrame({
+            "grid_id" : grid_ids,
+            "Wid2" : widths,
+            "Dep2" : depths,
+            "row" : rows,
+            "col" : cols,
+            "top_elev" : elevs,
+            "rgrid_len" : lengths
+            })
+        hk = self.lineEdit_riverbedK2.text()
+        rivBedthick = self.lineEdit_riverbedThick2.text()
+        width_sum = data.groupby(["grid_id"])["Wid2"].sum()
+        depth_avg = data.groupby(["grid_id"])["Dep2"].mean()
+        row_avg = data.groupby(["grid_id"])["row"].mean().astype(int)   
+        col_avg = data.groupby(["grid_id"])["col"].mean().astype(int)   
+        elev_avg = data.groupby(["grid_id"])["top_elev"].mean()
+        length_sum = data.groupby(["grid_id"])["rgrid_len"].sum()
+
+        riv2_cond = float(hk)*length_sum*width_sum / float(rivBedthick)
+        riv2_stage = elev_avg + depth_avg + float(rivBedthick)
+        riv2_bot = elev_avg + float(rivBedthick)
+
+        # Convert dataframe to lists
+        row_avg_lst = row_avg.values.tolist()
+        col_avg_lst = col_avg.tolist()
+        riv2_cond_lst = riv2_cond.tolist()
+        riv2_stage_lst = riv2_stage.tolist()
+        riv2_bot_lst = riv2_bot.tolist()
+
+        # Part II ---------------------------------------------------------------
+        layer = self.mf_riv2_layer()
+        provider2 = layer.dataProvider()
+
+        # from qgis.core import QgsField, QgsExpression, QgsFeature
+        if layer.dataProvider().fields().indexFromName("riv_stage") == -1:
+            field = QgsField("riv_stage", QVariant.Double, 'double', 20, 5)
+            provider2.addAttributes([field])
+            layer.updateFields()
+
+        # Obtain col number
+        if layer.dataProvider().fields().indexFromName( "riv_cond" ) == -1:
+            field = QgsField("riv_cond", QVariant.Double, 'double', 20, 5)
+            provider2.addAttributes([field])
+            layer.updateFields()
+
+        # Obtain col number
+        if layer.dataProvider().fields().indexFromName( "riv_bot" ) == -1:
+            field = QgsField("riv_bot", QVariant.Double, 'double', 20, 5)
+            provider2.addAttributes([field])
+            layer.updateFields()
+
+        # Get the index numbers of the fields
+        riv_stage = provider2.fields().indexFromName("riv_stage")
+        riv_cond = provider2.fields().indexFromName("riv_cond")
+        riv_bot = provider2.fields().indexFromName("riv_bot")  
+
+        feats = layer.getFeatures()
+        layer.startEditing()
+
+        # add riv_info based on row and column numbers
+        for f in feats:
+            rowNo = f.attribute("row")
+            colNo = f.attribute("col")
+            for ii in range(len(riv2_cond_lst)):
+                if ((rowNo == (row_avg_lst[ii])) and (colNo == (col_avg_lst[ii]))):
+                    layer.changeAttributeValue(f.id(), riv_stage, float(riv2_stage_lst[ii])) # why without float is not working?
+                    layer.changeAttributeValue(f.id(), riv_cond, float(riv2_cond_lst[ii]))             
+                    layer.changeAttributeValue(f.id(), riv_bot, float(riv2_bot_lst[ii]))
+        layer.commitChanges()
+        QCoreApplication.processEvents()
+
+    def riv_cond_delete_NULL(self):
+        layer = self.mf_riv2_layer()
+        provider = layer.dataProvider()
+        request =  QgsFeatureRequest().setFilterExpression("riv_cond IS NULL" )
+        request.setSubsetOfAttributes([])
+        request.setFlags(QgsFeatureRequest.NoGeometry)
+        layer.startEditing()
+        for f in layer.getFeatures(request):
+            layer.deleteFeature(f.id())
+        layer.commitChanges()
+
+    def create_layer_inRiv(self):
+        layer = self.mf_riv2_layer()
+        provider = layer.dataProvider()
+        if layer.dataProvider().fields().indexFromName( "layer" ) == -1:
+            field = QgsField("layer", QVariant.Int)
+            provider.addAttributes([field])
+            layer.updateFields()
+        feats = layer.getFeatures()
+        layer.startEditing()
+        for feat in feats:
+            layer_num = 1
+            feat['layer'] = layer_num
+            layer.updateFeature(feat)
+        layer.commitChanges()
+
+    def export_rgrid_len(self):
+        QSWATMOD_path_dict = self.dirs_and_paths()  
+        ### sort by dhru_id and then by grid and save down ### 
+        #read in the dhru shapefile
+        layer = self.river_grid_layer()
+        # Get the index numbers of the fields
+        grid_id_index = layer.dataProvider().fields().indexFromName("grid_id")
+        subbasin_index = layer.dataProvider().fields().indexFromName("Subbasin")
+        ol_length_index = layer.dataProvider().fields().indexFromName("ol_length")
+        
+        # transfer the shapefile layer to a python list
+        l = []
+        for i in layer.getFeatures():
+            l.append(i.attributes())
+        
+        # then sort by columns
+        import operator
+        l_sorted = sorted(l, key=operator.itemgetter(grid_id_index))
+        
+        info_number = len(l_sorted) # number of lines
+        #-----------------------------------------------------------------------#
+        # exporting the file 
+        name = "river_grid"
+        output_dir = QSWATMOD_path_dict['Table']   
+        output_file = os.path.normpath(os.path.join(output_dir, name))
+
+        with open(output_file, "w", newline='') as f:
+            writer = csv.writer(f, delimiter = '\t')
+            first_row = [str(info_number)] # prints the dhru number to the file
+            second_row = ["grid_id subbasin rgrid_len"]
+            writer.writerow(first_row)
+            writer.writerow(second_row)
+            for item in l_sorted:
+                # Write item to outcsv. the order represents the output order
+                writer.writerow([item[grid_id_index], item[subbasin_index], item[ol_length_index]])
 
     #-------------------------------------------------------------------------------
     def aqufierThickness_option(self):
@@ -1123,91 +1114,112 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
             self.lineEdit_initialH_uniform.setEnabled(False)
             self.lineEdit_initialH_raster.setEnabled(False)
             self.pushButton_initialH_raster.setEnabled(False)
-
         elif self.radioButton_initialH_uniform.isChecked():
             self.lineEdit_initialH_single.setEnabled(False)
             self.lineEdit_initialH_uniform.setEnabled(True)
             self.lineEdit_initialH_raster.setEnabled(False)
             self.pushButton_initialH_raster.setEnabled(False)           
-
         else:
             self.lineEdit_initialH_single.setEnabled(False)
             self.lineEdit_initialH_uniform.setEnabled(False)
             self.lineEdit_initialH_raster.setEnabled(True)
             self.pushButton_initialH_raster.setEnabled(True)
 
+    def evt_option(self):
+        if self.radioButton_evt_single.isChecked():
+            self.lineEdit_evt_single.setEnabled(True)
+            self.lineEdit_evt_raster.setEnabled(False)
+            self.pushButton_evt_raster.setEnabled(False)
+        else:
+            self.lineEdit_evt_single.setEnabled(False)
+            self.lineEdit_evt_raster.setEnabled(True)
+            self.pushButton_evt_raster.setEnabled(True)
+
     def writeMF(self):
         self.DB_push_mf_userVal()
-
         from QSWATMOD2.pyfolder.writeMF import extentlayer
         self.textEdit_mf_log.append(" ")
         self.textEdit_mf_log.append("- Exporting MODFLOW input files...")
-        
-        # '''
         self.checkBox_mfPrepared.setChecked(0)
         self.progressBar_mf.setValue(0)
 
         # Bottom
         if (self.radioButton_aq_thic_single.isChecked() or self.radioButton_aq_thic_uniform.isChecked()):
-            writeMF.createBotElev(self)
+            writeMF.createBotElev(self) # create bottom elevation in mf_act_grid_layer
             self.progressBar_mf.setValue(10)
             QCoreApplication.processEvents()
-        writeMF.cvtBotElevToR(self)
-        self.progressBar_mf.setValue(20)
-        QCoreApplication.processEvents()
-
+            writeMF.cvtBotElevToR(self) # convert bottom elevation to raster
+            self.progressBar_mf.setValue(20)
+            QCoreApplication.processEvents()
+            
         # HK
-        if (self.radioButton_hk_raster.isChecked() and self.lineEdit_hk_raster.text()):
-            writeMF.cvtHKtoR(self)
+        if (self.radioButton_hk_single.isChecked() and self.lineEdit_hk_single.text()):
+            writeMF.createHK(self)
+            writeMF.cvt_geovarToR(self, geovar="hk")
+        elif (self.radioButton_hk_raster.isChecked() and self.lineEdit_hk_raster.text()):
+            writeMF.get_geovar_fromR(self, geovar="hk")
+            writeMF.cvt_geovarToR(self, geovar="hk")
             self.progressBar_mf.setValue(30)
             QCoreApplication.processEvents()
         else:
             self.progressBar_mf.setValue(40)
             QCoreApplication.processEvents()
 
-        # writeMF.cvtHKtoR(self)
-        # self.progressBar_mf.setValue(40)
-        # QCoreApplication.processEvents()
-        
         # SS
-        if (self.radioButton_ss_raster.isChecked() and self.lineEdit_ss_raster.text()):
-            writeMF.cvtSStoR(self)
-            self.progressBar_mf.setValue(60)
+        if (self.radioButton_ss_single.isChecked() and self.lineEdit_ss_single.text()):
+            writeMF.createSS(self)
+            writeMF.cvt_geovarToR(self, geovar="ss")
+        elif (self.radioButton_ss_raster.isChecked() and self.lineEdit_ss_raster.text()):
+            writeMF.get_geovar_fromR(self, geovar="ss")
+            writeMF.cvt_geovarToR(self, geovar="ss")
+            self.progressBar_mf.setValue(50)
             QCoreApplication.processEvents()
         else:
-            # writeMF.createSY(self)
-            self.progressBar_mf.setValue(70)
-            QCoreApplication.processEvents()        
+            self.progressBar_mf.setValue(60)
+            QCoreApplication.processEvents()
 
         # SY
-        if (self.radioButton_sy_raster.isChecked() and self.lineEdit_sy_raster.text()):
-            writeMF.cvtSYtoR(self)
+        if (self.radioButton_sy_single.isChecked() and self.lineEdit_sy_single.text()):
+            writeMF.createSY(self)
+            writeMF.cvt_geovarToR(self, geovar="sy")
+        elif (self.radioButton_sy_raster.isChecked() and self.lineEdit_sy_raster.text()):
+            writeMF.get_geovar_fromR(self, geovar="sy")
+            writeMF.cvt_geovarToR(self, geovar="sy")
             self.progressBar_mf.setValue(80)
             QCoreApplication.processEvents()
         else:
             self.progressBar_mf.setValue(85)
             QCoreApplication.processEvents()
+        
         # IH
         if (self.radioButton_initialH_single.isChecked() or self.radioButton_initialH_uniform.isChecked()):
             writeMF.createInitialH(self)
+            writeMF.cvt_geovarToR(self, geovar="ih")
+        elif (self.radioButton_initialH_raster.isChecked() and self.lineEdit_initialH_raster.text()):
+            writeMF.get_geovar_fromR(self, geovar="ih")
+            writeMF.cvt_geovarToR(self, geovar="ih")        
             self.progressBar_mf.setValue(90)
             QCoreApplication.processEvents()
-        writeMF.cvtInitialHtoR(self)
-        self.progressBar_mf.setValue(95)
-        QCoreApplication.processEvents()
+        else:
+            self.progressBar_mf.setValue(95)
+            QCoreApplication.processEvents()
 
         # EVT
         if self.groupBox_evt.isChecked():
-            if (self.radioButton_evt_raster.isChecked() and self.lineEdit_evt_raster.text()):
-                writeMF.cvtEVTtoR(self)
+            if (self.radioButton_evt_single.isChecked() and self.lineEdit_evt_single.text()):
+                writeMF.createEVT(self)
+                writeMF.cvt_geovarToR(self, geovar="evt")
+            elif (self.radioButton_evt_raster.isChecked() and self.lineEdit_evt_raster.text()):
+                writeMF.get_geovar_fromR(self, geovar="evt")
+                writeMF.cvt_geovarToR(self, geovar="evt")
                 self.progressBar_mf.setValue(80)
                 QCoreApplication.processEvents()
             else:
                 self.progressBar_mf.setValue(85)
                 QCoreApplication.processEvents()
-
-        # '''
+                
         writeMF.writeMFmodel(self)
         self.progressBar_mf.setValue(100)
         self.checkBox_mfPrepared.setChecked(1)
+
 

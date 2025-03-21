@@ -23,9 +23,29 @@ from PyQt5.QtWidgets import (
 from QSWATMOD2.modules import flopy
 
 
+def start_time(self, desc):
+    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
+    self.textEdit_mf_log.append(time+' -> ' + f"{desc} ... processing")
+    self.label_mf_status.setText(f"{desc} ... ")
+    self.progressBar_mf_status.setValue(0)
+    QCoreApplication.processEvents()
+
+def end_time(self, desc):
+    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
+    self.textEdit_mf_log.append(time+' -> ' + f"{desc} ... passed")
+    self.label_mf_status.setText('Step Status: ')
+    self.progressBar_mf_status.setValue(100)
+    QCoreApplication.processEvents()
+
+def messageBox(self, title, message):
+    msgBox = QMessageBox()
+    msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))  
+    msgBox.setWindowTitle(title)
+    msgBox.setText(message)
+    msgBox.exec_()
+
 def extentlayer(self): # ----> why is not working T,.T
     extlayer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-
     # get extent
     ext = extlayer.extent()
     xmin = ext.xMinimum()
@@ -35,38 +55,30 @@ def extentlayer(self): # ----> why is not working T,.T
     extent = "{a},{b},{c},{d}".format(a=xmin, b=xmax, c=ymin, d=ymax)
     return extent
 
-
 def createBotElev(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + "Creating bottom elevation ... processing")
-    self.label_mf_status.setText("Creating bottom elevation ... ")
-    self.progressBar_mf_status.setValue(0)
-    QCoreApplication.processEvents()
-
-    self.layer = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    provider = self.layer.dataProvider()
-
+    desc = "Creating bottom elevation"
+    start_time(self, desc)
+    layer = self.mf_act_grid_layer()
+    provider = layer.dataProvider()
     try:
         if provider.fields().indexFromName("bot_elev") != -1:
             attrIdx = provider.fields().indexFromName( "bot_elev" )
             provider.deleteAttributes([attrIdx])
             field = QgsField("bot_elev", QVariant.Double,'double', 20, 5)
-
         elif provider.fields().indexFromName("bot_elev" ) == -1:
             field = QgsField("bot_elev", QVariant.Double,'double', 20, 5)
-
         provider.addAttributes([field])
-        self.layer.updateFields()
-        feats = self.layer.getFeatures()
-        self.layer.startEditing()
+        layer.updateFields()
+        feats = layer.getFeatures()
+        layer.startEditing()
 
         # Single value
         if (self.radioButton_aq_thic_single.isChecked() and self.lineEdit_aq_thic_single.text()):
             depth = float(self.lineEdit_aq_thic_single.text())
             for f in feats:
-                f['bot_elev'] = - depth + f['elev_mf']
-                self.layer.updateFeature(f)
-            self.layer.commitChanges()
+                f['bot_elev'] = - depth + f['top_elev']
+                layer.updateFeature(f)
+            layer.commitChanges()
             self.time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
             self.textEdit_mf_log.append(self.time+' -> ' + 'Aquifer thickness is entered ...')
         # Uniform value
@@ -74,50 +86,31 @@ def createBotElev(self):
             elev = float(self.lineEdit_aq_thic_uniform.text())
             for f in feats:
                 f['bot_elev'] = elev
-                self.layer.updateFeature(f)
-            self.layer.commitChanges()
+                layer.updateFeature(f)
+            layer.commitChanges()
             self.time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
             self.textEdit_mf_log.append(self.time+' -> ' + 'Aquifer thickness is entered ...')
         else:
-            msgBox = QMessageBox()
-            msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-            msgBox.setWindowTitle("Oops!")
-            msgBox.setText("Please, provide a value of the Aquifer thickness!")
-            msgBox.exec_()
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.textEdit_mf_log.append(time+' -> ' + "Creating bottom elevation ... passed")
-        self.label_mf_status.setText('Step Status: ')
-        self.progressBar_mf_status.setValue(100)
-        QCoreApplication.processEvents()        
+            messageBox(self, "Oops!", "Please, provide a value of the Aquifer thickness!")
+        end_time(self, desc)
+        QCoreApplication.processEvents()
     except:
-        msgBox = QMessageBox()
-        msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-        msgBox.setWindowTitle("Oops!")
-        msgBox.setText("ERROR!!!")
-        msgBox.exec_()
+        messageBox(self, "Oops!", "ERROR!!!")
 
 
 def cvtBotElevToR(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + "Converting bottom elevation to raster ... processing")
-    self.label_mf_status.setText("Converting bottom elevation to raster ... ")
-    self.progressBar_mf_status.setValue(0)
-    QCoreApplication.processEvents()
-
+    desc = "Converting bottom elevation to raster"
+    start_time(self, desc)
     QSWATMOD_path_dict = self.dirs_and_paths()
-
     for lyr in list(QgsProject.instance().mapLayers().values()):
         if lyr.name() == ("bot_elev (MODFLOW)"):
             QgsProject.instance().removeMapLayers([lyr.id()])
-
-    extlayer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
+    extlayer = self.mf_grid_layer()
+    input1 = self.mf_act_grid_layer()
     input2 = QgsProject.instance().mapLayersByName("top_elev (MODFLOW)")[0]
-    
     # Get pixel size from top_elev raster
     delc = input2.rasterUnitsPerPixelX()
     delr = input2.rasterUnitsPerPixelY()
-    
     # get extent
     ext = extlayer.extent()
     xmin = ext.xMinimum()
@@ -125,7 +118,6 @@ def cvtBotElevToR(self):
     ymin = ext.yMinimum()
     ymax = ext.yMaximum()
     extent = "{a},{b},{c},{d}".format(a=xmin, b = xmax, c = ymin, d = ymax)
-
     name = 'bot_elev'
     name_ext = "bot_elev.tif"
     output_dir = QSWATMOD_path_dict['org_shps']
@@ -156,7 +148,6 @@ def cvtBotElevToR(self):
             'OUTPUT': output_raster
         }
     processing.run("gdal:rasterize", params)
-
     layer = QgsRasterLayer(output_raster, '{0} ({1})'.format("bot_elev", "MODFLOW"))
         
     # Put in the group
@@ -164,11 +155,7 @@ def cvtBotElevToR(self):
     mf_group = root.findGroup("MODFLOW")    
     QgsProject.instance().addMapLayer(layer, False)
     mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + "Converting bottom elevation to raster ... passed")
-    self.label_mf_status.setText('Step Status: ')
-    self.progressBar_mf_status.setValue(0)
+    end_time(self, desc)
     QCoreApplication.processEvents()
 
 # navigate to the bot_elev raster
@@ -209,7 +196,6 @@ def loadBotElev(self):
         for lyr in list(QgsProject.instance().mapLayers().values()):
             if lyr.name() == ("bot_elev (DATA)"):
                 QgsProject.instance().removeMapLayers([lyr.id()])
-
         layer = QgsRasterLayer(bot_elev, '{0} ({1})'.format("bot_elev", "DATA"))
         # Put in the group
         root = QgsProject.instance().layerTreeRoot()
@@ -218,14 +204,12 @@ def loadBotElev(self):
         mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
         self.lineEdit_aq_thic_raster.setText(bot_elev)
 
-
 def getBotfromR(self):
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
+    input1 = self.mf_act_grid_layer()
     input2 = QgsProject.instance().mapLayersByName("bot_elev (DATA)")[0]
     provider1 = input1.dataProvider()
     provider2 = input2.dataProvider()
     rpath = provider2.dataSourceUri()
-
     if provider1.fields().indexFromName("bot_mean") != -1:
         attrIdx = provider1.fields().indexFromName("bot_mean")
         provider1.deleteAttributes([attrIdx])
@@ -240,70 +224,25 @@ def getBotfromR(self):
     time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
     self.textEdit_mf_log.append(time+' -> ' + 'Extrating Bottom Elevation from Raster has been finished...')
 
-
 # ----------------------------------------------------------------------------------------------
-# def createHK(self):
-#     self.layer = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-#     provider = self.layer.dataProvider()
-
-#     try:
-#         if provider.fields().indexFromName("hk") != -1:
-#             attrIdx = provider.fields().indexFromName("hk")
-#             provider.deleteAttributes([attrIdx])
-#             field = QgsField("hk", QVariant.Double,'double', 20, 5)
-
-#         elif provider.fields().indexFromName("hk") == -1:
-#             field = QgsField("hk", QVariant.Double,'double', 20, 5)
-
-#         provider.addAttributes([field])
-#         self.layer.updateFields()
-#         feats = self.layer.getFeatures()
-#         self.layer.startEditing()
-
-#         if (self.radioButton_hk_single.isChecked() and self.lineEdit_hk_single.text()):
-#             hk = float(self.lineEdit_hk_single.text())
-#             for f in feats:
-#                 f['hk'] = hk
-#                 self.layer.updateFeature(f)
-
-#             self.layer.commitChanges()
-#             self.time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-#             self.textEdit_mf_log.append(self.time+' -> ' + 'Horizantal Hydraulic Conductivity is entered ...')
-
-#         else:
-#             msgBox = QMessageBox()
-#             msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-#             msgBox.setWindowTitle("Oops!")
-#             msgBox.setText("Please, provide a value of the Horizontal Hydraulic Conductivity!")
-#             msgBox.exec_()
-#     except:
-#         msgBox = QMessageBox()
-#         msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-#         msgBox.setWindowTitle("Oops!")
-#         msgBox.setText("ERROR!!!")
-#         msgBox.exec_()
-
-
-def cvtHKtoR(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + "Converting hydraulic conductivity to raster ... processing")
-    self.label_mf_status.setText("Converting bottom elevation to raster ... ")
-    self.progressBar_mf_status.setValue(0)
-    QCoreApplication.processEvents()
-
+def cvt_geovarToR(self, geovar, geovar_group="MODFLOW"):
+    desc = f"Converting {geovar} to raster"
+    start_time(self, desc)
     QSWATMOD_path_dict = self.dirs_and_paths()
-
     for lyr in list(QgsProject.instance().mapLayers().values()):
-        if lyr.name() == ("hk (MODFLOW)"):
+        if lyr.name() == (f"{geovar} ({geovar_group}"):
             QgsProject.instance().removeMapLayers([lyr.id()])
+    extlayer = self.mf_grid_layer()
+    input1 = self.mf_act_grid_layer()
 
-    extlayer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("top_elev (MODFLOW)")[0]
-
-    # Get pixel size from top_elev raster
-    delc = input2.rasterUnitsPerPixelX()
-    delr = input2.rasterUnitsPerPixelY()
+    if geovar == "top_elev":
+        delc = float(self.doubleSpinBox_delc.value())
+        delr = float(self.doubleSpinBox_delr.value())
+    else:
+        input2 = QgsProject.instance().mapLayersByName(f"top_elev ({geovar_group})")[0]
+        # Get pixel size from top_elev raster
+        delc = input2.rasterUnitsPerPixelX()
+        delr = input2.rasterUnitsPerPixelY()
 
     # get extent
     ext = extlayer.extent()
@@ -312,15 +251,13 @@ def cvtHKtoR(self):
     ymin = ext.yMinimum()
     ymax = ext.yMaximum()
     extent = "{a},{b},{c},{d}".format(a=xmin, b=xmax, c=ymin, d=ymax)
-
-    name = 'hk'
-    name_ext = "hk.tif"
+    name = f'{geovar}'
+    name_ext = f"{geovar}.tif"
     output_dir = QSWATMOD_path_dict['org_shps']
     output_raster = os.path.join(output_dir, name_ext)
-
     params = {
         'INPUT': input1,
-        'FIELD': "elev_mf",
+        'FIELD': f"{geovar}",
         'UNITS': 1,
         'WIDTH': delc,
         'HEIGHT': delr,
@@ -330,29 +267,106 @@ def cvtHKtoR(self):
         'OUTPUT': output_raster
     }
     processing.run("gdal:rasterize", params)
-    layer = QgsRasterLayer(output_raster, '{0} ({1})'.format("hk","MODFLOW"))
-
+    layer = QgsRasterLayer(output_raster, '{0} ({1})'.format(f"{geovar}","MODFLOW"))
     # Put in the group
     root = QgsProject.instance().layerTreeRoot()
     mf_group = root.findGroup("MODFLOW")    
     QgsProject.instance().addMapLayer(layer, False)
     mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
+    self.iface.mapCanvas().refreshAllLayers()
+    end_time(self, desc)    
+
+def get_geovar_fromR(self, geovar):
+    input1 = self.mf_act_grid_layer()
+    input2 = QgsProject.instance().mapLayersByName(f"{geovar} (DATA)")[0]
+    provider1 = input1.dataProvider()
+    provider2 = input2.dataProvider()
+    rpath = provider2.dataSourceUri()
+    fields_to_delete = [
+                    f"{geovar}_mean", f"{geovar}", f"{geovar}_count", 
+                    f"{geovar}_sum", f"{geovar}_min", f"{geovar}_max"
+                    ]
+    for field in fields_to_delete:
+        if provider1.fields().indexFromName(field) != -1:
+            attrIdx = provider1.fields().indexFromName(field)
+            provider1.deleteAttributes([attrIdx])    
+    params = {
+        'INPUT_RASTER': input2,
+        'RASTER_BAND':1,
+        'INPUT_VECTOR': input1,
+        'COLUMN_PREFIX':f'{geovar}_',
+        'STATS':[2]            
+        }      
+    processing.run("qgis:zonalstatistics", params)
+    # Change name
+    for field in input1.fields():
+        if field.name() == f'{geovar}_mean':
+            input1.startEditing()
+            idx = provider1.fields().indexFromName(field.name())
+            input1.renameAttribute(idx, f"{geovar}")
+            input1.commitChanges()
+    fields_to_delete = [
+                f"{geovar}_mean", f"{geovar}_count", f"{geovar}_sum", 
+                f"{geovar}_min", f"{geovar}_max"]
+    for field in fields_to_delete:
+        if provider1.fields().indexFromName(field) != -1:
+            attrIdx = provider1.fields().indexFromName(field)
+            provider1.deleteAttributes([attrIdx])    
+    self.iface.mapCanvas().refreshAllLayers()
     time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + "Converting hydraulic conductivity to raster ... passed")
-    self.label_mf_status.setText("Step Status: ")
-    self.progressBar_mf_status.setValue(0)
-    QCoreApplication.processEvents()
+    self.textEdit_mf_log.append(time+' -> ' + f'Extrating {geovar} from Raster has been finished...')
 
 
-# navigate to the hk raster
-def loadHK(self):
+def getElevfromDem(self):
+    decs = "Extracting elevation from DEM"
+    geovar = "top_elev"
+    self.start_time(decs)
+
+    input1 = self.mf_grid_layer_f()
+    provider = input1.dataProvider()
+    input2 = QgsProject.instance().mapLayersByName("top_elev (DATA)")[0]
+    fields_to_delete = [
+                    f"{geovar}_mean", f"{geovar}", f"{geovar}_count", 
+                    f"{geovar}_sum", f"{geovar}_min", f"{geovar}_max"
+                    ]
+    for field in fields_to_delete:
+        if provider.fields().indexFromName(field) != -1:
+            attrIdx = provider.fields().indexFromName(field)
+            provider.deleteAttributes([attrIdx])    
+    params = {
+        'INPUT_RASTER': input2,
+        'RASTER_BAND':1,
+        'INPUT_VECTOR': input1,
+        'COLUMN_PREFIX':f'{geovar}_',
+        'STATS':[2]            
+    }
+    processing.run("qgis:zonalstatistics", params)
+    # Change name
+    for field in input1.fields():
+        if field.name() == f'{geovar}_mean':
+            input1.startEditing()
+            idx = provider.fields().indexFromName(field.name())
+            input1.renameAttribute(idx, f"{geovar}")
+            input1.commitChanges()
+    fields_to_delete = [
+                f"{geovar}_mean", f"{geovar}_count", f"{geovar}_sum", 
+                f"{geovar}_min", f"{geovar}_max"]
+    for field in fields_to_delete:
+        if provider.fields().indexFromName(field) != -1:
+            attrIdx = provider.fields().indexFromName(field)
+            provider.deleteAttributes([attrIdx])    
+    self.iface.mapCanvas().refreshAllLayers()
+    self.end_time(decs)
+
+
+def load_geovar_raster(self, geovar):
     QSWATMOD_path_dict = self.dirs_and_paths()
     settings = QSettings()
     if settings.contains('/QSWATMOD2/LastInputPath'):
         path = str(settings.value('/QSWATMOD2/LastInputPath'))
     else:
         path = ''
-    title = "Choose Hydraulic Conductivity Rasterfile"
+    title = f"Choose {geovar} Rasterfile"
     inFileName, __ = QFileDialog.getOpenFileName(None, title, path, "Rasterfiles (*.tif);; All files (*.*)")
 
     if inFileName:
@@ -364,7 +378,7 @@ def loadHK(self):
         baseName = inInfo.baseName()
 
         # inName = os.path.splitext(inFile)[0]
-        inName = 'hk'
+        inName = f'{geovar}'
         for f in glob.iglob(pattern):
             suffix = os.path.splitext(f)[1]
             if os.name == 'nt':
@@ -372,696 +386,171 @@ def loadHK(self):
             else:
                 outfile = posixpath.join(Out_folder, inName + suffix)
             shutil.copy(f, outfile)
-    
         if os.name == 'nt':
-            hk = ntpath.join(Out_folder, inName + ".tif")
+            geovar_path = ntpath.join(Out_folder, inName + ".tif")
         else:
             hk = posixpath.join(Out_folder, inName + ".tif")
 
         # Delete existing "bot_elev (MODFLOW)" raster file"
         for lyr in list(QgsProject.instance().mapLayers().values()):
-            if lyr.name() == ("hk (DATA)"):
+            if lyr.name() == (f"{geovar} (DATA)"):
                 QgsProject.instance().removeMapLayers([lyr.id()])
 
-        layer = QgsRasterLayer(hk, '{0} ({1})'.format("hk", "DATA"))
+        layer = QgsRasterLayer(geovar_path, '{0} ({1})'.format(f"{geovar}", "DATA"))
         # Put in the group
         root = QgsProject.instance().layerTreeRoot()
         mf_group = root.findGroup("MODFLOW")
         QgsProject.instance().addMapLayer(layer, False)
         mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-        self.lineEdit_hk_raster.setText(hk)
-
-
-def getHKfromR(self):
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("hk (DATA)")[0]
-    provider1 = input1.dataProvider()
-    provider2 = input2.dataProvider()
-    rpath = provider2.dataSourceUri()
-
-    if provider1.fields().indexFromName("hk_mean") != -1:
-        attrIdx = provider1.fields().indexFromName("hk_mean")
-        provider1.deleteAttributes([attrIdx])
-    params = {
-        'INPUT_RASTER': input2,
-        'RASTER_BAND':1,
-        'INPUT_VECTOR': input1,
-        'COLUMN_PREFIX':'hk_',
-        'STATS':[2]            
-        }      
-    processing.run("qgis:zonalstatistics", params)
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + 'Extrating Hydraulic Conductivity from Raster has been finished...')
-
-
-# ----------------------------------------------------------------------------------------------
-# def createSS(self):
-#     self.layer = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-#     provider = self.layer.dataProvider()
-
-#     try:
-#         if provider.fields().indexFromName("ss") != -1:
-#             attrIdx = provider.fields().indexFromName("ss")
-#             provider.deleteAttributes([attrIdx])
-#             field = QgsField("ss", QVariant.Double,'double', 20, 5)
-
-#         elif provider.fields().indexFromName("ss") == -1:
-#             field = QgsField("ss", QVariant.Double,'double', 20, 5)
-
-#         provider.addAttributes([field])
-#         self.layer.updateFields()
-#         feats = self.layer.getFeatures()
-#         self.layer.startEditing()
-
-#         if (self.radioButton_ss_single.isChecked() and self.lineEdit_ss_single.text()):
-#             ss = float(self.lineEdit_ss_single.text())
-#             for f in feats:
-#                 f['ss'] = ss
-#                 self.layer.updateFeature(f)
-
-#             self.layer.commitChanges()
-#             time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-#             self.textEdit_mf_log.append(time+' -> ' + 'Specific Storage is entered ...')
-
-#         else:
-#             msgBox = QMessageBox()
-#             msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-#             msgBox.setWindowTitle("Oops!")
-#             msgBox.setText("Please, provide a value of the Horizontal Hydraulic Conductivity!")
-#             msgBox.exec_()
-
-#     except:
-#         msgBox = QMessageBox()
-#         msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-#         msgBox.setWindowTitle("Oops!")
-#         msgBox.setText("ERROR!!")
-#         msgBox.exec_()
-
-
-def cvtSStoR(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-
-    for lyr in list(QgsProject.instance().mapLayers().values()):
-        if lyr.name() == ("ss (MODFLOW)"):
-            QgsProject.instance().removeMapLayers([lyr.id()])
-
-    extlayer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("top_elev (MODFLOW)")[0]
-    
-    # Get pixel size from top_elev raster
-    delc = input2.rasterUnitsPerPixelX()
-    delr = input2.rasterUnitsPerPixelY()
-    
-    # get extent
-    ext = extlayer.extent()
-    xmin = ext.xMinimum()
-    xmax = ext.xMaximum()
-    ymin = ext.yMinimum()
-    ymax = ext.yMaximum()
-    extent = "{a},{b},{c},{d}".format(a=xmin, b=xmax, c=ymin, d=ymax)
-
-    name = 'ss'
-    name_ext = "ss.tif"
-    output_dir = QSWATMOD_path_dict['org_shps']
-    output_raster = os.path.join(output_dir, name_ext)
-
-
-    params = {
-        'INPUT': input1,
-        'FIELD': "ss_mean",
-        'UNITS': 1,
-        'WIDTH': delc,
-        'HEIGHT': delr,
-        'EXTENT': extent,
-        'NODATA': -9999,
-        'DATA_TYPE': 5,
-        'OUTPUT': output_raster
-    }
-    processing.run("gdal:rasterize", params)
-    layer = QgsRasterLayer(output_raster, '{0} ({1})'.format("ss","MODFLOW"))
-
-    # Put in the group
-    root = QgsProject.instance().layerTreeRoot()
-    mf_group = root.findGroup("MODFLOW")    
-    QgsProject.instance().addMapLayer(layer, False)
-    mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + 'Specific Storage is converted to Raster ...')
-
-
-def loadSS(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    settings = QSettings()
-    if settings.contains('/QSWATMOD2/LastInputPath'):
-        path = str(settings.value('/QSWATMOD2/LastInputPath'))
-    else:
-        path = ''
-    title = "Choose Specific Storage Rasterfile"
-    inFileName, __ = QFileDialog.getOpenFileName(None, title, path, "Rasterfiles (*.tif);; All files (*.*)")
-
-    if inFileName:
-        settings.setValue('/QSWATMOD2/LastInputPath', os.path.dirname(str(inFileName)))
-        Out_folder = QSWATMOD_path_dict['org_shps']
-        inInfo = QFileInfo(inFileName)
-        inFile = inInfo.fileName()
-        pattern = os.path.splitext(inFileName)[0] + '.*'
-        baseName = inInfo.baseName()
-
-        # inName = os.path.splitext(inFile)[0]
-        inName = 'ss'
-        for f in glob.iglob(pattern):
-            suffix = os.path.splitext(f)[1]
-            if os.name == 'nt':
-                outfile = ntpath.join(Out_folder, inName + suffix)
-            else:
-                outfile = posixpath.join(Out_folder, inName + suffix)                    
-            shutil.copy(f, outfile)
-    
-        if os.name == 'nt':
-            ss = ntpath.join(Out_folder, inName + ".tif")
-        else:
-            ss = posixpath.join(Out_folder, inName + ".tif")
-
-        # Delete existing "bot_elev (MODFLOW)" raster file"
-        for lyr in list(QgsProject.instance().mapLayers().values()):
-            if lyr.name() == ("ss (DATA)"):
-                QgsProject.instance().removeMapLayers([lyr.id()])
-
-        layer = QgsRasterLayer(ss, '{0} ({1})'.format("ss", "DATA"))
-        # Put in the group
-        root = QgsProject.instance().layerTreeRoot()
-        mf_group = root.findGroup("MODFLOW")    
-        QgsProject.instance().addMapLayer(layer, False)
-        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-        self.lineEdit_ss_raster.setText(ss)
-
-
-def getSSfromR(self):
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("ss (DATA)")[0]
-    provider1 = input1.dataProvider()
-    provider2 = input2.dataProvider()
-    rpath = provider2.dataSourceUri()
-
-    if provider1.fields().indexFromName("ss_mean") != -1:
-        attrIdx = provider1.fields().indexFromName("ss_mean")
-        provider1.deleteAttributes([attrIdx])
-    params = {
-        'INPUT_RASTER': input2,
-        'RASTER_BAND':1,
-        'INPUT_VECTOR': input1,
-        'COLUMN_PREFIX':'ss_',
-        'STATS':[2]            
-    }      
-    processing.run("qgis:zonalstatistics", params)
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + 'Extrating Specific Storage from Raster has been finished...')
-
-
-# ----------------------------------------------------------------------------------------------
-# def createSY(self):
-#     self.layer = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-#     provider = self.layer.dataProvider()
-
-#     try:
-#         if provider.fields().indexFromName("sy") != -1:
-#             attrIdx = provider.fields().indexFromName("sy")
-#             provider.deleteAttributes([attrIdx])
-#             field = QgsField("sy", QVariant.Double,'double', 20, 5)
-
-#         elif provider.fields().indexFromName( "sy" ) == -1:
-#             field = QgsField("sy", QVariant.Double,'double', 20, 5)
-
-#         provider.addAttributes([field])
-#         self.layer.updateFields()
-#         feats = self.layer.getFeatures()
-#         self.layer.startEditing()
-
-#         if (self.radioButton_sy_single.isChecked() and self.lineEdit_sy_single.text()):
-#             sy = float(self.lineEdit_sy_single.text())
-#             for f in feats:
-#                 f['sy'] = sy
-#                 self.layer.updateFeature(f)
-
-#             self.layer.commitChanges()
-#             time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-#             self.textEdit_mf_log.append(time+' -> ' + 'Specific Yield is entered ...')
-
-#         else:
-#             msgBox = QMessageBox()
-#             msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-#             msgBox.setWindowTitle("Oops!")
-#             msgBox.setText("Please, provide a value of the Specific Yield!")
-#             msgBox.exec_()
-
-#     except:
-#         msgBox = QMessageBox()
-#         msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-#         msgBox.setWindowTitle("Oops!")
-#         msgBox.setText("ERROR: Specific Yield")
-#         msgBox.exec_()
-
-
-def cvtSYtoR(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-
-    for lyr in list(QgsProject.instance().mapLayers().values()):
-        if lyr.name() == ("sy (MODFLOW)"):
-            QgsProject.instance().removeMapLayers([lyr.id()])
-
-    extlayer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("top_elev (MODFLOW)")[0]
-    
-    # Get pixel size from top_elev raster
-    delc = input2.rasterUnitsPerPixelX()
-    delr = input2.rasterUnitsPerPixelY()
-    
-    # get extent
-    ext = extlayer.extent()
-    xmin = ext.xMinimum()
-    xmax = ext.xMaximum()
-    ymin = ext.yMinimum()
-    ymax = ext.yMaximum()
-    extent = "{a},{b},{c},{d}".format(a = xmin, b = xmax, c = ymin, d = ymax)
-
-    name = 'sy'
-    name_ext = "sy.tif"
-    output_dir = QSWATMOD_path_dict['org_shps']
-    output_raster = os.path.join(output_dir, name_ext)
-    params = {
-        'INPUT': input1,
-        'FIELD': "sy_mean",
-        'UNITS': 1,
-        'WIDTH': delc,
-        'HEIGHT': delr,
-        'EXTENT': extent,
-        'NODATA': -9999,
-        'DATA_TYPE': 5,
-        'OUTPUT': output_raster
-    }
-    processing.run("gdal:rasterize", params)
-    layer = QgsRasterLayer(output_raster, '{0} ({1})'.format("sy","MODFLOW"))
+    return geovar_path
         
-    # Put in the group
-    root = QgsProject.instance().layerTreeRoot()
-    mf_group = root.findGroup("MODFLOW")    
-    QgsProject.instance().addMapLayer(layer, False)
-    mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + 'Specific Yield is converted to Raster ...')
-
-
-def loadSY(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    settings = QSettings()
-    if settings.contains('/QSWATMOD2/LastInputPath'):
-        path = str(settings.value('/QSWATMOD2/LastInputPath'))
-    else:
-        path = ''
-    title = "Choose Specific Yield Rasterfile"
-    inFileName, __ = QFileDialog.getOpenFileName(None, title, path, "Rasterfiles (*.tif);; All files (*.*)")
-
-    if inFileName:
-        settings.setValue('/QSWATMOD2/LastInputPath', os.path.dirname(str(inFileName)))
-        Out_folder = QSWATMOD_path_dict['org_shps']
-        inInfo = QFileInfo(inFileName)
-        inFile = inInfo.fileName()
-        pattern = os.path.splitext(inFileName)[0] + '.*'
-        baseName = inInfo.baseName()
-
-        # inName = os.path.splitext(inFile)[0]
-        inName = 'sy'
-        for f in glob.iglob(pattern):
-            suffix = os.path.splitext(f)[1]
-            if os.name == 'nt':
-                outfile = ntpath.join(Out_folder, inName + suffix)
-            else:
-                outfile = posixpath.join(Out_folder, inName + suffix)                    
-            shutil.copy(f, outfile)
-    
-        if os.name == 'nt':
-            sy = ntpath.join(Out_folder, inName + ".tif")
-        else:
-            sy = posixpath.join(Out_folder, inName + ".tif")
-
-        # Delete existing "bot_elev (MODFLOW)" raster file"
-        for lyr in list(QgsProject.instance().mapLayers().values()):
-            if lyr.name() == ("sy (DATA)"):
-                QgsProject.instance().removeMapLayers([lyr.id()])
-
-        layer = QgsRasterLayer(sy, '{0} ({1})'.format("sy", "DATA"))
-        # Put in the group
-        root = QgsProject.instance().layerTreeRoot()
-        mf_group = root.findGroup("MODFLOW")    
-        QgsProject.instance().addMapLayer(layer, False)
-        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-        self.lineEdit_sy_raster.setText(sy)
-
-
-def getSYfromR(self):
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("sy (DATA)")[0]
-    provider1 = input1.dataProvider()
-    provider2 = input2.dataProvider()
-    rpath = provider2.dataSourceUri()
-
-    if provider1.fields().indexFromName("sy_mean") != -1:
-        attrIdx = provider1.fields().indexFromName("sy_mean")
-        provider1.deleteAttributes([attrIdx])
-    params = {
-        'INPUT_RASTER': input2,
-        'RASTER_BAND':1,
-        'INPUT_VECTOR': input1,
-        'COLUMN_PREFIX':'sy_',
-        'STATS':[2]            
-    }      
-    processing.run("qgis:zonalstatistics", params)
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + 'Extrating Specific Yield from Raster has been finished...')
-
-
 # ----------------------------------------------------------------------------------------------
-
-def createInitialH(self):
-    self.layer = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
+def createHK(self):
+    self.layer = self.mf_act_grid_layer()
     provider = self.layer.dataProvider()
-
     try:
-        if provider.fields().indexFromName("initialH") != -1:
-            attrIdx = provider.fields().indexFromName( "initialH" )
+        if provider.fields().indexFromName("hk") != -1:
+            attrIdx = provider.fields().indexFromName("hk")
             provider.deleteAttributes([attrIdx])
-            field = QgsField("initialH", QVariant.Double,'double', 20, 5)
-
-        elif provider.fields().indexFromName( "initialH" ) == -1:
-            field = QgsField("initialH", QVariant.Double,'double', 20, 5)
-
+        field = QgsField("hk", QVariant.Double,'double', 20, 5)
         provider.addAttributes([field])
         self.layer.updateFields()
         feats = self.layer.getFeatures()
         self.layer.startEditing()
+        if (self.radioButton_hk_single.isChecked() and self.lineEdit_hk_single.text()):
+            hk = float(self.lineEdit_hk_single.text())
+            for f in feats:
+                f['hk'] = hk
+                self.layer.updateFeature(f)
+            self.layer.commitChanges()
+            self.time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
+            self.textEdit_mf_log.append(self.time+' -> ' + 'Horizantal Hydraulic Conductivity is entered ...')
+        else:
+            messageBox(
+                self, "Oops!", 
+                "Please, provide a value of the Horizontal Hydraulic Conductivity!")
+    except:
+        messageBox(self, "Oops!", "ERROR!!!")
 
+# ----------------------------------------------------------------------------------------------
+def createSS(self):
+    self.layer = self.mf_act_grid_layer()
+    provider = self.layer.dataProvider()
+    try:
+        if provider.fields().indexFromName("ss") != -1:
+            attrIdx = provider.fields().indexFromName("ss")
+            provider.deleteAttributes([attrIdx])
+        field = QgsField("ss", QVariant.Double,'double', 20, 5)
+        provider.addAttributes([field])
+        self.layer.updateFields()
+        feats = self.layer.getFeatures()
+        self.layer.startEditing()
+        if (self.radioButton_ss_single.isChecked() and self.lineEdit_ss_single.text()):
+            ss = float(self.lineEdit_ss_single.text())
+            for f in feats:
+                f['ss'] = ss
+                self.layer.updateFeature(f)
+            self.layer.commitChanges()
+            time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
+            self.textEdit_mf_log.append(time+' -> ' + 'Specific Storage is entered ...')
+        else:
+            messageBox(self, "Oops!", "Please, provide a value of the Specific Storage!")
+    except:
+        messageBox(self, "Oops!", "ERROR!!!")
+
+# ----------------------------------------------------------------------------------------------
+def createSY(self):
+    self.layer = self.mf_act_grid_layer()
+    provider = self.layer.dataProvider()
+    try:
+        if provider.fields().indexFromName("sy") != -1:
+            attrIdx = provider.fields().indexFromName("sy")
+            provider.deleteAttributes([attrIdx])
+        field = QgsField("sy", QVariant.Double,'double', 20, 5)
+        provider.addAttributes([field])
+        self.layer.updateFields()
+        feats = self.layer.getFeatures()
+        self.layer.startEditing()
+        if (self.radioButton_sy_single.isChecked() and self.lineEdit_sy_single.text()):
+            sy = float(self.lineEdit_sy_single.text())
+            for f in feats:
+                f['sy'] = sy
+                self.layer.updateFeature(f)
+            self.layer.commitChanges()
+            time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
+            self.textEdit_mf_log.append(time+' -> ' + 'Specific Yield is entered ...')
+        else:
+            messageBox(self, "Oops!", "Please, provide a value of the Specific Yield!")
+    except:
+        messageBox(self, "Oops!", "ERROR!!!")
+
+# ----------------------------------------------------------------------------------------------
+def createInitialH(self):
+    desc = "Creating Initial Hydraulic Head"
+    start_time(self, desc)
+    self.layer = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
+    provider = self.layer.dataProvider()
+    try:
+        if provider.fields().indexFromName("ih") != -1:
+            attrIdx = provider.fields().indexFromName( "ih" )
+            provider.deleteAttributes([attrIdx])
+        field = QgsField("ih", QVariant.Double,'double', 20, 5)
+        provider.addAttributes([field])
+        self.layer.updateFields()
+        feats = self.layer.getFeatures()
+        self.layer.startEditing()
         # Single value
         if (self.radioButton_initialH_single.isChecked() and self.lineEdit_initialH_single.text()):
             depth = float(self.lineEdit_initialH_single.text())
             for f in feats:
-                f['initialH'] = - depth + f['elev_mf']
+                f['ih'] = - depth + f['top_elev']
                 self.layer.updateFeature(f)
-
             self.layer.commitChanges()
-            self.time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-            self.textEdit_mf_log.append(self.time+' -> ' + 'Initial Hydraulic Head is entered ...')
-
+            start_time(self, desc)
         # Uniform value
         elif (self.radioButton_initialH_uniform.isChecked() and self.lineEdit_initialH_uniform.text()):
             elev = float(self.lineEdit_initialH_uniform.text())
             for f in feats:
-                f['initialH'] = elev
+                f['ih'] = elev
                 self.layer.updateFeature(f)
-
             self.layer.commitChanges()
-            self.time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-            self.textEdit_mf_log.append(self.time+' -> ' + 'Initial Hydraulic Head is entered ...')
-
+            start_time(self, desc)
         else:
-            msgBox = QMessageBox()
-            msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-            msgBox.setWindowTitle("Oops!")
-            msgBox.setText("Please, provide a value of the Initial Hydraulic Head!")
-            msgBox.exec_()
-
+            messageBox(self, "Oops!", "Please, provide a value of the Initial Hydraulic Head!")
     except:
-        msgBox = QMessageBox()
-        msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-        msgBox.setWindowTitle("Oops!")
-        msgBox.setText("ERROR!!!")
-        msgBox.exec_()
+        messageBox(self, "Oops!", "ERROR!!!")
 
 
-def cvtInitialHtoR(self):
-    #extent = self.extentlayer()
-    #layer_extent = extent
-    QSWATMOD_path_dict = self.dirs_and_paths()
-
-    for lyr in list(QgsProject.instance().mapLayers().values()):
-        if lyr.name() == ("initialH (MODFLOW)"):
-            QgsProject.instance().removeMapLayers([lyr.id()])
-
-    extlayer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("top_elev (MODFLOW)")[0]
-    
-    # Get pixel size from top_elev raster
-    delc = input2.rasterUnitsPerPixelX()
-    delr = input2.rasterUnitsPerPixelY()
-    
-    # get extent
-    ext = extlayer.extent()
-    xmin = ext.xMinimum()
-    xmax = ext.xMaximum()
-    ymin = ext.yMinimum()
-    ymax = ext.yMaximum()
-    extent = "{a},{b},{c},{d}".format(a = xmin, b = xmax, c = ymin, d = ymax)
-
-    name = 'initialH'
-    name_ext = "initialH.tif"
-    output_dir = QSWATMOD_path_dict['org_shps']
-    output_raster = os.path.join(output_dir, name_ext)
-
-    if (self.radioButton_initialH_raster.isChecked() and self.lineEdit_initialH_raster.text()):
-        params = {
-            'INPUT': input1,
-            'FIELD': "ih_mean",
-            'UNITS': 1,
-            'WIDTH': delc,
-            'HEIGHT': delr,
-            'EXTENT': extent,
-            'NODATA': -9999,
-            'DATA_TYPE': 5,
-            'OUTPUT': output_raster
-        }        
-    else:
-        params = {
-            'INPUT': input1,
-            'FIELD': "initialH",
-            'UNITS': 1,
-            'WIDTH': delc,
-            'HEIGHT': delr,
-            'EXTENT': extent,
-            'NODATA': -9999,
-            'DATA_TYPE': 5,
-            'OUTPUT': output_raster
-        }
-
-    processing.run("gdal:rasterize", params)
-    layer = QgsRasterLayer(output_raster, '{0} ({1})'.format("initialH", "MODFLOW"))
-
-    # Put in the group
-    root = QgsProject.instance().layerTreeRoot()
-    mf_group = root.findGroup("MODFLOW")
-    QgsProject.instance().addMapLayer(layer, False)
-    mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + 'Initial Hydraulic Head has been converted to Raster ...')
-
-
-def loadInitialH(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    settings = QSettings()
-    if settings.contains('/QSWATMOD2/LastInputPath'):
-        path = str(settings.value('/QSWATMOD2/LastInputPath'))
-    else:
-        path = ''
-    title = "Choose Initial Head Rasterfile"
-    inFileName, __ = QFileDialog.getOpenFileName(None, title, path, "Rasterfiles (*.tif);; All files (*.*)")
-
-    if inFileName:
-        settings.setValue('/QSWATMOD2/LastInputPath', os.path.dirname(str(inFileName)))
-        Out_folder = QSWATMOD_path_dict['org_shps']
-        inInfo = QFileInfo(inFileName)
-        inFile = inInfo.fileName()
-        pattern = os.path.splitext(inFileName)[0] + '.*'
-        baseName = inInfo.baseName()
-
-        # inName = os.path.splitext(inFile)[0]
-        inName = 'initialH'
-        for f in glob.iglob(pattern):
-            suffix = os.path.splitext(f)[1]
-            if os.name == 'nt':
-                outfile = ntpath.join(Out_folder, inName + suffix)
-            else:
-                outfile = posixpath.join(Out_folder, inName + suffix)
-            shutil.copy(f, outfile)
-        if os.name == 'nt':
-            initialH = ntpath.join(Out_folder, inName + ".tif")
+def createEVT(self):
+    desc = "Creating Evapotranspiration"
+    start_time(self, desc)
+    self.layer = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
+    provider = self.layer.dataProvider()
+    try:
+        if provider.fields().indexFromName("evt") != -1:
+            attrIdx = provider.fields().indexFromName( "evt" )
+            provider.deleteAttributes([attrIdx])
+        field = QgsField("evt", QVariant.Double,'double', 20, 5)
+        provider.addAttributes([field])
+        self.layer.updateFields()
+        feats = self.layer.getFeatures()
+        self.layer.startEditing()
+        if (self.radioButton_evt_single.isChecked() and self.lineEdit_evt_single.text()):
+            evt = float(self.lineEdit_evt_single.text())
+            for f in feats:
+                f['evt'] = evt
+                self.layer.updateFeature(f)
+            self.layer.commitChanges()
+            time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
+            self.textEdit_mf_log.append(time+' -> ' + 'Evapotranspiration is entered ...')
         else:
-            initialH = posixpath.join(Out_folder, inName + ".tif")
+            messageBox(self, "Oops!", "Please, provide a value of the Evapotranspiration!")
+    except:
+        messageBox(self, "Oops!", "ERROR!!!")
 
-        # Delete existing "bot_elev (MODFLOW)" raster file"
-        for lyr in list(QgsProject.instance().mapLayers().values()):
-            if lyr.name() == ("initialH (DATA)"):
-                QgsProject.instance().removeMapLayers([lyr.id()])
-
-        layer = QgsRasterLayer(initialH, '{0} ({1})'.format("initialH","DATA"))
-        # Put in the group
-        root = QgsProject.instance().layerTreeRoot()
-        mf_group = root.findGroup("MODFLOW")    
-        QgsProject.instance().addMapLayer(layer, False)
-        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-        self.lineEdit_initialH_raster.setText(initialH)
-
-
-def getIHfromR(self):
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("initialH (DATA)")[0]
-    provider1 = input1.dataProvider()
-    provider2 = input2.dataProvider()
-    rpath = provider2.dataSourceUri()
-
-    if provider1.fields().indexFromName("ih_mean") != -1:
-        attrIdx = provider1.fields().indexFromName("ih_mean")
-        provider1.deleteAttributes([attrIdx])
-    params = {
-        'INPUT_RASTER': input2,
-        'RASTER_BAND':1,
-        'INPUT_VECTOR': input1,
-        'COLUMN_PREFIX':'ih_',
-        'STATS':[2]            
-        }     
-    processing.run("qgis:zonalstatistics", params)
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + 'Extrating Initial Head from Raster has been finished...')
-
-### ============================================================================================
-
-def cvtEVTtoR(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-
-    for lyr in list(QgsProject.instance().mapLayers().values()):
-        if lyr.name() == ("evt (MODFLOW)"):
-            QgsProject.instance().removeMapLayers([lyr.id()])
-
-    extlayer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("top_elev (MODFLOW)")[0]
-    
-    # Get pixel size from top_elev raster
-    delc = input2.rasterUnitsPerPixelX()
-    delr = input2.rasterUnitsPerPixelY()
-    
-    # get extent
-    ext = extlayer.extent()
-    xmin = ext.xMinimum()
-    xmax = ext.xMaximum()
-    ymin = ext.yMinimum()
-    ymax = ext.yMaximum()
-    extent = "{a},{b},{c},{d}".format(a = xmin, b = xmax, c = ymin, d = ymax)
-
-    name = 'evt'
-    name_ext = "evt.tif"
-    output_dir = QSWATMOD_path_dict['org_shps']
-    output_raster = os.path.join(output_dir, name_ext)
-
-    params = {
-        'INPUT': input1,
-        'FIELD': "elev_mean",
-        'UNITS': 1,
-        'WIDTH': delc,
-        'HEIGHT': delr,
-        'EXTENT': extent,
-        'NODATA': -9999,
-        'DATA_TYPE': 5,
-        'OUTPUT': output_raster
-    }
-    processing.run("gdal:rasterize", params)
-    layer = QgsRasterLayer(output_raster, '{0} ({1})'.format("evt","MODFLOW"))
-        
-    # Put in the group
-    root = QgsProject.instance().layerTreeRoot()
-    mf_group = root.findGroup("MODFLOW")    
-    QgsProject.instance().addMapLayer(layer, False)
-    mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + 'Evapotranspiration has been converted to Raster ...')
-
-
-def loadEVT(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    settings = QSettings()
-    if settings.contains('/QSWATMOD2/LastInputPath'):
-        path = str(settings.value('/QSWATMOD2/LastInputPath'))
-    else:
-        path = ''
-    title = "Choose Specific Yield Rasterfile"
-    inFileName, __ = QFileDialog.getOpenFileName(None, title, path, "Rasterfiles (*.tif);; All files (*.*)")
-
-    if inFileName:
-        settings.setValue('/QSWATMOD2/LastInputPath', os.path.dirname(str(inFileName)))
-        Out_folder = QSWATMOD_path_dict['org_shps']
-        inInfo = QFileInfo(inFileName)
-        inFile = inInfo.fileName()
-        pattern = os.path.splitext(inFileName)[0] + '.*'
-        baseName = inInfo.baseName()
-
-        # inName = os.path.splitext(inFile)[0]
-        inName = 'evt'
-        for f in glob.iglob(pattern):
-            suffix = os.path.splitext(f)[1]
-            if os.name == 'nt':
-                outfile = ntpath.join(Out_folder, inName + suffix)
-            else:
-                outfile = posixpath.join(Out_folder, inName + suffix)                    
-            shutil.copy(f, outfile)
-    
-        if os.name == 'nt':
-            evt = ntpath.join(Out_folder, inName + ".tif")
-        else:
-            evt = posixpath.join(Out_folder, inName + ".tif")
-
-        # Delete existing "bot_elev (MODFLOW)" raster file"
-        for lyr in list(QgsProject.instance().mapLayers().values()):
-            if lyr.name() == ("evt (DATA)"):
-                QgsProject.instance().removeMapLayers([lyr.id()])
-
-        layer = QgsRasterLayer(evt, '{0} ({1})'.format("evt", "DATA"))
-        # Put in the group
-        root = QgsProject.instance().layerTreeRoot()
-        mf_group = root.findGroup("MODFLOW")    
-        QgsProject.instance().addMapLayer(layer, False)
-        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-        self.lineEdit_evt_raster.setText(evt)
-
-
-def getEVTfromR(self):
-    input1 = QgsProject.instance().mapLayersByName("mf_act_grid (MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("evt (DATA)")[0]
-    provider1 = input1.dataProvider()
-    provider2 = input2.dataProvider()
-    rpath = provider2.dataSourceUri()
-
-    if provider1.fields().indexFromName("evt_mean") != -1:
-        attrIdx = provider1.fields().indexFromName("evt_mean")
-        provider1.deleteAttributes([attrIdx])
-    params = {
-        'INPUT_RASTER': input2,
-        'RASTER_BAND':1,
-        'INPUT_VECTOR': input1,
-        'COLUMN_PREFIX':'evt_',
-        'STATS':[2]            
-        }     
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.textEdit_mf_log.append(time+' -> ' + 'Extrating Specific Yield from Raster has been finished...')
-
-
-# ----------------------------------------------------------------------------------------------
 def create_layer_inRiv(self):
     
-    self.layer = QgsProject.instance().mapLayersByName("mf_riv2 (MODFLOW)")[0]
+    self.layer = self.mf_riv2_layer()
     provider = self.layer.dataProvider()
 
     if self.layer.dataProvider().fields().indexFromName( "layer" ) == -1:
@@ -1111,11 +600,7 @@ def createRch(self):
         time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
         self.textEdit_mf_log.append(time+' -> ' + 'Specific Yield is entered ...')
     else:
-        msgBox = QMessageBox()
-        msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
-        msgBox.setWindowTitle("Oops!")
-        msgBox.setText("Please, provide a value of the recharge rate!")
-        msgBox.exec_()
+        messageBox(self, "Oops!", "Please, provide a value of the recharge rate!")
 
 # def cvtRchtoR(self):
 #     QSWATMOD_path_dict = self.dirs_and_paths()
@@ -1293,14 +778,13 @@ def writeMFmodel(self):
                 msgBox.exec_()
 
         # initialH
-        initialH = QgsProject.instance().mapLayersByName("initialH (MODFLOW)")[0]
+        initialH = QgsProject.instance().mapLayersByName("ih (MODFLOW)")[0]
         initialH_Ds = gdal.Open(initialH.source())
         initialH_Data = initialH_Ds.GetRasterBand(1).ReadAsArray()
-
+        
         # have geo transform to set things up to match later that puts our outputs
         geot = top_elev_Ds.GetGeoTransform()
-
-
+        
         # The following method cause a problem (None Type has no SetProjection)
         # Get ibound -------------------------------------------------------------------------
         iboundDs = gdal.GetDriverByName('GTiff').Create(

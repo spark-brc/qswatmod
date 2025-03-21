@@ -532,7 +532,7 @@ def cvt_vtr_hydrology(self):
                 field.name() == 'grid_id' or
                 field.name() == 'row' or
                 field.name() == 'col' or
-                field.name() == 'elev_mf'
+                field.name() == 'top_elev'
                 )
                     ]
 

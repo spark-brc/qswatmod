@@ -330,7 +330,7 @@ def create_col(self):
     QCoreApplication.processEvents()
 
 
-def create_elev_mf(self):
+def create_top_elev(self):
     time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
     self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Importing 'land surface elevation' ... processing")
     self.dlg.label_StepStatus.setText("Importing 'land surface elevation' ... ")
@@ -342,14 +342,14 @@ def create_elev_mf(self):
     provider = self.layer.dataProvider()
 
     # Create Elevation field
-    if self.layer.dataProvider().fields().indexFromName("elev_mf") == -1:
-        field = QgsField("elev_mf", QVariant.Double, 'double', 20, 5)
+    if self.layer.dataProvider().fields().indexFromName("top_elev") == -1:
+        field = QgsField("top_elev", QVariant.Double, 'double', 20, 5)
         provider.addAttributes([field])
         self.layer.updateFields()
 
         # Get the index numbers of the fields
         grid_id = self.layer.dataProvider().fields().indexFromName("grid_id")
-        elev_mf = provider.fields().indexFromName("elev_mf")
+        top_elev = provider.fields().indexFromName("top_elev")
 
         # Find .dis file and read number of rows, cols, x spacing, and y spacing (not allowed to change)
         for filename in glob.glob(str(QSWATMOD_path_dict['SMfolder'])+"/*.dis"):
@@ -361,10 +361,10 @@ def create_elev_mf(self):
 
         # Get an elevation list from discretiztion file
         ii = 5  # Starting line
-        elev_mfs = []
+        top_elevs = []
         while data[ii][0] != "INTERNAL":
             for jj in range(len(data[ii])):
-                elev_mfs.append(float(data[ii][jj]))
+                top_elevs.append(float(data[ii][jj]))
             ii += 1
 
         # Get features (Find out a way to change attribute values using another field)
@@ -374,8 +374,8 @@ def create_elev_mf(self):
         feats = self.layer.getFeatures()
         self.layer.startEditing()
         # add row number
-        for f, elev in zip(feats, elev_mfs):
-            self.layer.changeAttributeValue(f.id(), elev_mf, elev)
+        for f, elev in zip(feats, top_elevs):
+            self.layer.changeAttributeValue(f.id(), top_elev, elev)
             count += 1
             provalue = round(count/tot_feats*100)
             self.dlg.progressBar_step.setValue(provalue)
@@ -384,7 +384,7 @@ def create_elev_mf(self):
         QCoreApplication.processEvents()
     else:
         time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.dlg.textEdit_sm_link_log.append(time+' -> ' + "'elev_mf' already exists ...")
+        self.dlg.textEdit_sm_link_log.append(time+' -> ' + "'top_elev' already exists ...")
     time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
     self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Importing 'land surface elevation' ... passed")
     self.dlg.label_StepStatus.setText('Step Status: ')
@@ -520,7 +520,8 @@ def create_riv_info(self):
     QCoreApplication.processEvents()
 
 # Option 2
-def mf_riv2(self):
+def mf_riv2(self):  
+
     QSWATMOD_path_dict = self.dirs_and_paths()
     input1 = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
     input2 = QgsProject.instance().mapLayersByName("riv (SWAT)")[0]
@@ -549,16 +550,17 @@ def mf_riv2(self):
     # Deselect the features
     input1.removeSelection()
 
-    layer = QgsVectorLayer(riv_swat_shp, '{0} ({1})'.format("mf_riv2", "MODFLOW"), 'ogr')
-    # Put in the group
-    root = QgsProject.instance().layerTreeRoot()
-    swat_group = root.findGroup("MODFLOW")  
-    QgsProject.instance().addMapLayer(layer, False)
-    swat_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-    layer = QgsProject.instance().addMapLayer(layer)
+    # layer = QgsVectorLayer(riv_swat_shp, '{0} ({1})'.format("mf_riv2", "MODFLOW"), 'ogr')
+    # # Put in the group
+    # root = QgsProject.instance().layerTreeRoot()
+    # swat_group = root.findGroup("MODFLOW")  
+    # QgsProject.instance().addMapLayer(layer, False)
+    # swat_group.insertChildNode(0, QgsLayerTreeLayer(layer))
+    # layer = QgsProject.instance().addMapLayer(layer)
 
     # ing: Tried to put it in "createMFmodel_dialog" but not working
     self.dlg.radioButton_mf_riv2.setChecked(1)
+
 
 # def getElevfromDem_riv2(self):
 #   from qgis.analysis import QgsZonalStatistics
@@ -631,7 +633,7 @@ def overwriteRivPac(self):
     QSWATMOD_path_dict = self.dirs_and_paths()
     # try:
     if self.dlg.radioButton_mf_riv2.isChecked():
-        self.layer = QgsProject.instance().mapLayersByName("mf_riv2 (MODFLOW)")[0]
+        self.layer = self.mf_riv2_layer()
     elif self.dlg.radioButton_mf_riv3.isChecked():
         self.layer = QgsProject.instance().mapLayersByName("mf_riv3 (MODFLOW)")[0]
     provider = self.layer.dataProvider()
@@ -673,7 +675,7 @@ def overwriteRivPac(self):
     if len(riv_files) == 1:
         # ------------ Export Data to file -------------- #
         from datetime import datetime
-        version = "version 2.8."
+        version = "version 2.9."
         time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
         with open(riv_files[0], "w", newline='') as f:
             writer = csv.writer(f, delimiter='\t')
@@ -724,7 +726,7 @@ def rivInfoTo_mf_riv2(self):
     depth_idx = provider1.fields().indexFromName("Dep2")
     row_idx = provider1.fields().indexFromName("row")
     col_idx = provider1.fields().indexFromName("col")
-    elev_idx = provider1.fields().indexFromName("elev_mf")
+    elev_idx = provider1.fields().indexFromName("top_elev")
     length_idx = provider1.fields().indexFromName("rgrid_len")         
 
     # transfer the shapefile layer to a python list 
@@ -752,7 +754,7 @@ def rivInfoTo_mf_riv2(self):
             "Dep2": depths,
             "row": rows,
             "col": cols,
-            "elev_mf": elevs,
+            "top_elev": elevs,
             "rgrid_len": lengths
         }
     )
@@ -765,7 +767,7 @@ def rivInfoTo_mf_riv2(self):
     depth_avg = data.groupby(["grid_id"])["Dep2"].mean()
     row_avg = data.groupby(["grid_id"])["row"].mean().astype(int)
     col_avg = data.groupby(["grid_id"])["col"].mean().astype(int)
-    elev_avg = data.groupby(["grid_id"])["elev_mf"].mean()
+    elev_avg = data.groupby(["grid_id"])["top_elev"].mean()
     length_sum = data.groupby(["grid_id"])["rgrid_len"].sum()
 
     riv2_cond = float(hk)*length_sum*width_sum / float(rivBedthick)
@@ -780,7 +782,7 @@ def rivInfoTo_mf_riv2(self):
     riv2_bot_lst = riv2_bot.tolist()
 
     # Part II ---------------------------------------------------------------
-    self.layer = QgsProject.instance().mapLayersByName("mf_riv2 (MODFLOW)")[0]
+    self.layer = self.mf_riv2_layer()
     provider2 = self.layer.dataProvider()
 
     # from qgis.core import QgsField, QgsExpression, QgsFeature
@@ -823,6 +825,15 @@ def rivInfoTo_mf_riv2(self):
     QCoreApplication.processEvents()
 
 
+def river_grid_layer(self):
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    output_dir = QSWATMOD_path_dict['sm_shps']
+    name_ext_v = 'river_grid.gpkg'
+    output_file_v = os.path.normpath(os.path.join(output_dir, name_ext_v))
+    layer = QgsVectorLayer(output_file_v, '{0} ({1})'.format("river_grid","SWAT-MODFLOW"), 'ogr')
+    return layer   
+
+
 def rivInfoTo_mf_riv2_ii(self):
     import csv
     import pandas as pd
@@ -830,7 +841,7 @@ def rivInfoTo_mf_riv2_ii(self):
 
     QSWATMOD_path_dict = self.dirs_and_paths()
     # try:
-    river_grid = QgsProject.instance().mapLayersByName("river_grid (SWAT-MODFLOW)")[0]
+    river_grid = self.river_grid_layer()
     provider1 = river_grid.dataProvider()
 
     # Get the index numbers of the fields
@@ -839,7 +850,7 @@ def rivInfoTo_mf_riv2_ii(self):
     depth_idx = provider1.fields().indexFromName("Dep2")
     row_idx = provider1.fields().indexFromName("row")
     col_idx = provider1.fields().indexFromName("col")
-    elev_idx = provider1.fields().indexFromName("elev_mf")
+    elev_idx = provider1.fields().indexFromName("top_elev")
     length_idx = provider1.fields().indexFromName("rgrid_len")         
 
     # transfer the shapefile layer to a python list 
@@ -866,7 +877,7 @@ def rivInfoTo_mf_riv2_ii(self):
         "Dep2" : depths,
         "row" : rows,
         "col" : cols,
-        "elev_mf" : elevs,
+        "top_elev" : elevs,
         "rgrid_len" : lengths
         })
     hk = self.lineEdit_riverbedK2.text()
@@ -875,7 +886,7 @@ def rivInfoTo_mf_riv2_ii(self):
     depth_avg = data.groupby(["grid_id"])["Dep2"].mean()
     row_avg = data.groupby(["grid_id"])["row"].mean().astype(int)   
     col_avg = data.groupby(["grid_id"])["col"].mean().astype(int)   
-    elev_avg = data.groupby(["grid_id"])["elev_mf"].mean()
+    elev_avg = data.groupby(["grid_id"])["top_elev"].mean()
     length_sum = data.groupby(["grid_id"])["rgrid_len"].sum()
 
     riv2_cond = float(hk)*length_sum*width_sum / float(rivBedthick)
@@ -890,7 +901,7 @@ def rivInfoTo_mf_riv2_ii(self):
     riv2_bot_lst = riv2_bot.tolist()
 
     # Part II ---------------------------------------------------------------
-    self.layer = QgsProject.instance().mapLayersByName("mf_riv2 (MODFLOW)")[0]
+    self.layer = self.mf_riv2_layer()
     provider2 = self.layer.dataProvider()
 
     # from qgis.core import QgsField, QgsExpression, QgsFeature
@@ -935,7 +946,7 @@ def rivInfoTo_mf_riv2_ii(self):
 
 def riv_cond_delete_NULL(self):
     if self.dlg.radioButton_mf_riv2.isChecked():
-        layer = QgsProject.instance().mapLayersByName("mf_riv2 (MODFLOW)")[0]
+        layer = self.mf_riv2_layer()
 
     provider = layer.dataProvider()
     request =  QgsFeatureRequest().setFilterExpression("riv_cond IS NULL" )
@@ -1125,7 +1136,7 @@ def export_modflow_obs(self):
     # Get the index numbers of the fields
     grid_id_index = provider.fields().indexFromName("grid_id")
     layer_index = provider.fields().indexFromName("layer")
-    elev_mf_idx = provider.fields().indexFromName("elev_mf")
+    top_elev_idx = provider.fields().indexFromName("top_elev")
 
     # transfer the shapefile layer to a python list 
     l = []
@@ -1139,7 +1150,7 @@ def export_modflow_obs(self):
     # Extract grid_ids and layers as lists
     grid_ids = [int(g[grid_id_index]) for g in l_sorted]
     layers = [l[layer_index] for l in l_sorted]
-    elevs_mf = ['{:.2f}'.format(l[elev_mf_idx]) for l in l_sorted]
+    elevs_mf = ['{:.2f}'.format(l[top_elev_idx]) for l in l_sorted]
 
     info_number = len(grid_ids)
     # Find .dis file and read number of rows, cols, x spacing, and y spacing (not allowed to change)
@@ -1170,7 +1181,7 @@ def export_modflow_obs(self):
 
     # ------------ Export Data to file -------------- #
     from datetime import datetime
-    version = "version 2.8."
+    version = "version 2.9."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     name = "modflow.obs"
@@ -1276,7 +1287,7 @@ def create_modflow_mfn(self):
     QSWATMOD_path_dict = self.dirs_and_paths()
     wd = QSWATMOD_path_dict['SMfolder']
     for filename in glob.glob(wd + "/*.nam"):
-        version = "version 2.8."
+        version = "version 2.9."
         time = datetime.datetime.now().strftime(' - %m/%d/%y %H:%M:%S -')
         info = "# modflow.mfn file, generated by QSWATMOD2 plugin "+version+ time +'\n'
         lines = []
@@ -1328,7 +1339,7 @@ def modify_modflow_oc(self):
     QSWATMOD_path_dict = self.dirs_and_paths()
     wd = QSWATMOD_path_dict['SMfolder']
     for filename in glob.glob(wd + "/*.oc"):
-        version = "version 2.8."
+        version = "version 2.9."
         time = datetime.datetime.now().strftime(' - %m/%d/%y %H:%M:%S -')
         info = "# Output Control file, modified by QSWATMOD2 plugin "+version+ time +'\n'
 

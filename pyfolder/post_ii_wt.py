@@ -642,7 +642,7 @@ def export_wt_daily(self):
 
     # Add info
     from datetime import datetime
-    version = "version 2.8."
+    version = "version 2.9."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     mf_obs = pd.read_csv(
@@ -849,7 +849,7 @@ def export_wt_monthly(self):
 
     # Add info
     from datetime import datetime
-    version = "version 2.8."
+    version = "version 2.9."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     mf_obs = pd.read_csv(os.path.join(wd, "modflow.obs"),
@@ -1053,7 +1053,7 @@ def export_wt_annual(self):
 
     # Add info
     from datetime import datetime
-    version = "version 2.8."
+    version = "version 2.9."
     time = datetime.now().strftime('- %m/%d/%y %H:%M:%S -')
 
     mf_obs = pd.read_csv(os.path.join(wd, "modflow.obs"),

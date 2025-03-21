@@ -15,15 +15,122 @@ import subprocess
 import shutil
 from datetime import datetime
 import csv
+import pandas as pd
 from PyQt5.QtWidgets import QMessageBox
 
-# TODO: implement "creat_hru_id" function
-def create_hru_id(self):
+
+def start_time(self, desc):
     time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Creating 'HRU_ID' ... processing")
-    self.dlg.label_StepStatus.setText("Creating 'HRU_ID' ... ")
+    self.dlg.textEdit_sm_link_log.append(time+' -> ' + f"{desc} ... processing")
+    self.dlg.label_StepStatus.setText(f"{desc} ... ")
     self.dlg.progressBar_step.setValue(0)
     QCoreApplication.processEvents()
+
+def end_time(self, desc):
+    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
+    self.dlg.textEdit_sm_link_log.append(time+' -> ' + f"{desc} ... passed")
+    self.dlg.label_StepStatus.setText('Step Status: ')
+    self.dlg.progressBar_step.setValue(100)
+    QCoreApplication.processEvents()
+
+def messageBox(self, title, message):
+    msgBox = QMessageBox()
+    msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))  
+    msgBox.setWindowTitle(title)
+    msgBox.setText(message)
+    msgBox.exec_()
+
+def get_attribute_to_dataframe(self, layer):
+    #List all columns you want to include in the dataframe. I include all with:
+    cols = [f.name() for f in layer.fields()] #Or list them manually: ['kommunnamn', 'kkod', ... ]
+    #A generator to yield one row at a time
+    datagen = ([f[col] for col in cols] for f in layer.getFeatures())
+    df = pd.DataFrame.from_records(data=datagen, columns=cols)
+    return df
+
+def dissolve_field(self, layername, fieldname, outputname):
+    start_time(self, f"Dissolving '{fieldname}'")
+    layer = QgsProject.instance().mapLayersByName(f"{layername}")[0]
+    # runinng the actual routine: 
+    params = {
+        'INPUT': layer,
+        'FIELD':fieldname,
+        'SEPARATE_DISJOINT':False,
+        'OUTPUT': f"memory:{outputname}"
+    }
+    outlayer = processing.run('qgis:dissolve', params)
+    outlayer = outlayer['OUTPUT']
+
+    for lyr in list(QgsProject.instance().mapLayers().values()):
+        if lyr.name() == (outputname):
+            QgsProject.instance().removeMapLayers([lyr.id()])
+
+    # Put in the group  
+    root = QgsProject.instance().layerTreeRoot()
+    mf_group = root.findGroup("SWAT-MODFLOW")
+    QgsProject.instance().addMapLayer(outlayer, False)
+    mf_group.insertChildNode(0, QgsLayerTreeLayer(outlayer))
+    self.iface.mapCanvas().refreshAllLayers()
+    end_time(self, f"Dissolving '{fieldname}'")
+
+def delete_layers(self, layernames):
+    for layername in layernames:
+        for lyr in list(QgsProject.instance().mapLayers().values()):
+            if lyr.name() == (layername):
+                QgsProject.instance().removeMapLayers([lyr.id()])
+    self.iface.mapCanvas().refreshAllLayers()
+
+
+
+def calculate_area(self, input_layer, var_name, out_name):
+    start_time(self, f"Calculating '{var_name}' areas")
+    layer = QgsProject.instance().mapLayersByName(input_layer)[0]
+    provider = layer.dataProvider()
+    if provider.fields().indexFromName(var_name) != -1:
+        provider.deleteAttributes([provider.fields().indexFromName(var_name)])
+        # field = QgsField(var_name, QVariant.Double, 'double', 0, 2)
+        # provider.addAttributes([field])
+        # layer.updateFields()
+
+    params = {
+        'INPUT': layer,
+        'FIELD_NAME': var_name,
+        'FIELD_TYPE': 0,
+        'FIELD_LENGTH': 0,
+        'FIELD_PRECISION': 2,
+        'FORMULA': '$area',
+        'OUTPUT': f"memory:{out_name}"
+    }
+    outlayer = processing.run("native:fieldcalculator", params)
+    outlayer = outlayer['OUTPUT']
+
+    for lyr in list(QgsProject.instance().mapLayers().values()):
+        if lyr.name() == (out_name):
+            QgsProject.instance().removeMapLayers([lyr.id()])
+
+    # Put in the group  
+    root = QgsProject.instance().layerTreeRoot()
+    mf_group = root.findGroup("SWAT-MODFLOW")
+    QgsProject.instance().addMapLayer(outlayer, False)
+    mf_group.insertChildNode(0, QgsLayerTreeLayer(outlayer))
+    self.iface.mapCanvas().refreshAllLayers()
+    end_time(self, f"Calculating '{var_name}' areas")
+
+
+def filter_required_fields(self, layer, fields_required):
+    layer = QgsProject.instance().mapLayersByName(layer)[0]
+    prov = layer.dataProvider()
+    field_names = [field.name() for field in prov.fields()]
+    fields_filter = [i for i in field_names if i not in fields_required]
+    fields_filter = [prov.fields().indexFromName(i) for i in fields_filter]
+    prov.deleteAttributes(fields_filter)
+    layer.updateFields()
+
+
+def create_hru_id(self):
+    desc = "Creating 'HRU_ID'"
+    start_time(self, desc)
+    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
     self.layer = QgsProject.instance().mapLayersByName("hru (SWAT)")[0]
     provider = self.layer.dataProvider()
     if provider.fields().indexFromName("HRU_ID") == -1:
@@ -45,10 +152,7 @@ def create_hru_id(self):
     else:
         time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
         self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Creating 'HRU_ID' already exists ...")        
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Creating 'HRU_ID' ... passed")
-    self.dlg.label_StepStatus.setText('Step Status: ')
-    QCoreApplication.processEvents()
+    end_time(self, desc)
 
 
 def calculate_hru_area(self):
@@ -87,367 +191,203 @@ def calculate_hru_area(self):
     self.dlg.label_StepStatus.setText('Step Status: ')
     QCoreApplication.processEvents()
 
-
 def multipart_to_singlepart(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Disaggregating HRUs ... processing")
-    self.dlg.label_StepStatus.setText("Disaggregating HRUs ... ")
-    self.dlg.progressBar_step.setValue(0)
-    QCoreApplication.processEvents()
-
-
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    layer = QgsProject.instance().mapLayersByName("hru (SWAT)")[0]
-    name = "dhru"
-    name_ext = "dhru.gpkg"
-    output_dir = QSWATMOD_path_dict['SMshps']    
-    output_file = os.path.normpath(os.path.join(output_dir, name_ext))
+    start_time(self, "Disaggregating HRUs")
+    layer = QgsProject.instance().mapLayersByName("hru (link)")[0]
     # runinng the actual routine:
     params = {
         'INPUT': layer,
-        'OUTPUT': output_file
+        'OUTPUT': f"memory:{"dhru (link)"}"
     }
-    processing.run("qgis:multiparttosingleparts", params)
-    # defining the outputfile to be loaded into the canvas        
-    dhru_shapefile = os.path.join(output_dir, name_ext)
-    layer = QgsVectorLayer(dhru_shapefile, '{0} ({1})'.format("dhru", "SWAT-MODFLOW"), 'ogr')
+    outlayer = processing.run("qgis:multiparttosingleparts", params)
+    outlayer = outlayer['OUTPUT']
+
     # Put in the group
     root = QgsProject.instance().layerTreeRoot()
     sm_group = root.findGroup("SWAT-MODFLOW")
-    QgsProject.instance().addMapLayer(layer, False)
-    sm_group.insertChildNode(1, QgsLayerTreeLayer(layer))
+    QgsProject.instance().addMapLayer(outlayer, False)
+    sm_group.insertChildNode(1, QgsLayerTreeLayer(outlayer))
+    end_time(self, "Disaggregating HRUs")
 
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Disaggregating HRUs ... passed")
-    self.dlg.label_StepStatus.setText("Step Status: ")
-    self.dlg.progressBar_step.setValue(100)
-    QCoreApplication.processEvents()
-
+def create_temp_id(self):
+    layer = QgsProject.instance().mapLayersByName("dhru (link)")[0]
+    params = {
+        'INPUT': layer,
+        'FIELD_NAME': 'tid',
+        'FIELD_TYPE': 0,
+        'FIELD_LENGTH': 0,
+        'FIELD_PRECISION': 0,
+        'FORMULA': '$id',
+        'OUTPUT': f"memory:{"dhru (link)"}"
+    }
+    outlayer = processing.run("native:fieldcalculator", params)
+    outlayer = outlayer['OUTPUT']
+    # Put in the group
+    for lyr in list(QgsProject.instance().mapLayers().values()):
+        if lyr.name() == ("dhru (link)"):
+            QgsProject.instance().removeMapLayers([lyr.id()])
+    # Put in the group
+    root = QgsProject.instance().layerTreeRoot()
+    sm_group = root.findGroup("SWAT-MODFLOW")
+    QgsProject.instance().addMapLayer(outlayer, False)
+    sm_group.insertChildNode(1, QgsLayerTreeLayer(outlayer))
+    self.iface.mapCanvas().refreshAllLayers()
 
 def create_dhru_id(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Creating DHRU ids ... processing")
-    self.dlg.label_StepStatus.setText("Creating 'dhru_id' ... ")
-    self.dlg.progressBar_step.setValue(0)
-    QCoreApplication.processEvents()
+    layer = QgsProject.instance().mapLayersByName("dhru (link)")[0]
+    data = get_attribute_to_dataframe(self, layer)
+    data_sorted = data.sort_values(by=['HRU_ID'])
+    data_sorted['dhru_id'] = range(1, len(data_sorted) + 1)
+    vl = QgsVectorLayer("None", "tt", "memory") #Adjust this line if you dont want a temp table
+    pr = vl.dataProvider()
+    vl.startEditing()
+    fieldlist = [QgsField(fieldname, QVariant.Double) for fieldname in data_sorted.columns]
+    pr.addAttributes(fieldlist)
+    vl.updateFields()
 
-    self.layer = QgsProject.instance().mapLayersByName("dhru (SWAT-MODFLOW)")[0]  # get active layer
-    # create list of tupels of area and feature-id
-    provider = self.layer.dataProvider()
-    if provider.fields().indexFromName("dhru_id") == -1:
-        field = QgsField("dhru_id", QVariant.Int)
-        provider.addAttributes([field])
-        self.layer.updateFields()
+    for i in data_sorted.index.to_list():
+        fet = QgsFeature()
+        newrow = data_sorted[data_sorted.columns].iloc[i].tolist()
+        fet.setAttributes(newrow)
+        pr.addFeatures([fet])
+    vl.commitChanges()
+    QgsProject.instance().addMapLayer(vl)
+    dhru_table = QgsProject.instance().mapLayersByName("tt")[0]
+    params = {
+        'INPUT': layer.source(),
+        'FIELD': 'tid',
+        'INPUT_2': dhru_table.source(),
+        'FIELD_2': 'tid',
+        'FIELDS_TO_COPY': ['dhru_id'],
+        'METHOD': 1,
+        'DISCARD_NONMATCHING': False,
+        'PREFIX': '',
+        'OUTPUT': f"memory:{"dhru (link)"}"
+    }
+    outlayer = processing.run("native:joinattributestable", params)['OUTPUT']
+    # Put in the group
+    for lyr in list(QgsProject.instance().mapLayers().values()):
+        if lyr.name() == ("dhru (link)"):
+            QgsProject.instance().removeMapLayers([lyr.id()])
+    # Put in the group
+    root = QgsProject.instance().layerTreeRoot()
+    sm_group = root.findGroup("SWAT-MODFLOW")
+    QgsProject.instance().addMapLayer(outlayer, False)
+    sm_group.insertChildNode(1, QgsLayerTreeLayer(outlayer))
+    self.iface.mapCanvas().refreshAllLayers()
+    
+def cvt_vl_to_gpkg(self, layernam, output_file):
+    QSWATMOD_path_dict = self.dirs_and_paths()
+    output_dir = QSWATMOD_path_dict['SMshps']
+    layer = QgsProject.instance().mapLayersByName(layernam)[0]
+    layer_gpkg = os.path.normpath(os.path.join(output_dir, output_file))
+    layer.selectAll()
+    params = {
+        'INPUT': layer,
+        'OUTPUT': layer_gpkg
+    }
+    processing.run("native:saveselectedfeatures", params)
+    layer.removeSelection()
+    outlayer = QgsVectorLayer(layer_gpkg, f"{layernam}", 'ogr')     
 
-        # BUG: featur count not working with geopackage
-        tot_feats = self.layer.featureCount()
-        count = 0
-        #field1Id = provider.fields().indexFromName( "hru_id" ) # for SWAT+
-        field1Id = provider.fields().indexFromName("HRU_ID") # for origin SWAT
-        attrIdx = provider.fields().indexFromName("dhru_id")
-
-        # aList = list( aLayer.getFeatures() )
-        aList = self.layer.getFeatures()
-        featureList = sorted(aList, key=lambda f: f[field1Id])
-        self.layer.startEditing()
-        for i, f in enumerate(featureList):
-            self.layer.changeAttributeValue(f.id(), attrIdx, i+1)
-            count += 1
-            provalue = round(count/tot_feats*100)
-            self.dlg.progressBar_step.setValue(provalue)
-            QCoreApplication.processEvents()
-        self.layer.commitChanges()
-        QCoreApplication.processEvents()
-    else:
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.dlg.textEdit_sm_link_log.append(time+' -> ' + "'dhru_id' already exists ...")        
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Creating DHRU ids ... passed")
-    self.dlg.label_StepStatus.setText('Step Status: ')
-    QCoreApplication.processEvents()
+    # if there is an existing mf_grid shapefile, it will be removed
+    for lyr in list(QgsProject.instance().mapLayers().values()):
+        if lyr.name() == (layernam):
+            QgsProject.instance().removeMapLayers([lyr.id()])
+    # Put in the group
+    root = QgsProject.instance().layerTreeRoot()
+    sm_group = root.findGroup("SWAT-MODFLOW")
+    QgsProject.instance().addMapLayer(outlayer, False)
+    sm_group.insertChildNode(1, QgsLayerTreeLayer(outlayer))
+    self.iface.mapCanvas().refreshAllLayers()
 
 
-# calculate the dhru area
-def calculate_dhru_area(self): 
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Calculating 'DHRU areas' ... processing")
-    self.dlg.label_StepStatus.setText("Calculating 'DHRU areas' ... ")
-    self.dlg.progressBar_step.setValue(0)
-    QCoreApplication.processEvents()
 
-    self.layer = QgsProject.instance().mapLayersByName("dhru (SWAT-MODFLOW)")[0]
-    provider = self.layer.dataProvider()
-    if provider.fields().indexFromName("dhru_area") == -1:
-        field = QgsField("dhru_area", QVariant.Int)
-        provider.addAttributes([field])
-        self.layer.updateFields()
-        tot_feats = self.layer.featureCount()
-        count = 0
-        feats = self.layer.getFeatures()
-        self.layer.startEditing()
-        for feat in feats:
-            area = feat.geometry().area()
-            feat['dhru_area'] = round(area)
-            self.layer.updateFeature(feat)
-            count += 1
-            provalue = round(count/tot_feats*100)
-            self.dlg.progressBar_step.setValue(provalue)
-            QCoreApplication.processEvents()
-        self.layer.commitChanges()
-        QCoreApplication.processEvents()
-    else:
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.dlg.textEdit_sm_link_log.append(time+' -> ' + "'dhru_area' already exists ...")        
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Calculating 'DHRU areas' ... passed")
-    self.dlg.label_StepStatus.setText('Step Status: ')
-    QCoreApplication.processEvents()
+
+
+# processing.run(
+#     "native:savefeatures", 
+#     {'INPUT':'memory://MultiPolygon?crs=EPSG:5070&field=HRU_ID:integer(0,0)&field=hru_area:double(0,2)&field=tid:double(0,0)&field=dhru_id:double(0,0)&field=dhru_area:double(0,2)&field=fid:long(0,0)&field=grid_id:integer(0,0)&field=row:integer(0,0)&field=col:integer(0,0)&field=top_elev:double(0,0)&field=ol_area:double(0,2)&uid={28f8f565-083f-4a9e-99fe-579a7743e332}','OUTPUT':'D:/Projects/temp_qswatmod/tttt.gpkg',
+#      'LAYER_NAME':'testing','DATASOURCE_OPTIONS':'','LAYER_OPTIONS':'','ACTION_ON_EXISTING_FILE':0})
 
 
 def hru_dhru(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Intersecting DHRUs by SUBs ... processing")
-    self.dlg.label_StepStatus.setText("Intersecting DHRUs by SUBs ... ")
-    self.dlg.progressBar_step.setValue(0)
-    QCoreApplication.processEvents()
-
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    input1 = QgsProject.instance().mapLayersByName("dhru (SWAT-MODFLOW)")[0]
-    input2 = QgsProject.instance().mapLayersByName("sub (SWAT)")[0]    
-    name = "hru_dhru_"
-    name_ext = "hru_dhru_.gpkg"
-    output_dir = QSWATMOD_path_dict['SMshps']
-    output_file = os.path.normpath(os.path.join(output_dir, name_ext))
+    start_time(self, "Intersecting DHRUs by SUBs")
+    input1 = QgsProject.instance().mapLayersByName("dhru (link)")[0]
+    input2 = QgsProject.instance().mapLayersByName("sub (link)")[0]    
 
     # runinng the actual routine:
     params = {
         'INPUT': input1,
         'OVERLAY': input2,
-        'OUTPUT': output_file
+        'OUTPUT': f"memory:{"hru_dhru (SWAT-MODFLOW)"}"
     }
-    processing.run("native:intersection", params)
-    # processing.run("saga:intersect", params)
-    # defining the outputfile to be loaded into the canvas        
-    hru_dhru_shapefile = os.path.join(output_dir, name_ext)
-    # layer = QgsVectorLayer(hru_dhru_shapefile, '{0} ({1})'.format("hru_dhru","--"), 'ogr')  # if it needs additional processing
-    layer = QgsVectorLayer(hru_dhru_shapefile, '{0} ({1})'.format("hru_dhru", "SWAT-MODFLOW"), 'ogr')
+    outlayer = processing.run("native:intersection", params)
+    outlayer = outlayer['OUTPUT']
+    for lyr in list(QgsProject.instance().mapLayers().values()):
+        if lyr.name() == ("hru_dhru (SWAT-MODFLOW)"):
+            QgsProject.instance().removeMapLayers([lyr.id()])
 
     # Put in the group
     root = QgsProject.instance().layerTreeRoot()
     sm_group = root.findGroup("SWAT-MODFLOW")   
-    QgsProject.instance().addMapLayer(layer, False)
-    sm_group.insertChildNode(1, QgsLayerTreeLayer(layer))
-
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Intersecting DHRUs by SUBs ... passed")
-    self.dlg.label_StepStatus.setText("Step Status: ")
-    self.dlg.progressBar_step.setValue(100)
-    QCoreApplication.processEvents()
-
-
-def hru_dhru_dissolve(self):
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    input1 = QgsProject.instance().mapLayersByName("hru_dhru (--)")[0]
-    name = "hru_dhru"
-    name_ext = "hru_dhru.shp"
-    output_dir = QSWATMOD_path_dict['SMshps']
-    output_file = os.path.normpath(os.path.join(output_dir, name_ext))
-    fieldName = "dhru_id"
-
-    # runinng the actual routine: 
-    processing.run('qgis:dissolve', input1, False, fieldName, output_file)
-
-    # defining the outputfile to be loaded into the canvas        
-    hru_dhru_shapefile = os.path.join(output_dir, name_ext)
-    layer = QgsVectorLayer(hru_dhru_shapefile, '{0} ({1})'.format("hru_dhru","SWAT-MODFLOW"), 'ogr')
-
-    # Put in the group
-    root = QgsProject.instance().layerTreeRoot()
-    sm_group = root.findGroup("SWAT-MODFLOW")   
-    QgsProject.instance().addMapLayer(layer, False)
-    sm_group.insertChildNode(1, QgsLayerTreeLayer(layer))
+    QgsProject.instance().addMapLayer(outlayer, False)
+    sm_group.insertChildNode(1, QgsLayerTreeLayer(outlayer))
+    end_time(self, "Intersecting DHRUs by SUBs")
 
 
 # Create a field for filtering rows on area
 def create_hru_dhru_filter(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Checking nulls ... processing")
-    self.dlg.label_StepStatus.setText("Checking nulls ... ")
-    self.dlg.progressBar_step.setValue(0)
-    QCoreApplication.processEvents()
-
-    self.layer = QgsProject.instance().mapLayersByName("hru_dhru (SWAT-MODFLOW)")[0]
-    provider = self.layer.dataProvider()
-    if provider.fields().indexFromName("area_f") == -1:
-        # field = QgsField("area_f", QVariant.Int)
-        field = QgsField("area_f", QVariant.Int)
-        provider.addAttributes([field])
-        self.layer.updateFields()
-        # 
-        tot_feats = self.layer.featureCount()
-        count = 0
-
-        feats = self.layer.getFeatures()
-        self.layer.startEditing()
-        for feat in feats:
-            area = feat.geometry().area()
-            #score = scores[i]
-            feat['area_f'] = round(area) # abs function for negative area a bug produces same dhru_id
-            self.layer.updateFeature(feat)
-            count += 1
-            provalue = round(count/tot_feats*100)
-            self.dlg.progressBar_step.setValue(provalue)
-            QCoreApplication.processEvents()
-        self.layer.commitChanges()
-        QCoreApplication.processEvents()
-
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Checking nulls ... passed")
-        self.dlg.label_StepStatus.setText('Step Status: ')
-        QCoreApplication.processEvents()
+    dissolve_field(self, "hru_dhru (SWAT-MODFLOW)", "dhru_id", "hru_dhru (SWAT-MODFLOW)")
+    calculate_area(self, "hru_dhru (SWAT-MODFLOW)", "area_f", "hru_dhru (SWAT-MODFLOW)")
+    layer = QgsProject.instance().mapLayersByName("hru_dhru (SWAT-MODFLOW)")[0]
+    layer.startEditing()
+    params = {
+        'INPUT': layer,
+        'FIELD':'area_f','OPERATOR':4,'VALUE':'9','METHOD':0
+    }
+    processing.run("qgis:selectbyattribute", params)
+    layer.deleteSelectedFeatures()
+    layer.commitChanges()
 
 
-def delete_hru_dhru_with_zero(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Deleting nulls ... processing")
-    self.dlg.label_StepStatus.setText("Deleting nulls ... ")
-    self.dlg.progressBar_step.setValue(0)
-    QCoreApplication.processEvents()
-
-    self.layer = QgsProject.instance().mapLayersByName("hru_dhru (SWAT-MODFLOW)")[0]
-    provider = self.layer.dataProvider()
-    request =  QgsFeatureRequest().setFilterExpression('"area_f" < 9')
-    request.setSubsetOfAttributes([])
-    request.setFlags(QgsFeatureRequest.NoGeometry)
-    tot_feats = self.layer.featureCount()
-    count = 0
-    feats = self.layer.getFeatures()
-    self.layer.startEditing()
-    for f in self.layer.getFeatures(request):
-        self.layer.deleteFeature(f.id())
-        count += 1
-        provalue = round(count/tot_feats*100)
-        self.dlg.progressBar_step.setValue(provalue)
-        QCoreApplication.processEvents()
-    self.layer.commitChanges()
-    QCoreApplication.processEvents()
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Deleting nulls ... passed")
-    self.dlg.label_StepStatus.setText('Step Status: ')
-    QCoreApplication.processEvents()
 
 
 def dhru_grid(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Intersecting DHRUs by GRIDs ... processing")
-    self.dlg.label_StepStatus.setText("Intersecting DHRUs by GRIDs ... ")
-    self.dlg.progressBar_step.setValue(0)
-    QCoreApplication.processEvents()
-
-    QSWATMOD_path_dict = self.dirs_and_paths()
-    input1 = QgsProject.instance().mapLayersByName("dhru (SWAT-MODFLOW)")[0]
+    start_time(self, "Intersecting DHRUs by GRIDs")
+    input1 = QgsProject.instance().mapLayersByName("dhru (link)")[0]
     input2 = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
-    name = "dhru_grid"
-    name_ext = "dhru_grid.gpkg"
-    output_dir = QSWATMOD_path_dict['SMshps']
-    output_file = os.path.normpath(os.path.join(output_dir, name_ext))
-
     params = {
         'INPUT': input1,
         'OVERLAY': input2,
-        'OUTPUT': output_file
+        'OUTPUT': f"memory:{"dhru_grid (SWAT-MODFLOW)"}"
     }
-    processing.run("native:intersection", params)
-
-    # defining the outputfile to be loaded into the canvas        
-    dhru_grid_shapefile = os.path.join(output_dir, name_ext)
-    layer = QgsVectorLayer(dhru_grid_shapefile, '{0} ({1})'.format("dhru_grid", "SWAT-MODFLOW"), 'ogr')
-
+    outlayer = processing.run("native:intersection", params)
+    outlayer = outlayer['OUTPUT']
+    for lyr in list(QgsProject.instance().mapLayers().values()):
+        if lyr.name() == ("dhru_grid (SWAT-MODFLOW)"):
+            QgsProject.instance().removeMapLayers([lyr.id()])
     # Put in the group
     root = QgsProject.instance().layerTreeRoot()
-    sm_group = root.findGroup("SWAT-MODFLOW")   
-    QgsProject.instance().addMapLayer(layer, False)
-    sm_group.insertChildNode(1, QgsLayerTreeLayer(layer))
-
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Intersecting DHRUs by GRIDs ... passed")
-    self.dlg.label_StepStatus.setText("Step Status: ")
-    self.dlg.progressBar_step.setValue(100)
-    QCoreApplication.processEvents()
+    sm_group = root.findGroup("SWAT-MODFLOW")
+    QgsProject.instance().addMapLayer(outlayer, False)
+    sm_group.insertChildNode(1, QgsLayerTreeLayer(outlayer))
+    end_time(self, "Intersecting DHRUs by GRIDs")
 
 
-# Create a field for filtering rows on area
 def create_dhru_grid_filter(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Calculating overlapping sizes ... processing")
-    self.dlg.textEdit_sm_link_log.append('              ⮡     *** BE PATIENT!!! This step takes the most time! ***    ')
-
-    self.dlg.label_StepStatus.setText("Calculating overlapping sizes ... ")
-    self.dlg.progressBar_step.setValue(0)
-    QCoreApplication.processEvents()
-
-    self.layer = QgsProject.instance().mapLayersByName("dhru_grid (SWAT-MODFLOW)")[0]
-    provider = self.layer.dataProvider()
-    if provider.fields().indexFromName("ol_area") == -1:
-        field = QgsField("ol_area", QVariant.Int)
-        provider.addAttributes([field])
-        self.layer.updateFields()
-        # 
-        tot_feats = self.layer.featureCount()
-        count = 0
-
-        feats = self.layer.getFeatures()
-        self.layer.startEditing()
-        for feat in feats:
-            area = feat.geometry().area()
-            #score = scores[i]
-            feat['ol_area'] = round(area)
-            self.layer.updateFeature(feat)
-            count += 1
-            provalue = round(count/tot_feats*100)
-            self.dlg.progressBar_step.setValue(provalue)
-            QCoreApplication.processEvents()
-        self.layer.commitChanges()
-        QCoreApplication.processEvents()
-        time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-        self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Calculating overlapping sizes... processing")
-        self.dlg.textEdit_sm_link_log.append('              ⮡     *** HOORAY!!! Almost there! ***    ')      
-        self.dlg.label_StepStatus.setText('Step Status: ')
-        QCoreApplication.processEvents()
-
-
-def delete_dhru_grid_with_zero(self):
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Deleting small DHRUs ... processing")
-    self.dlg.label_StepStatus.setText("Deleting small DHRUs ... ")
-    self.dlg.progressBar_step.setValue(0)
-    QCoreApplication.processEvents()
-
-    self.layer = QgsProject.instance().mapLayersByName("dhru_grid (SWAT-MODFLOW)")[0]
-    provider = self.layer.dataProvider()
-    if self.dlg.groupBox_threshold.isChecked():
-        threshold = self.dlg.horizontalSlider_ol_area.value()
-        request = QgsFeatureRequest().setFilterExpression('"ol_area" < {}'.format(threshold))
-    else:
-        request = QgsFeatureRequest().setFilterExpression('"ol_area" < 9')
-    request.setSubsetOfAttributes([])
-    request.setFlags(QgsFeatureRequest.NoGeometry)
-    tot_feats = self.layer.featureCount()
-    count = 0
-    self.layer.startEditing()
-    for f in self.layer.getFeatures(request):
-        self.layer.deleteFeature(f.id())
-        count += 1
-        provalue = round(count/tot_feats*100)
-        self.dlg.progressBar_step.setValue(provalue)
-        QCoreApplication.processEvents()
-    self.layer.commitChanges()
-    QCoreApplication.processEvents()
-    time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
-    self.dlg.textEdit_sm_link_log.append(time+' -> ' + "Deleting small DHRUs ... passed")
-    self.dlg.label_StepStatus.setText('Step Status: ')
-    QCoreApplication.processEvents()
-
+    start_time(self, "Calculating overlapping sizes")
+    calculate_area(self, "dhru_grid (SWAT-MODFLOW)", "ol_area", "dhru_grid (SWAT-MODFLOW)")
+    layer = QgsProject.instance().mapLayersByName("dhru_grid (SWAT-MODFLOW)")[0]
+    layer.startEditing()
+    params = {
+        'INPUT': layer,
+        'FIELD':'ol_area','OPERATOR':4,'VALUE':'30','METHOD':0
+    }
+    processing.run("qgis:selectbyattribute", params)
+    layer.deleteSelectedFeatures()
+    layer.commitChanges()
+    end_time(self, "Calculating overlapping sizes")
 
 # deleting existing river_grid
 def deleting_river_grid(self):
@@ -456,6 +396,16 @@ def deleting_river_grid(self):
             QgsProject.instance().removeMapLayers([lyr.id()])
 
 # Used for both SWAT and SWAT+
+
+# def mf_riv2_layer(self):
+#     QSWATMOD_path_dict = self.dirs_and_paths()
+#     output_dir = QSWATMOD_path_dict['org_shps']
+#     name_ext_v = 'mf_riv2.gpkg'
+#     output_file_v = os.path.normpath(os.path.join(output_dir, name_ext_v))
+#     layer = QgsVectorLayer(output_file_v, '{0} ({1})'.format("mf_riv2","MODFLOW"), 'ogr')
+#     return layer   
+
+
 def river_grid(self): #step 1
     QSWATMOD_path_dict = self.dirs_and_paths()
 
@@ -497,17 +447,17 @@ def river_grid(self): #step 1
     processing.run('qgis:intersection', params)
     
     # defining the outputfile to be loaded into the canvas        
-    river_grid_shapefile = os.path.join(output_dir, name_ext)
-    self.layer = QgsVectorLayer(river_grid_shapefile, '{0} ({1})'.format("river_grid","SWAT-MODFLOW"), 'ogr')    
-    # Put in the group
-    root = QgsProject.instance().layerTreeRoot()
-    sm_group = root.findGroup("SWAT-MODFLOW")   
-    QgsProject.instance().addMapLayer(self.layer, False)
-    sm_group.insertChildNode(1, QgsLayerTreeLayer(self.layer))
+    # river_grid_shapefile = os.path.join(output_dir, name_ext)
+    # self.layer = QgsVectorLayer(river_grid_shapefile, '{0} ({1})'.format("river_grid","SWAT-MODFLOW"), 'ogr')    
+    # # Put in the group
+    # root = QgsProject.instance().layerTreeRoot()
+    # sm_group = root.findGroup("SWAT-MODFLOW")   
+    # QgsProject.instance().addMapLayer(self.layer, False)
+    # sm_group.insertChildNode(1, QgsLayerTreeLayer(self.layer))
 
 # 
 def river_grid_delete_NULL(self):
-    layer = QgsProject.instance().mapLayersByName("river_grid (SWAT-MODFLOW)")[0]
+    layer = self.river_grid_layer()
     provider = layer.dataProvider()
     request =  QgsFeatureRequest().setFilterExpression("grid_id IS NULL" )
     request.setSubsetOfAttributes([])
@@ -527,7 +477,7 @@ def river_grid_delete_NULL(self):
 # SWAT+
 # Create a field for filtering rows on area
 def create_river_grid_filter(self):
-    self.layer = QgsProject.instance().mapLayersByName("river_grid (SWAT-MODFLOW)")[0]
+    self.layer = self.river_grid_layer()
     provider = self.layer.dataProvider()
     field = QgsField("ol_length", QVariant.Int)
     #field = QgsField("ol_area", QVariant.Int)
@@ -546,7 +496,7 @@ def create_river_grid_filter(self):
 
 
 def delete_river_grid_with_threshold(self):
-    self.layer = QgsProject.instance().mapLayersByName("river_grid (SWAT-MODFLOW)")[0]
+    self.layer = self.river_grid_layer()
     provider = self.layer.dataProvider()
     request =  QgsFeatureRequest().setFilterExpression('"rgrid_len" < 0.5')
     request.setSubsetOfAttributes([])
@@ -558,8 +508,7 @@ def delete_river_grid_with_threshold(self):
 
 
 def rgrid_len(self):
-
-    self.layer = QgsProject.instance().mapLayersByName("river_grid (SWAT-MODFLOW)")[0]
+    self.layer = self.river_grid_layer()
     provider = self.layer.dataProvider()
     field = QgsField("rgrid_len", QVariant.Int)
     provider.addAttributes([field])
@@ -579,7 +528,7 @@ def rgrid_len(self):
 # SWAT+
 def river_sub(self):
     QSWATMOD_path_dict = self.dirs_and_paths()
-    input1 = QgsProject.instance().mapLayersByName("river_grid (SWAT-MODFLOW)")[0]
+    input1 = self.river_grid_layer()
     input2 = QgsProject.instance().mapLayersByName("sub (SWAT)")[0]
     name = "river_sub_union"
     name_ext = "river_sub_union.shp"
@@ -680,7 +629,7 @@ def export_hru_dhru(self):
 
     # Get the index numbers of the fields
     dhru_id_index = layer.dataProvider().fields().indexFromName("dhru_id")
-    dhru_area_index = layer.dataProvider().fields().indexFromName("dhru_area")
+    dhru_area_index = layer.dataProvider().fields().indexFromName("area_f")
     hru_id_index = layer.dataProvider().fields().indexFromName("HRU_ID")
     hru_area_index = layer.dataProvider().fields().indexFromName("hru_area")
     subbasin_index = layer.dataProvider().fields().indexFromName("Subbasin")
@@ -694,7 +643,6 @@ def export_hru_dhru(self):
     import operator
     l_sorted = sorted(l, key=operator.itemgetter(hru_id_index, dhru_id_index))
     dhru_number = len(l_sorted) # number of lines
-
 
     # Get hru number
     hru =[]
@@ -717,8 +665,8 @@ def export_hru_dhru(self):
 
     with open(output_file, "w", newline='') as f:
         writer = csv.writer(f, delimiter='\t')
-        first_row = [str(dhru_number)]  # prints the dhru number to the first row
-        second_row = [str(hru_number)]  # prints the hru number to the second row
+        first_row = [str(int(dhru_number))]  # prints the dhru number to the first row
+        second_row = [str(int(hru_number))]  # prints the hru number to the second row
         third_row = ["dhru_id dhru_area hru_id subbasin hru_area"]
         writer.writerow(first_row)
         writer.writerow(second_row)
@@ -727,19 +675,26 @@ def export_hru_dhru(self):
         for item in l_sorted:
         
         # Write item to outcsv. the order represents the output order
-            writer.writerow([item[dhru_id_index], item[dhru_area_index], item[hru_id_index],
-                item[subbasin_index], item[hru_area_index]])
-
+            writer.writerow(
+                [
+                f"{int(item[dhru_id_index]):>10d}", 
+                f"{int(item[dhru_area_index]):>14d}",
+                f"{int(item[hru_id_index]):>7d}",
+                f"{int(item[subbasin_index]):>7d}",
+                f"{int(item[hru_area_index]):>14d}"
+                ])
 
 def export_dhru_grid(self):
     QSWATMOD_path_dict = self.dirs_and_paths()
     #read in the dhru shapefile
     layer = QgsProject.instance().mapLayersByName("dhru_grid (SWAT-MODFLOW)")[0]
+    mflayer = QgsProject.instance().mapLayersByName("mf_grid (MODFLOW)")[0]
 
     # Get the index numbers of the fields
     dhru_id_index = layer.dataProvider().fields().indexFromName("dhru_id")
     dhru_area_index = layer.dataProvider().fields().indexFromName("dhru_area")
     grid_id_index = layer.dataProvider().fields().indexFromName("grid_id")
+    grid_area_index = layer.dataProvider().fields().indexFromName("grid_area")
     overlap_area_index = layer.dataProvider().fields().indexFromName("ol_area")
 
     # transfer the shapefile layer to a python list
@@ -750,39 +705,19 @@ def export_dhru_grid(self):
     import operator
     l_sorted = sorted(l, key=operator.itemgetter(grid_id_index, dhru_id_index))
 
-    #l.sort(key=itemgetter(6))
-    #add a counter as index for the dhru id
-    for filename in glob.glob(str(QSWATMOD_path_dict['SMfolder'])+"/*.dis"):
-        with open(filename, "r") as f:
-            data = []
-            for line in f.readlines():
-                if not line.startswith("#"):
-                    data.append(line.replace('\n', '').split())
-        nrow = int(data[0][1])
-        ncol = int(data[0][2])
-        delr = float(data[2][1]) # is the cell width along rows (x spacing)
-        delc = float(data[3][1]) # is the cell width along columns (y spacing).
+    # BUG: flopy generates wrong number of rows and cols in the dis file
 
-    cell_size = delr * delc
-    number_of_grids = nrow * ncol
-
-    for i in l_sorted:     
-        i.append(str(int(cell_size))) # area of the grid
-        
-    ''' I don't know what this is for
-    gridcell =[]
-    # slice the column of interest in order to count the number of grid cells
-    for h in l_sorted:
-        gridcell.append(h[6])
-
-    gridcell_unique = []    
-        
-    for h in gridcell:
-        if h not in gridcell_unique:
-            gridcell_unique.append(h)
-
-    gridcell_number = len(gridcell_unique) # number of hrus
-    '''
+    # for filename in glob.glob(str(QSWATMOD_path_dict['SMfolder'])+"/*.dis"):
+    #     with open(filename, "r") as f:
+    #         data = []
+    #         for line in f.readlines():
+    #             if not line.startswith("#"):
+    #                 data.append(line.replace('\n', '').split())
+    #     nrow = int(data[0][1])
+    #     ncol = int(data[0][2])
+    #     delr = float(data[2][1]) # is the cell width along rows (x spacing)
+    #     delc = float(data[3][1]) # is the cell width along columns (y spacing).
+    number_of_grids = mflayer.featureCount()
 
     info_number = len(l_sorted) # number of lines with information
     #-----------------------------------------------------------------------#
@@ -793,8 +728,8 @@ def export_dhru_grid(self):
 
     with open(output_file, "w", newline='') as f:
         writer = csv.writer(f, delimiter = '\t')
-        first_row = [str(info_number)] # prints the dhru number to the file
-        second_row = [str(number_of_grids)] # prints the total number of grid cells
+        first_row = [str(int(info_number))] # prints the dhru number to the file
+        second_row = [str(int(number_of_grids))] # prints the total number of grid cells
         third_row = ["grid_id grid_area dhru_id overlap_area dhru_area"]
         writer.writerow(first_row)
         writer.writerow(second_row)
@@ -803,8 +738,12 @@ def export_dhru_grid(self):
         for item in l_sorted:
         #Write item to outcsv. the order represents the output order
             writer.writerow([
-                item[grid_id_index], item[overlap_area_index + 1],
-                item[dhru_id_index], item[overlap_area_index], item[dhru_area_index]])
+                f"{int(item[grid_id_index]):>10d}",
+                f"{int(item[grid_area_index]):>14d}",
+                f"{int(item[dhru_id_index]):>10d}",
+                f"{int(item[overlap_area_index]):>14d}",
+                f"{int(item[dhru_area_index]):>14d}"
+                ])
 
 
 def export_grid_dhru(self):
@@ -820,6 +759,7 @@ def export_grid_dhru(self):
     dhru_id_index = layer.dataProvider().fields().indexFromName("dhru_id")
     dhru_area_index = layer.dataProvider().fields().indexFromName("dhru_area")
     grid_id_index = layer.dataProvider().fields().indexFromName("grid_id")
+    grid_area_index = layer.dataProvider().fields().indexFromName("grid_area")
     overlap_area_index = layer.dataProvider().fields().indexFromName("ol_area")
 
     # transfer the shapefile layer to a python list
@@ -874,8 +814,8 @@ def export_grid_dhru(self):
 
     with open(output_file, "w", newline='') as f:
         writer = csv.writer(f, delimiter = '\t')
-        first_row = [str(info_number)] # prints the dnumber of lines with information
-        second_row = [str(dhru_number)] # prints the total number of dhru
+        first_row = [str(int(info_number))] # prints the dnumber of lines with information
+        second_row = [str(int(dhru_number))] # prints the total number of dhru
         third_row = [str(nrow)] # prints the row number to the file
         fourth_row = [str(ncol)] # prints the column number to the file     
         fifth_row = ["grid_id grid_area dhru_id overlap_area dhru_area"]
@@ -887,16 +827,20 @@ def export_grid_dhru(self):
 
         for item in l_sorted:
         #Write item to outcsv. the order represents the output order
-            writer.writerow([item[grid_id_index], item[overlap_area_index + 1],
-                item[dhru_id_index], item[overlap_area_index], item[dhru_area_index]])
+            writer.writerow([
+                f"{int(item[grid_id_index]):>10d}",
+                f"{int(item[grid_area_index]):>14d}",
+                f"{int(item[dhru_id_index]):>10d}",
+                f"{int(item[overlap_area_index]):>14d}",
+                f"{int(item[dhru_area_index]):>14d}"
+                ])
 
 
 def export_rgrid_len(self):
     QSWATMOD_path_dict = self.dirs_and_paths()  
     ### sort by dhru_id and then by grid and save down ### 
     #read in the dhru shapefile
-    layer = QgsProject.instance().mapLayersByName("river_grid (SWAT-MODFLOW)")[0]
-
+    layer = self.river_grid_layer()
     # Get the index numbers of the fields
     grid_id_index = layer.dataProvider().fields().indexFromName("grid_id")
     subbasin_index = layer.dataProvider().fields().indexFromName("Subbasin")
@@ -926,9 +870,11 @@ def export_rgrid_len(self):
         writer.writerow(second_row)
         for item in l_sorted:
             # Write item to outcsv. the order represents the output order
-            writer.writerow([item[grid_id_index], item[subbasin_index], item[ol_length_index]])
-
-
+            writer.writerow([
+                f"{int(item[grid_id_index]):>10d}",
+                f"{int(item[subbasin_index]):>7d}",
+                f"{int(item[ol_length_index]):>10d}"
+                ])
 
 def run_CreateSWATMF(self):
     QSWATMOD_path_dict = self.dirs_and_paths()

@@ -698,7 +698,7 @@ class QSWATMOD2(object):
         self.dlg.progressBar_sm_link.setValue(80)
         QCoreApplication.processEvents()
 
-        modflow_functions.create_elev_mf(self)
+        modflow_functions.create_top_elev(self)
         self.dlg.progressBar_sm_link.setValue(100)
         QCoreApplication.processEvents()
 
@@ -708,11 +708,24 @@ class QSWATMOD2(object):
         msgBox.setText("'mf_grid' shapefile has been imported!")
         msgBox.exec_()
 
+
+    def river_grid_layer(self):
+        QSWATMOD_path_dict = self.dirs_and_paths()
+        output_dir = QSWATMOD_path_dict['SMshps']
+        name_ext_v = 'river_grid.gpkg'
+        output_file_v = os.path.normpath(os.path.join(output_dir, name_ext_v))
+        layer = QgsVectorLayer(output_file_v, '{0} ({1})'.format("river_grid","SWAT-MODFLOW"), 'ogr')
+        return layer 
+
+
     def create_rivs(self):
+        layernames = ["mf_riv1 (MODFLOW)", 'river_grid (SWAT-MODFLOW)']
+        linking_process.delete_layers(self, layernames)
         if self.dlg.radioButton_mf_riv1.isChecked():
             # linking_process.deleting_river_grid(self)
             modflow_functions.mf_riv1(self)
             modflow_functions.create_riv_info(self)
+
             linking_process.river_grid(self)
             linking_process.river_grid_delete_NULL(self)
             linking_process.rgrid_len(self)
@@ -735,6 +748,14 @@ class QSWATMOD2(object):
             linking_process.rgrid_len(self)
             linking_process.delete_river_grid_with_threshold(self)
         linking_process.export_rgrid_len(self)
+
+        root = QgsProject.instance().layerTreeRoot()
+        river_grid_layer = self.river_grid_layer()
+        sm_group = root.findGroup("SWAT-MODFLOW")
+        QgsProject.instance().addMapLayer(river_grid_layer, False)
+        sm_group.insertChildNode(0, QgsLayerTreeLayer(river_grid_layer))
+
+        self.iface.mapCanvas().refreshAllLayers()
         msgBox = QMessageBox()
         msgBox.setWindowIcon(QtGui.QIcon(':/QSWATMOD2/pics/sm_icon.png'))
         msgBox.setWindowTitle("Identified!")
@@ -1379,7 +1400,21 @@ class QSWATMOD2(object):
             self.mfOptionOn() # enable
             # check whether hru id should be created
             linking_process.create_hru_id(self)
+            linking_process.calculate_area(self, "hru (SWAT)", "hru_area", "hru (link)")
+            linking_process.filter_required_fields(self, "hru (link)", ["HRU_ID", "hru_area"])
+            linking_process.cvt_vl_to_gpkg(self, "hru (link)", "hru_link.gpkg")
+            linking_process.multipart_to_singlepart(self)
+            linking_process.create_temp_id(self)
+            linking_process.create_dhru_id(self)
+            linking_process.calculate_area(self, "dhru (link)", "dhru_area", "dhru (link)")
+            linking_process.filter_required_fields(
+                                                self, "dhru (link)", 
+                                                [
+                                                "HRU_ID", "hru_area", "dhru_id", "dhru_area"])
+            linking_process.cvt_vl_to_gpkg(self, "dhru (link)", "dhru_link.gpkg")
+            linking_process.delete_layers(self, ["tt"])
 
+            
 
     # navigate to the raster of the hru for SWAT+
     def hru_rasterfile(self):            
@@ -1488,6 +1523,18 @@ class QSWATMOD2(object):
             self.mfOptionOn() # enable
             post_i_sw.read_sub_no(self)
 
+            layer.selectAll()
+            clone_layer = processing.run("native:saveselectedfeatures", {'INPUT': layer, 'OUTPUT': f"memory:{'sub (link)'}"})['OUTPUT']
+            layer.removeSelection()
+        
+            QgsProject.instance().addMapLayer(clone_layer, False)
+            sm_group = root.findGroup("SWAT-MODFLOW")
+            sm_group.insertChildNode(1, QgsLayerTreeLayer(clone_layer))
+            linking_process.filter_required_fields(self, "sub (link)", ["Subbasin"])
+            linking_process.cvt_vl_to_gpkg(self, "sub (link)", "sub_link.gpkg")
+
+
+
     # River shapfile
     def river_shapefile(self):
         settings = QSettings()
@@ -1546,6 +1593,16 @@ class QSWATMOD2(object):
             self.dlg.lineEdit_river_shapefile.setText(riv_gpkg)
             self.mfOptionOn() # enable
 
+            layer.selectAll()
+            clone_layer = processing.run("native:saveselectedfeatures", {'INPUT': layer, 'OUTPUT': f"memory:{'riv (link)'}"})['OUTPUT']
+            layer.removeSelection()
+        
+            QgsProject.instance().addMapLayer(clone_layer, False)
+            sm_group = root.findGroup("SWAT-MODFLOW")
+            sm_group.insertChildNode(1, QgsLayerTreeLayer(clone_layer))
+            required_fields = ["Subbasin", "Len2", "Wid2", "Dep2", "Shape_Leng"]
+            linking_process.filter_required_fields(self, "riv (link)", required_fields)
+            linking_process.cvt_vl_to_gpkg(self, "riv (link)", "riv_link.gpkg")
 
     #----------------------------------------------------------------------------#
     #-----------------------databae features-------------------------------------#
@@ -1662,7 +1719,7 @@ class QSWATMOD2(object):
         self.dlg.progressBar_sm_link.setValue(80)
         QCoreApplication.processEvents()
         
-        modflow_functions.create_elev_mf(self)
+        modflow_functions.create_top_elev(self)
         self.dlg.progressBar_sm_link.setValue(100)
         QCoreApplication.processEvents()
         ### Use the "use_sub_shapefile" function from CreateMFmodel_dialog --> not working
@@ -1681,71 +1738,32 @@ class QSWATMOD2(object):
         self.dlg.checkBox_filesPrepared.setChecked(0)
         self.dlg.progressBar_sm_link.setValue(0)
         self.dlg.textEdit_sm_link_log.append('======== Start Linking Process =========')
-        # '''
-        # Calculate HRU area
-        linking_process.calculate_hru_area(self)
-        self.dlg.progressBar_sm_link.setValue(20)         
-        QCoreApplication.processEvents()
-        # Create DHRUs
-        linking_process.multipart_to_singlepart(self)
-        self.dlg.progressBar_sm_link.setValue(40)
-        QCoreApplication.processEvents() # it works as F5
-        # Create DHRU id
-        linking_process.create_dhru_id(self)    
-        self.dlg.progressBar_sm_link.setValue(45)
-        QCoreApplication.processEvents() # it works as F5 !! Be careful to use this for long geoprocessing
-        # Create dhru area
-        linking_process.calculate_dhru_area(self)
-        self.dlg.progressBar_sm_link.setValue(48)
-        QCoreApplication.processEvents() # it works as F5
+        
         # Create hru_dhru
         linking_process.hru_dhru(self)
-        linking_process.create_hru_dhru_filter(self)  # for invalid geometry 
-        linking_process.delete_hru_dhru_with_zero(self)  # for invalid geometry
-        self.dlg.progressBar_sm_link.setValue(50)
-        QCoreApplication.processEvents()
-
-        ### below function can be used for unstructered grid
-        # modflow_functions.calculate_grid_area(self)  # can be used for unstructered grid
-        # self.dlg.progressBar_sm_link.setValue(80)
-        # self.dlg.textEdit_sm_link_log.append('MODFLOW grid area is calculated!')
-        # QCoreApplication.processEvents()
-
+        self.dlg.progressBar_sm_link.setValue(20)
+        linking_process.create_hru_dhru_filter(self)
+        self.dlg.progressBar_sm_link.setValue(40)
         # Get dhru_grid
         linking_process.dhru_grid(self)
-        self.dlg.progressBar_sm_link.setValue(70) 
-        QCoreApplication.processEvents()
-
-        # Calculate overlapping areas
-        linking_process.create_dhru_grid_filter(self)  
+        self.dlg.progressBar_sm_link.setValue(70)
+        linking_process.create_dhru_grid_filter(self)
         self.dlg.progressBar_sm_link.setValue(80)
-        QCoreApplication.processEvents()
 
-        # Filter out small size  
-        # linking_process.create_dhru_grid_filter(self)
-        # self.dlg.progressBar_sm_link.setValue(95)
-        # QCoreApplication.processEvents()
-        # NOTE: less than 900 create zero features from small grids
-        # NOTE: let's set 30 sqm in next version
-        linking_process.delete_dhru_grid_with_zero(self)
-        QCoreApplication.processEvents()
+        linking_process.filter_required_fields(
+            self, "hru_dhru (SWAT-MODFLOW)", [
+                "HRU_ID", "hru_area", "dhru_id", "dhru_area", "Subbasin", "area_f"])
+        linking_process.cvt_vl_to_gpkg(self, "hru_dhru (SWAT-MODFLOW)", "hru_dhru_link.gpkg")
+        linking_process.filter_required_fields(
+            self, "dhru_grid (SWAT-MODFLOW)", [
+                "HRU_ID", "hru_area", "dhru_id", "dhru_area", "grid_id", "grid_area", "ol_area"])
+        linking_process.cvt_vl_to_gpkg(self, "dhru_grid (SWAT-MODFLOW)", "dhru_grid_link.gpkg")
+    
 
-        # self.dlg.progressBar_sm_link.setValue(90)
-        # QCoreApplication.processEvents()
-        # self.dlg.progressBar_sm_link.setValue(95)
-        # Used for both SWAT and SWAT+
-        #### The following processings are applied to the step "Identify River Cells"
-        # linking_process.river_grid(self) # union is used
-        # linking_process.river_grid_delete_NULL(self)
-        # linking_process.rgrid_len(self) #SWAT
-        # linking_process.create_river_grid_filter(self) #SWAT
-        # linking_process.delete_river_grid_with_threshold(self) #SWAT
-        # ---------------------------------------------------------------
-        # '''
         # Export tables from layers
         time = datetime.now().strftime('[%m/%d/%y %H:%M:%S]')
         self.dlg.textEdit_sm_link_log.append(time+' -> ' + 'Exporting tables from layers ... processing') 
-        self.dlg.progressBar_sm_link.setValue(96)     
+        self.dlg.progressBar_sm_link.setValue(96)
         linking_process.export_hru_dhru(self)
         linking_process.export_dhru_grid(self)
         linking_process.export_grid_dhru(self)
@@ -1775,6 +1793,8 @@ class QSWATMOD2(object):
             msgBox.setText("Linkage files have been exported to your SWAT-MODFLOW folder!")
             msgBox.exec_()
             self.dlg.tabWidget.setTabEnabled(2, True)
+        '''
+        '''
 
         self.define_sim_period()
 
