@@ -337,34 +337,6 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
         # return layer
 
 
-    def use_sub_shapefile(self):
-        QSWATMOD_path_dict = self.dirs_and_paths()
-
-
-        input1 = QgsProject.instance().mapLayersByName("sub (SWAT)")[0]
-        #provider = layer.dataProvider()
-        name = "mf_boundary"
-        name_ext = "mf_boundary.shp"
-        output_dir = QSWATMOD_path_dict['org_shps']
-        mf_boundary = os.path.join(output_dir, name_ext)
-        params = {
-            'INPUT': input1,
-            'OUTPUT': mf_boundary
-        }
-        processing.run("native:dissolve", params)
-
-        # defining the outputfile to be loaded into the canvas
-        layer = QgsVectorLayer(mf_boundary, '{0} ({1})'.format("mf_boundary","MODFLOW"), 'ogr')
-
-        # Put in the group
-        root = QgsProject.instance().layerTreeRoot()
-        mf_group = root.findGroup("MODFLOW")    
-        QgsProject.instance().addMapLayer(layer, False)
-        mf_group.insertChildNode(0, QgsLayerTreeLayer(layer))
-        #subpath = layer.source()
-        self.lineEdit_boundary.setText(mf_boundary)
-
-
     def get_attribute_to_dataframe(self, layer):
         #List all columns you want to include in the dataframe. I include all with:
         cols = [f.name() for f in layer.fields()] #Or list them manually: ['kommunnamn', 'kkod', ... ]
@@ -384,7 +356,6 @@ class createMFmodelDialog(QDialog, FORM_CLASS):
                 self.iface.mapCanvas().refreshAllLayers()
                 self.iface.mapCanvas().refresh()
                 
-
 
     def create_MF_grid(self):
         # Create fishnet based on user inputs
